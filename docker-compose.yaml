@@ -1,0 +1,8 @@
+version: "3.8"
+services:
+  disbot:
+    container_name: disbot
+    build:
+      context: .
+      dockerfile: ./docker/disbot/Dockerfile
+    image: disbot:latest
