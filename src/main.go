@@ -10,8 +10,12 @@ import (
 func main() {
 	e, err := di.InitializeBot()
 	if err != nil {
-		fmt.Printf("Failed to create event: $s\n", err)
+		fmt.Printf("Failed to create event: %s\n", err)
 		os.Exit(2)
 	}
-	e.Start()
+	err = e.Start()
+	if err != nil {
+		fmt.Printf("Failed to start bot: %s\n", err)
+		os.Exit(2)
+	}
 }
