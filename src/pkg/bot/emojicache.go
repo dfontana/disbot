@@ -7,7 +7,10 @@ import (
 )
 
 // EmojiCache caches emoji values by GuildId for the doggo
-type EmojiCache map[string]Emote
+type EmojiCache struct {
+	cache  map[string]Emote
+	config Config
+}
 
 // Emote represents the format for reacting with, or sending a message containing, this emote
 type Emote struct {
@@ -16,29 +19,32 @@ type Emote struct {
 }
 
 // NewEmojiCache builder
-func NewEmojiCache() EmojiCache {
-	return make(EmojiCache)
+func NewEmojiCache(config Config) EmojiCache {
+	return EmojiCache{
+		cache:  make(map[string]Emote),
+		config: config,
+	}
 }
 
-func (ec EmojiCache) get(s *dg.Session, m *dg.MessageCreate) (Emote, error) {
-	emote, ok := ec[m.GuildID]
+func (ec *EmojiCache) get(s *dg.Session, m *dg.MessageCreate) (Emote, error) {
+	emote, ok := ec.cache[m.GuildID]
 	if !ok {
 		emojis, err := s.GuildEmojis(m.GuildID)
 		if err != nil {
 			return Emote{}, err
 		}
-		emote, ok = findEmoji(emojis, "shrug_dog")
+		emote, ok = ec.findEmoji(emojis)
 		if !ok {
 			return Emote{}, errors.New("Server does not have 'shrug_dog' emote")
 		}
-		ec[m.GuildID] = emote
+		ec.cache[m.GuildID] = emote
 	}
 	return emote, nil
 }
 
-func findEmoji(emojis []*dg.Emoji, name string) (Emote, bool) {
+func (ec *EmojiCache) findEmoji(emojis []*dg.Emoji) (Emote, bool) {
 	for _, e := range emojis {
-		if e.Name == name {
+		if e.Name == ec.config.getEmoteName() {
 			return Emote{e.MessageFormat(), e.APIName()}, true
 		}
 	}

@@ -14,6 +14,7 @@ import (
 type Bot struct {
 	dd      *dg.Session
 	emcache EmojiCache
+	users   map[string]bool
 }
 
 // NewBot builder
@@ -22,7 +23,11 @@ func NewBot(config Config, emcache EmojiCache) (Bot, error) {
 	if err != nil {
 		return Bot{}, errors.New("Failed build discord client")
 	}
-	return Bot{dd, emcache}, nil
+	mapped := make(map[string]bool)
+	for _, user := range config.getUsers() {
+		mapped[user] = true
+	}
+	return Bot{dd, emcache, mapped}, nil
 }
 
 // Start the bot lifecycle
@@ -49,7 +54,7 @@ func (b *Bot) onMessageCreate(s *dg.Session, m *dg.MessageCreate) {
 		// This message was from you
 		return
 	}
-	if containsUser(m.Mentions, "Nillin") {
+	if containsUser(m.Mentions, b.users) {
 		emoji, err := b.emcache.get(s, m)
 		if err != nil {
 			fmt.Printf("Failed to pull emojis: %s, %s\n", m.GuildID, err)
@@ -61,9 +66,9 @@ func (b *Bot) onMessageCreate(s *dg.Session, m *dg.MessageCreate) {
 	}
 }
 
-func containsUser(mentions []*dg.User, name string) bool {
+func containsUser(mentions []*dg.User, names map[string]bool) bool {
 	for _, user := range mentions {
-		if user.Username == name {
+		if _, ok := names[user.Username]; ok {
 			return true
 		}
 	}
