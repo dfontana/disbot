@@ -16,6 +16,9 @@ func InitializeBot() (bot.Bot, error) {
 	if err != nil {
 		return bot.Bot{}, err
 	}
-	botBot := bot.NewBot(config)
+	botBot, err := bot.NewBot(config)
+	if err != nil {
+		return bot.Bot{}, err
+	}
 	return botBot, nil
 }

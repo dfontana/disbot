@@ -9,6 +9,6 @@ import (
 
 // InitializeBot builds the bot for running
 func InitializeBot() (bot.Bot, error) {
-	wire.Build(bot.NewBot, bot.NewConfig)
+	wire.Build(bot.NewBot, bot.NewConfig, bot.NewEmojiCache)
 	return bot.Bot{}, nil
 }
