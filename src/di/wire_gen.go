@@ -6,24 +6,16 @@
 package di
 
 import (
-	"fmt"
+	"github.com/dfontana/disbot/pkg/bot"
 )
 
 // Injectors from wire.go:
 
-func InitializeBot() (Bot, error) {
-	bot := NewBot()
-	return bot, nil
-}
-
-// wire.go:
-
-type Bot struct{}
-
-func (b *Bot) Start() {
-	fmt.Println("Hey")
-}
-
-func NewBot() Bot {
-	return Bot{}
+func InitializeBot() (bot.Bot, error) {
+	config, err := bot.NewConfig()
+	if err != nil {
+		return bot.Bot{}, err
+	}
+	botBot := bot.NewBot(config)
+	return botBot, nil
 }

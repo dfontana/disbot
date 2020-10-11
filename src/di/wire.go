@@ -3,22 +3,12 @@
 package di
 
 import (
-	"fmt"
-
+	"github.com/dfontana/disbot/pkg/bot"
 	"github.com/google/wire"
 )
 
-type Bot struct{}
-
-func (b *Bot) Start() {
-	fmt.Println("Hey")
-}
-
-func InitializeBot() (Bot, error) {
-	wire.Build(NewBot)
-	return Bot{}, nil
-}
-
-func NewBot() Bot {
-	return Bot{}
+// InitializeBot builds the bot for running
+func InitializeBot() (bot.Bot, error) {
+	wire.Build(bot.NewBot, bot.NewConfig)
+	return bot.Bot{}, nil
 }

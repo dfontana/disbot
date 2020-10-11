@@ -6,3 +6,8 @@ services:
       context: .
       dockerfile: ./docker/disbot/Dockerfile
     image: disbot:latest
+    env_file: 
+      - ./docker/disbot/prod.env
+    deploy:
+      restart_policy:
+        condition: on-failure
