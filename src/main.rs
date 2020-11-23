@@ -15,6 +15,8 @@ async fn main() {
   let config = Config::new().expect("Err parsing environment");
 
   let mut client = Client::builder(&config.get_api_key())
+    .add_intent(GatewayIntents::GUILDS)
+    .add_intent(GatewayIntents::GUILD_EMOJIS)
     .add_intent(GatewayIntents::GUILD_MESSAGES)
     .add_intent(GatewayIntents::GUILD_MESSAGE_REACTIONS)
     .event_handler(Handler { config })
@@ -62,7 +64,7 @@ impl Handler {
         name: Some(emoji.name.to_string()),
       },
     );
-    let message = msg.channel_id.say(&ctx.http, emoji.name.to_string());
+    let message = msg.channel_id.say(&ctx.http, format!("{}", emoji));
     tokio::try_join!(react, message)
       .map(|_| ())
       .map_err(|_| "Failed to react/Send".to_string())
@@ -82,10 +84,7 @@ impl EventHandler for Handler {
 
     let guild_id = match msg.guild_id {
       Some(id) => id,
-      None => {
-        println!("Failed to get guildId");
-        return;
-      }
+      None => return,
     };
 
     let mentions_user = msg.mentions.iter().find(|user| {
@@ -98,7 +97,6 @@ impl EventHandler for Handler {
 
     if (mentions_user.is_none()) {
       // Nothing to do here
-      println!("Users not found in message");
       return;
     }
 
