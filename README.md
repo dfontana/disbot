@@ -30,3 +30,8 @@ EMOTE_USERS=<csv of users || User1,User2,User3>
 
 - [Wire](https://github.com/google/wire) for compile time DI
 - [DiscordGo](https://github.com/bwmarrin/discordgo) for the Discord API
+
+
+## Notes for RUST Branch
+
+- Run with `API_KEY=... EMOTE_NAME=shrug_dog EMOTE_USERS=Nillin cargo run`

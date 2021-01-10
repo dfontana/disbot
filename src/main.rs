@@ -15,10 +15,7 @@ async fn main() {
   let config = Config::new().expect("Err parsing environment");
 
   let mut client = Client::builder(&config.get_api_key())
-    .add_intent(GatewayIntents::GUILDS)
-    .add_intent(GatewayIntents::GUILD_EMOJIS)
-    .add_intent(GatewayIntents::GUILD_MESSAGES)
-    .add_intent(GatewayIntents::GUILD_MESSAGE_REACTIONS)
+    .intents(GatewayIntents::GUILDS | GatewayIntents::GUILD_EMOJIS | GatewayIntents::GUILD_MESSAGES | GatewayIntents::GUILD_MESSAGE_REACTIONS)
     .event_handler(Handler { config })
     .await
     .expect("Err creating client");
