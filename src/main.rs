@@ -1,4 +1,9 @@
 extern crate dotenv;
+#[macro_use]
+extern crate lazy_static;
+extern crate regex;
+extern crate reqwest;
+extern crate select;
 
 mod cmd;
 mod config;
@@ -8,7 +13,7 @@ use std::str::FromStr;
 
 use serenity::{client::bridge::gateway::GatewayIntents, prelude::*};
 
-use cmd::ShrugHandler;
+use cmd::{RedditPreviewHandler, ShrugHandler};
 use config::Config;
 use env::Environment;
 
@@ -28,6 +33,7 @@ async fn main() {
         | GatewayIntents::GUILD_MESSAGE_REACTIONS,
     )
     .event_handler(ShrugHandler::new(config.clone()))
+    .event_handler(RedditPreviewHandler::new())
     .await
     .expect("Err creating client");
 
