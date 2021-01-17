@@ -1,3 +1,5 @@
+extern crate dotenv;
+
 mod config;
 
 use serenity::{
@@ -12,10 +14,21 @@ use config::Config;
 
 #[tokio::main]
 async fn main() {
+  let args: Vec<String> = std::env::args().collect();
+  let env = match args.get(1).map(|v| v == "prod") {
+    Some(false) => "dev.env",
+    _ => "prod.env",
+  };
+  dotenv::from_filename(env).ok();
   let config = Config::new().expect("Err parsing environment");
 
   let mut client = Client::builder(&config.get_api_key())
-    .intents(GatewayIntents::GUILDS | GatewayIntents::GUILD_EMOJIS | GatewayIntents::GUILD_MESSAGES | GatewayIntents::GUILD_MESSAGE_REACTIONS)
+    .intents(
+      GatewayIntents::GUILDS
+        | GatewayIntents::GUILD_EMOJIS
+        | GatewayIntents::GUILD_MESSAGES
+        | GatewayIntents::GUILD_MESSAGE_REACTIONS,
+    )
     .event_handler(Handler { config })
     .await
     .expect("Err creating client");
@@ -71,10 +84,6 @@ impl Handler {
 #[async_trait]
 impl EventHandler for Handler {
   async fn message(&self, ctx: Context, msg: Message) {
-    println!(
-      "Got message {:?}",
-      msg.content_safe(&ctx.cache).await.to_string()
-    );
     if msg.is_own(&ctx.cache).await {
       return;
     }
@@ -89,7 +98,7 @@ impl EventHandler for Handler {
         .config
         .get_emote_users()
         .iter()
-        .any(|cname| *cname == user.name.to_lowercase())
+        .any(|cname| *cname.to_lowercase() == user.name.to_lowercase())
     });
 
     if (mentions_user.is_none()) {
@@ -119,8 +128,6 @@ impl EventHandler for Handler {
       }
     }
   }
-
-  // reaction_add
 
   async fn ready(&self, _: Context, ready: Ready) {
     println!("{} is connected!", ready.user.name);
