@@ -6,5 +6,9 @@ edition = "2018"
 
 [dependencies]
 dotenv = "0.15.0"
-tokio = { version = "1.0", features = ["full"] }
+lazy_static = "1.4.0"
+regex = "1"
+reqwest = { version = "0.11", features = ["json"] }
+select = "0.5.0"
 serenity = {default-features = false,features = ["client", "cache", "gateway", "model","rustls_backend"],version = "0.10.2"}
+tokio = { version = "1.0", features = ["full"] }
