@@ -27,7 +27,11 @@ impl RedditPreviewHandler {
 
   fn get_img_link(&self, body: String) -> Option<String> {
     let doc = Document::from(body.as_str());
-    let val = doc.find(Class("ImageBox-image")).next()?.attr("src")?;
+    let val = doc
+      .find(Class("ImageBox-image"))
+      .next()?
+      .parent()?
+      .attr("href")?;
     Some(val.to_owned())
   }
 }
@@ -46,7 +50,6 @@ impl EventHandler for RedditPreviewHandler {
       Some(caps) => caps.get(1).unwrap().as_str(),
       None => return,
     };
-
     let body = match self.download_body(link).await {
       Ok(v) => v,
       Err(err) => {
