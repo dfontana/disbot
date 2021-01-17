@@ -31,3 +31,4 @@ EMOTE_USERS=<csv of users || User1,User2,User3>
 ## This Project Uses
 
 - [Serenity](https://github.com/serenity-rs/serenity) for the Discord API
+- [rust-musl-cross](https://github.com/messense/rust-musl-cross) for local compilation in docker
