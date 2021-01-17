@@ -1,5 +1,6 @@
 use std::{env, env::VarError};
 
+#[derive(Debug, Clone)]
 pub struct Config {
   api_key: String,
   emote_name: String,
