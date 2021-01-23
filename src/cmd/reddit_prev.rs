@@ -2,7 +2,7 @@ use regex::Regex;
 use reqwest::Client;
 use select::document::Document;
 use select::predicate::Class;
-use serenity::{async_trait, model::channel::Message, prelude::*};
+use serenity::{model::channel::Message, prelude::Context};
 
 pub struct RedditPreviewHandler {}
 
@@ -34,11 +34,8 @@ impl RedditPreviewHandler {
       .attr("href")?;
     Some(val.to_owned())
   }
-}
 
-#[async_trait]
-impl EventHandler for RedditPreviewHandler {
-  async fn message(&self, ctx: Context, msg: Message) {
+  pub async fn message(&self, ctx: &Context, msg: &Message) {
     if msg.is_own(&ctx.cache).await {
       return;
     }

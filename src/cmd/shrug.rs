@@ -1,10 +1,8 @@
 use crate::config::Config;
-
 use serenity::{
-  async_trait,
   cache::Cache,
-  model::{channel::Message, channel::ReactionType, gateway::Ready, guild::Emoji, id::GuildId},
-  prelude::*,
+  model::{channel::Message, channel::ReactionType, guild::Emoji, id::GuildId},
+  prelude::Context,
 };
 
 pub struct ShrugHandler {
@@ -18,6 +16,12 @@ impl ShrugHandler {
 }
 
 impl ShrugHandler {
+  fn debug(&self, msg: &str) {
+    if self.config.get_env().is_dev() {
+      println!("{}", msg);
+    }
+  }
+
   async fn pull_emoji(&self, guild_id: GuildId, cache: &Cache) -> Result<Emoji, String> {
     // Pull the emoji from the guild attached to the message
     let maybe_emoji = cache
@@ -54,12 +58,10 @@ impl ShrugHandler {
       .map(|_| ())
       .map_err(|_| "Failed to react/Send".to_string())
   }
-}
 
-#[async_trait]
-impl EventHandler for ShrugHandler {
-  async fn message(&self, ctx: Context, msg: Message) {
+  pub async fn message(&self, ctx: &Context, msg: &Message) {
     if msg.is_own(&ctx.cache).await {
+      self.debug("Skipping, self message");
       return;
     }
 
@@ -76,8 +78,8 @@ impl EventHandler for ShrugHandler {
         .any(|cname| *cname.to_lowercase() == user.name.to_lowercase())
     });
 
-    if (mentions_user.is_none()) {
-      // Nothing to do here
+    if mentions_user.is_none() {
+      self.debug("Did not find a matching user mention");
       return;
     }
 
@@ -102,9 +104,5 @@ impl EventHandler for ShrugHandler {
         }
       }
     }
-  }
-
-  async fn ready(&self, _: Context, ready: Ready) {
-    println!("{} is connected!", ready.user.name);
   }
 }

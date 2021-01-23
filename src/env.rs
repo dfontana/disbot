@@ -1,5 +1,6 @@
 use std::str::FromStr;
 
+#[derive(Clone, Debug, PartialEq)]
 pub enum Environment {
   PROD,
   DEV,
@@ -11,6 +12,10 @@ impl Environment {
       Environment::PROD => String::from("prod.env"),
       Environment::DEV => String::from("dev.env"),
     }
+  }
+
+  pub fn is_dev(&self) -> bool {
+    self == &Environment::DEV
   }
 }
 
