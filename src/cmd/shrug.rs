@@ -1,4 +1,5 @@
 use crate::config::Config;
+use crate::debug::Debug;
 use serenity::{
   cache::Cache,
   model::{channel::Message, channel::ReactionType, guild::Emoji, id::GuildId},
@@ -7,19 +8,12 @@ use serenity::{
 
 pub struct ShrugHandler {
   config: Config,
+  debug: Debug,
 }
 
 impl ShrugHandler {
-  pub fn new(config: Config) -> Self {
-    ShrugHandler { config }
-  }
-}
-
-impl ShrugHandler {
-  fn debug(&self, msg: &str) {
-    if self.config.get_env().is_dev() {
-      println!("{}", msg);
-    }
+  pub fn new(config: Config, debug: Debug) -> Self {
+    ShrugHandler { config, debug }
   }
 
   async fn pull_emoji(&self, guild_id: GuildId, cache: &Cache) -> Result<Emoji, String> {
@@ -61,7 +55,7 @@ impl ShrugHandler {
 
   pub async fn message(&self, ctx: &Context, msg: &Message) {
     if msg.is_own(&ctx.cache).await {
-      self.debug("Skipping, self message");
+      self.debug.log("Skipping, self message");
       return;
     }
 
@@ -79,7 +73,7 @@ impl ShrugHandler {
     });
 
     if mentions_user.is_none() {
-      self.debug("Did not find a matching user mention");
+      self.debug.log("Did not find a matching user mention");
       return;
     }
 

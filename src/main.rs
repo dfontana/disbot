@@ -7,6 +7,7 @@ extern crate select;
 
 mod cmd;
 mod config;
+mod debug;
 mod env;
 
 use std::str::FromStr;
@@ -24,7 +25,6 @@ async fn main() {
   });
   dotenv::from_filename(env.as_file()).ok();
   let config = Config::new(env).expect("Err parsing environment");
-
   let mut client = Client::builder(&config.get_api_key())
     .intents(
       GatewayIntents::GUILDS
@@ -32,7 +32,7 @@ async fn main() {
         | GatewayIntents::GUILD_MESSAGES
         | GatewayIntents::GUILD_MESSAGE_REACTIONS,
     )
-    .event_handler(Handler::new(config))
+    .event_handler(Handler::new(config.clone()))
     .await
     .expect("Err creating client");
 

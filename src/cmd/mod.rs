@@ -1,4 +1,5 @@
 use crate::config::Config;
+use crate::debug::Debug;
 use serenity::{
   async_trait,
   model::{channel::Message, gateway::Ready},
@@ -17,10 +18,11 @@ pub struct Handler {
 
 impl Handler {
   pub fn new(config: Config) -> Self {
+    let debug = Debug::new(config.clone());
     Handler {
       ready: ready::ReadyHandler::new(),
-      shrug: shrug::ShrugHandler::new(config.clone()),
-      reddit: reddit_prev::RedditPreviewHandler::new(),
+      shrug: shrug::ShrugHandler::new(config.clone(), debug.clone()),
+      reddit: reddit_prev::RedditPreviewHandler::new(debug.clone()),
     }
   }
 }
