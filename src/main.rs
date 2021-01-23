@@ -7,13 +7,14 @@ extern crate select;
 
 mod cmd;
 mod config;
+mod debug;
 mod env;
 
 use std::str::FromStr;
 
 use serenity::{client::bridge::gateway::GatewayIntents, prelude::*};
 
-use cmd::{RedditPreviewHandler, ShrugHandler};
+use cmd::Handler;
 use config::Config;
 use env::Environment;
 
@@ -23,8 +24,7 @@ async fn main() {
     Environment::from_str(&v).unwrap()
   });
   dotenv::from_filename(env.as_file()).ok();
-  let config = Config::new().expect("Err parsing environment");
-
+  let config = Config::new(env).expect("Err parsing environment");
   let mut client = Client::builder(&config.get_api_key())
     .intents(
       GatewayIntents::GUILDS
@@ -32,8 +32,7 @@ async fn main() {
         | GatewayIntents::GUILD_MESSAGES
         | GatewayIntents::GUILD_MESSAGE_REACTIONS,
     )
-    .event_handler(ShrugHandler::new(config.clone()))
-    .event_handler(RedditPreviewHandler::new())
+    .event_handler(Handler::new(config.clone()))
     .await
     .expect("Err creating client");
 

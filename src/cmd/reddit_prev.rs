@@ -1,14 +1,17 @@
+use crate::debug::Debug;
 use regex::Regex;
 use reqwest::Client;
 use select::document::Document;
 use select::predicate::Class;
-use serenity::{async_trait, model::channel::Message, prelude::*};
+use serenity::{model::channel::Message, prelude::Context};
 
-pub struct RedditPreviewHandler {}
+pub struct RedditPreviewHandler {
+  debug: Debug,
+}
 
 impl RedditPreviewHandler {
-  pub fn new() -> Self {
-    RedditPreviewHandler {}
+  pub fn new(debug: Debug) -> Self {
+    RedditPreviewHandler { debug }
   }
 
   async fn download_body(&self, url: &str) -> Result<String, reqwest::Error> {
@@ -34,12 +37,10 @@ impl RedditPreviewHandler {
       .attr("href")?;
     Some(val.to_owned())
   }
-}
 
-#[async_trait]
-impl EventHandler for RedditPreviewHandler {
-  async fn message(&self, ctx: Context, msg: Message) {
+  pub async fn message(&self, ctx: &Context, msg: &Message) {
     if msg.is_own(&ctx.cache).await {
+      self.debug.log("Skipping, self message");
       return;
     }
     lazy_static! {
@@ -48,7 +49,10 @@ impl EventHandler for RedditPreviewHandler {
     }
     let link = match REDDIT_LINK.captures(&msg.content) {
       Some(caps) => caps.get(1).unwrap().as_str(),
-      None => return,
+      None => {
+        self.debug.log("No reddit link, skipping");
+        return;
+      }
     };
     let body = match self.download_body(link).await {
       Ok(v) => v,
@@ -59,7 +63,10 @@ impl EventHandler for RedditPreviewHandler {
     };
     let img = match self.get_img_link(body) {
       Some(v) => v,
-      None => return,
+      None => {
+        self.debug.log("Failed to find image link");
+        return;
+      }
     };
     if let Err(err) = self.send_preview(&img, &ctx, &msg).await {
       println!("{:?}", err);
