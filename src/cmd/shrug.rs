@@ -8,12 +8,11 @@ use serenity::{
 
 pub struct ShrugHandler {
   config: Config,
-  debug: Debug,
 }
 
 impl ShrugHandler {
-  pub fn new(config: Config, debug: Debug) -> Self {
-    ShrugHandler { config, debug }
+  pub fn new(config: Config) -> Self {
+    ShrugHandler { config }
   }
 
   async fn react_and_send(&self, emoji: Emoji, ctx: &Context, msg: &Message) -> Result<(), String> {
@@ -33,7 +32,7 @@ impl ShrugHandler {
 
   pub async fn message(&self, ctx: &Context, msg: &Message) {
     if msg.is_own(&ctx.cache).await {
-      self.debug.log("Skipping, self message");
+      Debug::inst().log("Skipping, self message");
       return;
     }
 
@@ -51,7 +50,7 @@ impl ShrugHandler {
     });
 
     if mentions_user.is_none() {
-      self.debug.log("Did not find a matching user mention");
+      Debug::inst().log("Did not find a matching user mention");
       return;
     }
 

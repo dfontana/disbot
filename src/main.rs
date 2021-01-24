@@ -37,6 +37,7 @@ async fn main() {
   dotenv::from_filename(env.as_file()).ok();
   let config = Config::new(env).expect("Err parsing environment");
   emoji::configure(&config).expect("Failed to setup emoji lookup");
+  debug::configure(&config).expect("Failed to setup debug logger");
   let framework = StandardFramework::new()
     .configure(|c| c.prefix("!"))
     .group(&GENERAL_GROUP)

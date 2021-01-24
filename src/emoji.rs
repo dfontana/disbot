@@ -22,7 +22,7 @@ pub fn configure(config: &Config) -> Result<(), String> {
 }
 
 impl EmojiLookup {
-  pub fn inst() -> EmojiLookup {
+  pub fn inst() -> Self {
     EmojiLookup {}
   }
   pub async fn get(&self, guild_id: GuildId, cache: &Cache) -> Result<Emoji, String> {
