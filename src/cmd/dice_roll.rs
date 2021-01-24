@@ -23,18 +23,27 @@ async fn roll(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
     None => return Ok(()),
   };
   let emoji = EmojiLookup::inst().get(guild_id, &ctx.cache).await?;
-  let response = MessageBuilder::new()
+  let mut response = MessageBuilder::new();
+  response
     .push("rolls ")
     .push(" ")
     .mention(&emoji)
-    .push(" ")
-    .push_bold(roll)
-    .push(" ")
+    .push(" ");
+
+  match roll {
+    1 => response.mention(&emoji),
+    21 => response.push_bold("21 - you stupid!"),
+    47 => response.push_bold("god damn 47"), 
+    69 => response.push_bold("69").push_italic("...nice"),
+    _ => response.push_bold(roll),
+  };
+
+  let resp_string = response.push(" ")
     .mention(&emoji)
     .push(" ")
     .push_mono(format!("({} - {})", lower, upper))
     .build();
-  msg.reply_mention(&ctx.http, response).await?;
+  msg.reply_mention(&ctx.http, resp_string).await?;
   Ok(())
 }
 
