@@ -1,6 +1,7 @@
 extern crate dotenv;
 #[macro_use]
 extern crate lazy_static;
+extern crate rand;
 extern crate regex;
 extern crate reqwest;
 extern crate select;
@@ -12,11 +13,21 @@ mod env;
 
 use std::str::FromStr;
 
-use serenity::{client::bridge::gateway::GatewayIntents, prelude::*};
+use serenity::{
+  client::{bridge::gateway::GatewayIntents, Client},
+  framework::standard::{macros::group, StandardFramework},
+};
 
-use cmd::Handler;
+use cmd::{dice_roll::*, help::*, Handler};
 use config::Config;
 use env::Environment;
+
+#[group]
+#[prefixes("sb")]
+#[description = "Utilities the Sheebs has Graced You With"]
+#[summary = "Utilities Sheebs Givith"]
+#[commands(roll)]
+struct General;
 
 #[tokio::main]
 async fn main() {
@@ -25,6 +36,11 @@ async fn main() {
   });
   dotenv::from_filename(env.as_file()).ok();
   let config = Config::new(env).expect("Err parsing environment");
+  let framework = StandardFramework::new()
+    .configure(|c| c.prefix("!"))
+    .group(&GENERAL_GROUP)
+    .help(&HELP);
+
   let mut client = Client::builder(&config.get_api_key())
     .intents(
       GatewayIntents::GUILDS
@@ -32,6 +48,7 @@ async fn main() {
         | GatewayIntents::GUILD_MESSAGES
         | GatewayIntents::GUILD_MESSAGE_REACTIONS,
     )
+    .framework(framework)
     .event_handler(Handler::new(config.clone()))
     .await
     .expect("Err creating client");

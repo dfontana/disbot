@@ -6,6 +6,8 @@ use serenity::{
   prelude::*,
 };
 
+pub mod dice_roll;
+pub mod help;
 mod ready;
 mod reddit_prev;
 mod shrug;
