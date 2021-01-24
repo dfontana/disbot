@@ -9,6 +9,7 @@ extern crate select;
 mod cmd;
 mod config;
 mod debug;
+mod emoji;
 mod env;
 
 use std::str::FromStr;
@@ -23,7 +24,6 @@ use config::Config;
 use env::Environment;
 
 #[group]
-#[prefixes("sb")]
 #[description = "Utilities the Sheebs has Graced You With"]
 #[summary = "Utilities Sheebs Givith"]
 #[commands(roll)]
@@ -36,6 +36,7 @@ async fn main() {
   });
   dotenv::from_filename(env.as_file()).ok();
   let config = Config::new(env).expect("Err parsing environment");
+  emoji::configure(&config).expect("Failed to setup emoji lookup");
   let framework = StandardFramework::new()
     .configure(|c| c.prefix("!"))
     .group(&GENERAL_GROUP)

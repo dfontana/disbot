@@ -1,8 +1,10 @@
+use crate::emoji::EmojiLookup;
 use rand::Rng;
 use serenity::{
   client::Context,
   framework::standard::{macros::command, Args, CommandResult},
   model::channel::Message,
+  utils::MessageBuilder,
 };
 
 #[command]
@@ -16,12 +18,23 @@ use serenity::{
 async fn roll(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
   let (lower, upper) = validate(args)?;
   let roll = rand::thread_rng().gen_range(lower..upper + 1);
-  msg
-    .reply_mention(
-      &ctx.http,
-      format!("rolls `{} ({} - {})` :shrug_dog:", roll, lower, upper),
-    )
-    .await?;
+  let guild_id = match msg.guild_id {
+    Some(id) => id,
+    None => return Ok(()),
+  };
+  let emoji = EmojiLookup::inst().get(guild_id, &ctx.cache).await?;
+  let response = MessageBuilder::new()
+    .push("rolls ")
+    .push(" ")
+    .mention(&emoji)
+    .push(" ")
+    .push_bold(roll)
+    .push(" ")
+    .mention(&emoji)
+    .push(" ")
+    .push_mono(format!("({} - {})", lower, upper))
+    .build();
+  msg.reply_mention(&ctx.http, response).await?;
   Ok(())
 }
 
