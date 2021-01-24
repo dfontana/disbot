@@ -1,41 +1,18 @@
 use crate::config::Config;
 use crate::debug::Debug;
+use crate::emoji::EmojiLookup;
 use serenity::{
-  cache::Cache,
-  model::{channel::Message, channel::ReactionType, guild::Emoji, id::GuildId},
+  model::{channel::Message, channel::ReactionType, guild::Emoji},
   prelude::Context,
 };
 
 pub struct ShrugHandler {
   config: Config,
-  debug: Debug,
 }
 
 impl ShrugHandler {
-  pub fn new(config: Config, debug: Debug) -> Self {
-    ShrugHandler { config, debug }
-  }
-
-  async fn pull_emoji(&self, guild_id: GuildId, cache: &Cache) -> Result<Emoji, String> {
-    // Pull the emoji from the guild attached to the message
-    let maybe_emoji = cache
-      .guild_field(guild_id, |guild| guild.emojis.clone())
-      .await
-      .ok_or("Failed to pull emojis for Guild".to_string())?;
-
-    // If we do, though, we should find the emoji from the config
-    let emoji = maybe_emoji
-      .iter()
-      .find_map(|(_, emoji)| {
-        if emoji.name == *self.config.get_emote_name() {
-          Some(emoji)
-        } else {
-          None
-        }
-      })
-      .ok_or("Server does not have expected Emoji".to_string())?;
-
-    Ok(emoji.clone())
+  pub fn new(config: Config) -> Self {
+    ShrugHandler { config }
   }
 
   async fn react_and_send(&self, emoji: Emoji, ctx: &Context, msg: &Message) -> Result<(), String> {
@@ -55,7 +32,7 @@ impl ShrugHandler {
 
   pub async fn message(&self, ctx: &Context, msg: &Message) {
     if msg.is_own(&ctx.cache).await {
-      self.debug.log("Skipping, self message");
+      Debug::inst().log("Skipping, self message");
       return;
     }
 
@@ -73,11 +50,11 @@ impl ShrugHandler {
     });
 
     if mentions_user.is_none() {
-      self.debug.log("Did not find a matching user mention");
+      Debug::inst().log("Did not find a matching user mention");
       return;
     }
 
-    let emoji = self.pull_emoji(guild_id, &ctx.cache).await;
+    let emoji = EmojiLookup::inst().get(guild_id, &ctx.cache).await;
 
     let send = match emoji {
       Ok(e) => self.react_and_send(e, &ctx, &msg).await,

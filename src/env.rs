@@ -13,10 +13,6 @@ impl Environment {
       Environment::DEV => String::from("dev.env"),
     }
   }
-
-  pub fn is_dev(&self) -> bool {
-    self == &Environment::DEV
-  }
 }
 
 impl FromStr for Environment {

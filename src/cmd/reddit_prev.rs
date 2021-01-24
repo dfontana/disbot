@@ -5,13 +5,11 @@ use select::document::Document;
 use select::predicate::Class;
 use serenity::{model::channel::Message, prelude::Context};
 
-pub struct RedditPreviewHandler {
-  debug: Debug,
-}
+pub struct RedditPreviewHandler {}
 
 impl RedditPreviewHandler {
-  pub fn new(debug: Debug) -> Self {
-    RedditPreviewHandler { debug }
+  pub fn new() -> Self {
+    RedditPreviewHandler {}
   }
 
   async fn download_body(&self, url: &str) -> Result<String, reqwest::Error> {
@@ -40,7 +38,7 @@ impl RedditPreviewHandler {
 
   pub async fn message(&self, ctx: &Context, msg: &Message) {
     if msg.is_own(&ctx.cache).await {
-      self.debug.log("Skipping, self message");
+      Debug::inst().log("Skipping, self message");
       return;
     }
     lazy_static! {
@@ -50,7 +48,7 @@ impl RedditPreviewHandler {
     let link = match REDDIT_LINK.captures(&msg.content) {
       Some(caps) => caps.get(1).unwrap().as_str(),
       None => {
-        self.debug.log("No reddit link, skipping");
+        Debug::inst().log("No reddit link, skipping");
         return;
       }
     };
@@ -64,7 +62,7 @@ impl RedditPreviewHandler {
     let img = match self.get_img_link(body) {
       Some(v) => v,
       None => {
-        self.debug.log("Failed to find image link");
+        Debug::inst().log("Failed to find image link");
         return;
       }
     };
