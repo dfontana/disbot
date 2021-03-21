@@ -1,7 +1,10 @@
 use crate::config::Config;
 use serenity::{
   async_trait,
-  model::{channel::Message, gateway::Ready},
+  model::{
+    channel::{Message, Reaction},
+    gateway::Ready,
+  },
   prelude::*,
 };
 
@@ -36,11 +39,18 @@ impl EventHandler for Handler {
     tokio::join!(
       self.shrug.message(&ctx, &msg),
       self.reddit.message(&ctx, &msg),
-      self.poller.message(&ctx, &msg),
     );
   }
 
   async fn ready(&self, ctx: Context, rdy: Ready) {
     self.ready.ready(&ctx, &rdy).await
+  }
+
+  async fn reaction_add(&self, ctx: Context, react: Reaction) {
+    self.poller.add_vote(&ctx, &react).await
+  }
+
+  async fn reaction_remove(&self, ctx: Context, react: Reaction) {
+    self.poller.remove_vote(&ctx, &react).await
   }
 }

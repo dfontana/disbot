@@ -2,7 +2,7 @@ use crate::config::Config;
 use lazy_static::lazy_static;
 use serenity::{
   cache::Cache,
-  model::{guild::Emoji, id::GuildId},
+  model::{channel::ReactionType, guild::Emoji, id::GuildId},
 };
 
 use std::{collections::HashMap, sync::RwLock};
@@ -71,5 +71,12 @@ impl EmojiLookup {
 
   pub fn get_numbers(&self) -> HashMap<usize, String> {
     NUMBERS.to_owned()
+  }
+
+  pub fn to_number(&self, emoji: &ReactionType) -> Option<usize> {
+    NUMBERS
+      .iter()
+      .find(|(_, v)| emoji.unicode_eq(v))
+      .map(|(num, _)| *num)
   }
 }
