@@ -16,6 +16,7 @@ pub struct Handler {
   ready: ready::ReadyHandler,
   shrug: shrug::ShrugHandler,
   reddit: reddit_prev::RedditPreviewHandler,
+  poller: poll::PollHandler,
 }
 
 impl Handler {
@@ -24,6 +25,7 @@ impl Handler {
       ready: ready::ReadyHandler::new(),
       shrug: shrug::ShrugHandler::new(config.clone()),
       reddit: reddit_prev::RedditPreviewHandler::new(),
+      poller: poll::PollHandler::new(),
     }
   }
 }
@@ -34,6 +36,7 @@ impl EventHandler for Handler {
     tokio::join!(
       self.shrug.message(&ctx, &msg),
       self.reddit.message(&ctx, &msg),
+      self.poller.message(&ctx, &msg),
     );
   }
 
