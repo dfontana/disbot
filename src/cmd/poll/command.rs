@@ -1,4 +1,4 @@
-use std::error::Error;
+use std::{error::Error, time::Duration};
 
 use crate::{
   cmd::poll::{cache::Cache, pollstate::PollState},
@@ -17,12 +17,11 @@ use serenity::{
 };
 
 // TODO
-//   - Have polls fall out of memory after 24hrs ("locking them")
 //   - Track who voted for what & list their names next to the vote
 //   - Allow polls only 1 vote per user (optional arg or even alternate command?)
 
 lazy_static! {
-  static ref POLL_STATES: Cache<MessageId, PollState> = Cache::new();
+  static ref POLL_STATES: Cache<MessageId, PollState> = Cache::new(Duration::from_secs(86400));
 }
 
 #[command]
@@ -131,7 +130,7 @@ impl PollHandler {
 }
 
 fn build_poll_message(emoji: &Emoji, poll_state: &PollState) -> String {
-  let bars = poll_state
+  let mut bar_vec = poll_state
     .votes
     .iter()
     .map(|(idx, (opt, votes))| {
@@ -147,8 +146,8 @@ fn build_poll_message(emoji: &Emoji, poll_state: &PollState) -> String {
         bar_width = poll_state.most_votes - votes
       )
     })
-    .collect::<Vec<String>>()
-    .join("\n");
+    .collect::<Vec<String>>();
+  bar_vec.sort();
 
   MessageBuilder::new()
     .mention(emoji)
@@ -156,7 +155,9 @@ fn build_poll_message(emoji: &Emoji, poll_state: &PollState) -> String {
     .mention(emoji)
     .push_line("")
     .push_line("")
-    .push_bold_line(&poll_state.topic)
-    .push_codeblock(&bars, Some("m"))
+    .push_bold(&poll_state.topic)
+    .push_italic(" (exp in 24hrs)")
+    .push_line("")
+    .push_codeblock(&bar_vec.join("\n"), Some("m"))
     .build()
 }
