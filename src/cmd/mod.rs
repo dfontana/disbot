@@ -1,12 +1,16 @@
 use crate::config::Config;
 use serenity::{
   async_trait,
-  model::{channel::Message, gateway::Ready},
+  model::{
+    channel::{Message, Reaction},
+    gateway::Ready,
+  },
   prelude::*,
 };
 
 pub mod dice_roll;
 pub mod help;
+pub mod poll;
 mod ready;
 mod reddit_prev;
 mod shrug;
@@ -15,6 +19,7 @@ pub struct Handler {
   ready: ready::ReadyHandler,
   shrug: shrug::ShrugHandler,
   reddit: reddit_prev::RedditPreviewHandler,
+  poller: poll::PollHandler,
 }
 
 impl Handler {
@@ -23,6 +28,7 @@ impl Handler {
       ready: ready::ReadyHandler::new(),
       shrug: shrug::ShrugHandler::new(config.clone()),
       reddit: reddit_prev::RedditPreviewHandler::new(),
+      poller: poll::PollHandler::new(),
     }
   }
 }
@@ -38,5 +44,13 @@ impl EventHandler for Handler {
 
   async fn ready(&self, ctx: Context, rdy: Ready) {
     self.ready.ready(&ctx, &rdy).await
+  }
+
+  async fn reaction_add(&self, ctx: Context, react: Reaction) {
+    self.poller.add_vote(&ctx, &react).await
+  }
+
+  async fn reaction_remove(&self, ctx: Context, react: Reaction) {
+    self.poller.remove_vote(&ctx, &react).await
   }
 }

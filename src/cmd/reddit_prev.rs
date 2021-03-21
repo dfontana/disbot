@@ -38,7 +38,7 @@ impl RedditPreviewHandler {
 
   pub async fn message(&self, ctx: &Context, msg: &Message) {
     if msg.is_own(&ctx.cache).await {
-      Debug::inst().log("Skipping, self message");
+      Debug::inst("reddit_prev").log("Skipping, self message");
       return;
     }
     lazy_static! {
@@ -48,7 +48,7 @@ impl RedditPreviewHandler {
     let link = match REDDIT_LINK.captures(&msg.content) {
       Some(caps) => caps.get(1).unwrap().as_str(),
       None => {
-        Debug::inst().log("No reddit link, skipping");
+        Debug::inst("reddit_prev").log("No reddit link, skipping");
         return;
       }
     };
@@ -62,7 +62,7 @@ impl RedditPreviewHandler {
     let img = match self.get_img_link(body) {
       Some(v) => v,
       None => {
-        Debug::inst().log("Failed to find image link");
+        Debug::inst("reddit_prev").log("Failed to find image link");
         return;
       }
     };

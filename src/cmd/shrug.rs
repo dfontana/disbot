@@ -32,7 +32,7 @@ impl ShrugHandler {
 
   pub async fn message(&self, ctx: &Context, msg: &Message) {
     if msg.is_own(&ctx.cache).await {
-      Debug::inst().log("Skipping, self message");
+      Debug::inst("shrug").log("Skipping, self message");
       return;
     }
 
@@ -50,7 +50,7 @@ impl ShrugHandler {
     });
 
     if mentions_user.is_none() {
-      Debug::inst().log("Did not find a matching user mention");
+      Debug::inst("shrug").log("Did not find a matching user mention");
       return;
     }
 
