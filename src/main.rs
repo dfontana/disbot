@@ -19,14 +19,14 @@ use serenity::{
   framework::standard::{macros::group, StandardFramework},
 };
 
-use cmd::{dice_roll::*, help::*, Handler};
+use cmd::{dice_roll::*, help::*, poll::*, Handler};
 use config::Config;
 use env::Environment;
 
 #[group]
 #[description = "Utilities the Sheebs has Graced You With"]
 #[summary = "Utilities Sheebs Givith"]
-#[commands(roll)]
+#[commands(roll, poll)]
 struct General;
 
 #[tokio::main]
