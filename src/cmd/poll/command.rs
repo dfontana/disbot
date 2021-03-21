@@ -1,10 +1,10 @@
-use std::{
-  collections::HashMap,
-  error::Error,
-  sync::{Arc, RwLock},
-};
+use std::error::Error;
 
-use crate::{debug::Debug, emoji::EmojiLookup};
+use crate::{
+  cmd::poll::{cache::Cache, pollstate::PollState},
+  debug::Debug,
+  emoji::EmojiLookup,
+};
 use serenity::{
   client::Context,
   framework::standard::{macros::command, Args, CommandResult},
@@ -18,59 +18,11 @@ use serenity::{
 
 // TODO
 //   - Have polls fall out of memory after 24hrs ("locking them")
-//   - Refactor POLL_STATES global into a caching type to simplify interactions
 //   - Track who voted for what & list their names next to the vote
 //   - Allow polls only 1 vote per user (optional arg or even alternate command?)
 
 lazy_static! {
-  static ref POLL_STATES: Arc<RwLock<HashMap<MessageId, PollState>>> =
-    Arc::new(RwLock::new(HashMap::new()));
-}
-fn does_poll_exist(id: &MessageId) -> bool {
-  match POLL_STATES.read() {
-    Err(_) => false,
-    Ok(poll) => poll.contains_key(id),
-  }
-}
-fn add_poll(id: MessageId, poll: PollState) -> Result<(), String> {
-  match POLL_STATES.write() {
-    Ok(mut map) => {
-      map.insert(id, poll);
-      Ok(())
-    }
-    Err(e) => Err(format!("Failed to aquire state lock - {}", e)),
-  }
-}
-fn invoke_mut<F>(id: &MessageId, mut apply: F) -> Result<(), String>
-where
-  F: FnMut(&mut PollState),
-{
-  match POLL_STATES.write() {
-    Err(_) => {
-      Debug::inst("poller").log("Failed to cast vote, lock not aquired");
-      Err("Failed to aquire lock for poll update".into())
-    }
-    Ok(mut polls) => {
-      // TODO remove the unwrap in favor of a check for missing poll
-      apply(polls.get_mut(id).unwrap());
-      Ok(())
-    }
-  }
-}
-fn invoke<F, T>(id: &MessageId, apply: F) -> Result<T, String>
-where
-  F: FnOnce(&PollState) -> T,
-{
-  match POLL_STATES.read() {
-    Err(_) => {
-      Debug::inst("poller").log("Failed to cast vote, lock not aquired");
-      Err("Failed to aquire lock for poll update".into())
-    }
-    Ok(polls) => {
-      // TODO remove the unwrap in favor of a check for missing poll
-      Ok(apply(polls.get(id).unwrap()))
-    }
-  }
+  static ref POLL_STATES: Cache<MessageId, PollState> = Cache::new();
 }
 
 #[command]
@@ -106,7 +58,7 @@ async fn poll(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
   }
 
   // Register globally
-  add_poll(res_msg.id, poll_state)?;
+  POLL_STATES.insert(res_msg.id, poll_state)?;
 
   Ok(())
 }
@@ -130,7 +82,7 @@ impl PollHandler {
     if react.user_id.unwrap() == ctx.cache.as_ref().current_user().await.id {
       return Err("Skipping, self reaction".into());
     }
-    if !does_poll_exist(&react.message_id) {
+    if !POLL_STATES.contains_key(&react.message_id)? {
       return Err("Skipping, not a poll reaction".into());
     }
 
@@ -147,14 +99,15 @@ impl PollHandler {
     };
     let mut msg = react.message(&ctx.http).await?;
     let emoji = EmojiLookup::inst().get(guild_id, &ctx.cache).await?;
-    let new_body = invoke(&react.message_id, |p| build_poll_message(&emoji, p))?;
+    let new_body = POLL_STATES.invoke(&react.message_id, |p| build_poll_message(&emoji, p))?;
     msg.edit(&ctx, |body| body.content(new_body)).await?;
 
     Ok(())
   }
 
   pub async fn add_vote(&self, ctx: &Context, react: &Reaction) {
-    let update_op = |msgid: &MessageId, vote: usize| invoke_mut(msgid, |p| p.cast_vote(vote));
+    let update_op =
+      |msgid: &MessageId, vote: usize| POLL_STATES.invoke_mut(msgid, |p| p.cast_vote(vote));
     match self._update_poll(ctx, react, update_op).await {
       Err(e) => {
         Debug::inst("poller").log(&format!("Failed - {}", e));
@@ -165,7 +118,8 @@ impl PollHandler {
   }
 
   pub async fn remove_vote(&self, ctx: &Context, react: &Reaction) {
-    let update_op = |msgid: &MessageId, vote: usize| invoke_mut(msgid, |p| p.revoke_vote(vote));
+    let update_op =
+      |msgid: &MessageId, vote: usize| POLL_STATES.invoke_mut(msgid, |p| p.revoke_vote(vote));
     match self._update_poll(ctx, react, update_op).await {
       Err(e) => {
         Debug::inst("poller").log(&format!("Failed - {}", e));
@@ -205,62 +159,4 @@ fn build_poll_message(emoji: &Emoji, poll_state: &PollState) -> String {
     .push_bold_line(&poll_state.topic)
     .push_codeblock(&bars, Some("m"))
     .build()
-}
-
-struct PollState {
-  topic: String,
-  longest_option: usize,
-  most_votes: usize,
-  votes: HashMap<usize, (String, usize)>,
-}
-
-impl PollState {
-  fn from_args(mut args: Args) -> Result<PollState, String> {
-    let topic = args.single_quoted::<String>().unwrap();
-    let items: Vec<String> = args
-      .trimmed()
-      .quoted()
-      .iter::<String>()
-      .map(|arg| arg.unwrap().trim_matches('"').to_owned())
-      .collect();
-    if items.len() > 10 {
-      Debug::inst("poll").log("Skipping poll, too many args");
-      return Err("Too many arguments given".to_string());
-    }
-
-    let opt_width = items.iter().map(String::len).max().unwrap_or(1);
-    let mut votes = HashMap::new();
-    items.iter().enumerate().for_each(|(idx, it)| {
-      votes.insert(idx + 1, (it.to_owned(), 0));
-    });
-
-    Ok(PollState {
-      topic,
-      longest_option: opt_width,
-      most_votes: 0,
-      votes,
-    })
-  }
-
-  fn set_highest_vote(&mut self) {
-    self.most_votes = self.votes.values().map(|e| e.1).max().unwrap_or(0);
-  }
-
-  fn cast_vote(&mut self, vote: usize) {
-    if !self.votes.contains_key(&vote) {
-      Debug::inst("poller").log("Vote not present in poll, ignoring");
-      return;
-    }
-    self.votes.entry(vote).and_modify(|e| e.1 += 1);
-    self.set_highest_vote();
-  }
-
-  fn revoke_vote(&mut self, vote: usize) {
-    if !self.votes.contains_key(&vote) {
-      Debug::inst("poller").log("Vote not present in poll, ignoring");
-      return;
-    }
-    self.votes.entry(vote).and_modify(|e| e.1 -= 1);
-    self.set_highest_vote();
-  }
 }
