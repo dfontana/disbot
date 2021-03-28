@@ -32,7 +32,12 @@ async fn start(ctx: &Context, msg: &Message, _: Args) -> CommandResult {
 
   match wol.awake() {
     Ok(_) => {
-      msg.reply_ping(&ctx.http, "Server is waking").await?;
+      msg
+        .reply_ping(
+          &ctx.http,
+          "Server is waking... (I'll let you known when its up)",
+        )
+        .await?;
     }
     Err(e) => {
       Debug::inst("server_wake").log(&format!("Failed to start Game Server - {}", e));
