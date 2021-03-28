@@ -1,7 +1,10 @@
 use crate::config::ServerConfig;
-use std::iter;
-use std::net::{SocketAddr, UdpSocket};
-use std::str::FromStr;
+use std::{
+  iter,
+  net::{IpAddr, Ipv4Addr, SocketAddr, UdpSocket},
+  process::{Command, Stdio},
+  str::FromStr,
+};
 
 const MAC_SIZE: usize = 6;
 const MAC_PER_MAGIC: usize = 16;
@@ -11,7 +14,7 @@ static HEADER: [u8; 6] = [0xFF; 6];
 #[derive(Debug, Clone)]
 pub struct Wol {
   packet: Vec<u8>,
-  ip: String,
+  ip: IpAddr,
 }
 
 impl Wol {
@@ -23,15 +26,27 @@ impl Wol {
     let mut packet = Vec::with_capacity(HEADER.len() + MAC_SIZE * MAC_PER_MAGIC);
     packet.extend(HEADER.iter());
     packet.extend(iter::repeat(hexed).take(MAC_PER_MAGIC).flatten());
+    let ip = Ipv4Addr::from_str(&cfg.ip).map_err(|e| format!("Invalid IP: {}", e))?;
     Ok(Wol {
       packet,
-      ip: cfg.ip.to_owned(),
+      ip: IpAddr::V4(ip),
     })
   }
 
   pub fn is_awake(&self) -> Result<bool, String> {
-    // TODO, first see it works
-    Ok(false)
+    let res = Command::new("ping")
+      .stdout(Stdio::null())
+      .arg(format!("{}", &self.ip))
+      .args(&["-c", "1"])
+      .args(&["-W", "1"])
+      .status()
+      .map_err(|e| format!("Failed to run Ping: {}", e))?
+      .code();
+    match res {
+      Some(0) => Ok(true),
+      Some(1) => Ok(false),
+      _ => Err("Unknown error running ping".into()),
+    }
   }
 
   pub fn awake(&self) -> std::io::Result<()> {
