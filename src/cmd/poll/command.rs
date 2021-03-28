@@ -16,10 +16,6 @@ use serenity::{
   utils::MessageBuilder,
 };
 
-// TODO
-//   - Track who voted for what & list their names next to the vote
-//   - Allow polls only 1 vote per user (optional arg or even alternate command?)
-
 lazy_static! {
   static ref POLL_STATES: Cache<MessageId, PollState> = Cache::new(Duration::from_secs(86400));
 }

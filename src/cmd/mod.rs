@@ -13,6 +13,7 @@ pub mod help;
 pub mod poll;
 mod ready;
 mod reddit_prev;
+pub mod server;
 mod shrug;
 
 pub struct Handler {

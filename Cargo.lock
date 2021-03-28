@@ -202,6 +202,7 @@ name = "disbot"
 version = "0.1.0"
 dependencies = [
  "dotenv",
+ "hex",
  "lazy_static",
  "rand 0.8.2",
  "regex",
@@ -428,6 +429,12 @@ checksum = "5aca5565f760fb5b220e499d72710ed156fdb74e631659e99377d9ebfbd13ae8"
 dependencies = [
  "libc",
 ]
+
+[[package]]
+name = "hex"
+version = "0.4.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7f24254aa9a54b5c858eaee2f5bccdb46aaf0e486a595ed5fd8f86ba55232a70"
 
 [[package]]
 name = "html5ever"

@@ -1,4 +1,5 @@
 extern crate dotenv;
+extern crate hex;
 #[macro_use]
 extern crate lazy_static;
 extern crate rand;
@@ -19,7 +20,7 @@ use serenity::{
   framework::standard::{macros::group, StandardFramework},
 };
 
-use cmd::{dice_roll::*, help::*, poll::*, Handler};
+use cmd::{dice_roll::*, help::*, poll::*, server::*, Handler};
 use config::Config;
 use env::Environment;
 
@@ -27,6 +28,7 @@ use env::Environment;
 #[description = "Utilities the Sheebs has Graced You With"]
 #[summary = "Utilities Sheebs Givith"]
 #[commands(roll, poll)]
+#[sub_groups(server)]
 struct General;
 
 #[tokio::main]
@@ -35,7 +37,7 @@ async fn main() {
     Environment::from_str(&v).unwrap()
   });
   dotenv::from_filename(env.as_file()).ok();
-  let config = Config::new(env).expect("Err parsing environment");
+  let config = Config::set(env).expect("Err parsing environment");
   emoji::configure(&config).expect("Failed to setup emoji lookup");
   debug::configure(&config).expect("Failed to setup debug logger");
   let framework = StandardFramework::new()
