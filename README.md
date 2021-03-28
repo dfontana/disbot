@@ -19,6 +19,8 @@ API_KEY=<Your Bot's Token Here>
 EMOTE_NAME=<your-emote || shrug_dog>
 EMOTE_USERS=<csv of users || User1,User2,User3>
 SERVER_MAC=<game-server-mac>
+SERVER_IP=<game-server-ip>
+SERVER_USER=<game-server-user>
 
 #You can repeat this for dev.env as well
 ```

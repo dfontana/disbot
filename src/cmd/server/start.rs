@@ -6,10 +6,10 @@ use serenity::{
 };
 
 #[command]
-#[description = "Wake the game server"]
-#[usage = "wake"]
-#[example = "wake"]
-async fn wake(ctx: &Context, msg: &Message, _: Args) -> CommandResult {
+#[description = "Start the game server"]
+#[usage = "start"]
+#[example = "start"]
+async fn start(ctx: &Context, msg: &Message, _: Args) -> CommandResult {
   let cfg = Config::inst()?;
   let wol = Wol::new(&cfg.server)?;
 
@@ -18,7 +18,7 @@ async fn wake(ctx: &Context, msg: &Message, _: Args) -> CommandResult {
     Err(e) => {
       Debug::inst("server_wake").log(&format!("Failed to check Game Server is awake - {}", e));
       msg
-        .reply_ping(&ctx.http, "Couldn't wake the server :(")
+        .reply_ping(&ctx.http, "Couldn't start the server :(")
         .await?;
       return Ok(());
     }
@@ -34,9 +34,9 @@ async fn wake(ctx: &Context, msg: &Message, _: Args) -> CommandResult {
       msg.reply_ping(&ctx.http, "Server is waking").await?;
     }
     Err(e) => {
-      Debug::inst("server_wake").log(&format!("Failed to wake Game Server - {}", e));
+      Debug::inst("server_wake").log(&format!("Failed to start Game Server - {}", e));
       msg
-        .reply_ping(&ctx.http, "Couldn't wake the server :(")
+        .reply_ping(&ctx.http, "Couldn't start the server :(")
         .await?;
       return Ok(());
     }

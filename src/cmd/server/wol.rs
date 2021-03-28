@@ -15,6 +15,7 @@ static HEADER: [u8; 6] = [0xFF; 6];
 pub struct Wol {
   packet: Vec<u8>,
   ip: IpAddr,
+  user: String,
 }
 
 impl Wol {
@@ -30,6 +31,7 @@ impl Wol {
     Ok(Wol {
       packet,
       ip: IpAddr::V4(ip),
+      user: cfg.user.to_owned(),
     })
   }
 
@@ -45,6 +47,7 @@ impl Wol {
     match res {
       Some(0) => Ok(true),
       Some(1) => Ok(false),
+      Some(2) => Ok(false),
       _ => Err("Unknown error running ping".into()),
     }
   }
@@ -58,5 +61,23 @@ impl Wol {
     udp_sock.send_to(&self.packet, dst)?;
 
     Ok(())
+  }
+
+  pub fn shutdown(&self) -> Result<(), String> {
+    let res = Command::new("ssh")
+      .arg("-t")
+      .arg(format!("{}@{}", &self.user, &self.ip))
+      .args(&["-o", "PasswordAuthentication=no"])
+      .arg("sudo shutdown now")
+      .stdout(Stdio::null())
+      .status()
+      .map_err(|e| format!("Failed to run shutdown: {}", e))?
+      .code();
+
+    match res {
+      Some(0) => Ok(()),
+      Some(255) => Ok(()), // 255 means error but since the server closes this is fine.
+      _ => Err("Failed to stop server".into()),
+    }
   }
 }

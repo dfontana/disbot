@@ -20,6 +20,7 @@ pub struct Config {
 pub struct ServerConfig {
   pub mac: String,
   pub ip: String,
+  pub user: String,
 }
 
 impl Default for ServerConfig {
@@ -27,6 +28,7 @@ impl Default for ServerConfig {
     ServerConfig {
       mac: "".to_owned(),
       ip: "".to_owned(),
+      user: "".to_owned(),
     }
   }
 }
@@ -56,6 +58,7 @@ impl Config {
       server: ServerConfig {
         mac: env::var("SERVER_MAC")?,
         ip: env::var("SERVER_IP")?,
+        user: env::var("SERVER_USER")?,
       },
     };
     if let Ok(mut inst) = INSTANCE.try_write() {

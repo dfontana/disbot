@@ -1,13 +1,15 @@
 use serenity::framework::standard::macros::group;
 
-mod wake;
+mod start;
+mod stop;
 mod wol;
 
-use wake::*;
+use start::*;
+use stop::*;
 
 #[group]
 #[description = "Game Server Management tools, for turning on, off, and switching servers"]
 #[summary = "Sheebs Givith Games"]
 #[prefix = "server"]
-#[commands(wake)]
+#[commands(stop, start)]
 pub struct Server;
