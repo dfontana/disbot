@@ -27,6 +27,11 @@ SERVER_USER=<game-server-user>
 
 1. Launch with `docker-compose up --build` or with `cargo run dev`. Alternatively, if your raspberry pi is configured on the local network as expected, you can run `./deploy.sh`
 
+### Gotchas
+
+- Ensure the `SERVER_USER` has sudo-er privilage to run `shutdown` without a password. (Eg: `sudo visudo -> [user]\tALL=NOPASSWD:[pathToBin1],[pathtoBin2],...`)
+- Equally, ensure the bot's host can run `ssh` without a password (eg setup it's SSH keys).
+
 ## Invite Shruggin' Shiba to Your Server
 
 [Invite Link](https://discord.com/api/oauth2/authorize?client_id=764937518570536990&permissions=342080&scope=bot)
