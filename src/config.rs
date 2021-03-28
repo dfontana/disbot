@@ -9,11 +9,26 @@ lazy_static! {
 
 #[derive(Debug, Clone)]
 pub struct Config {
-  api_key: String,
-  emote_name: String,
-  emote_users: Vec<String>,
-  env: Environment,
-  server_mac: String,
+  pub api_key: String,
+  pub emote_name: String,
+  pub emote_users: Vec<String>,
+  pub env: Environment,
+  pub server: ServerConfig,
+}
+
+#[derive(Debug, Clone)]
+pub struct ServerConfig {
+  pub mac: String,
+  pub ip: String,
+}
+
+impl Default for ServerConfig {
+  fn default() -> Self {
+    ServerConfig {
+      mac: "".to_owned(),
+      ip: "".to_owned(),
+    }
+  }
 }
 
 impl Default for Config {
@@ -23,7 +38,7 @@ impl Default for Config {
       emote_name: "".to_owned(),
       emote_users: Vec::new(),
       env: Environment::DEV,
-      server_mac: "".to_owned(),
+      server: ServerConfig::default(),
     }
   }
 }
@@ -38,7 +53,10 @@ impl Config {
         .map(|x| x.to_string())
         .collect(),
       env,
-      server_mac: env::var("SERVER_MAC")?,
+      server: ServerConfig {
+        mac: env::var("SERVER_MAC")?,
+        ip: env::var("SERVER_IP")?,
+      },
     };
     if let Ok(mut inst) = INSTANCE.try_write() {
       *inst = c.clone();
@@ -53,25 +71,5 @@ impl Config {
         .map_err(|_| "Failed to get config read lock")?
         .clone(),
     )
-  }
-
-  pub fn get_api_key(&self) -> &String {
-    &self.api_key
-  }
-
-  pub fn get_emote_name(&self) -> &String {
-    &self.emote_name
-  }
-
-  pub fn get_emote_users(&self) -> &Vec<String> {
-    &self.emote_users
-  }
-
-  pub fn get_env(&self) -> &Environment {
-    &self.env
-  }
-
-  pub fn get_server_mac(&self) -> &String {
-    &self.server_mac
   }
 }

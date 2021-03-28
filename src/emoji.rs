@@ -34,7 +34,7 @@ pub fn configure(config: &Config) -> Result<(), String> {
   let mut inst = INSTANCE
     .try_write()
     .map_err(|_| "Failed to get lock on emoji instance")?;
-  *inst = config.get_emote_name().to_string();
+  *inst = config.emote_name.to_string();
   Ok(())
 }
 

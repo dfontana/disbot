@@ -45,7 +45,7 @@ async fn main() {
     .group(&GENERAL_GROUP)
     .help(&HELP);
 
-  let mut client = Client::builder(&config.get_api_key())
+  let mut client = Client::builder(&config.api_key)
     .intents(
       GatewayIntents::GUILDS
         | GatewayIntents::GUILD_EMOJIS

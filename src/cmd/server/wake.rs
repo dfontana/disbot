@@ -1,5 +1,3 @@
-use std::str::FromStr;
-
 use crate::{cmd::server::wol::Wol, debug::Debug, Config};
 use serenity::{
   client::Context,
@@ -13,7 +11,7 @@ use serenity::{
 #[example = "wake"]
 async fn wake(ctx: &Context, msg: &Message, _: Args) -> CommandResult {
   let cfg = Config::inst()?;
-  let wol = Wol::from_str(cfg.get_server_mac())?;
+  let wol = Wol::new(&cfg.server)?;
 
   let is_awake = match wol.is_awake() {
     Ok(v) => v,

@@ -15,7 +15,7 @@ pub fn configure(config: &Config) -> Result<(), String> {
   let mut inst = INSTANCE
     .try_write()
     .map_err(|_| "Failed to get lock on debug instance")?;
-  *inst = Some(config.get_env().clone());
+  *inst = Some(config.env.clone());
   Ok(())
 }
 

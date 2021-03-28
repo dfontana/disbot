@@ -1,3 +1,4 @@
+use crate::config::ServerConfig;
 use std::iter;
 use std::net::{SocketAddr, UdpSocket};
 use std::str::FromStr;
@@ -10,23 +11,24 @@ static HEADER: [u8; 6] = [0xFF; 6];
 #[derive(Debug, Clone)]
 pub struct Wol {
   packet: Vec<u8>,
+  ip: String,
 }
 
-impl FromStr for Wol {
-  type Err = String;
-
-  fn from_str(s: &str) -> Result<Self, Self::Err> {
-    let hexed = s
+impl Wol {
+  pub fn new(cfg: &ServerConfig) -> Result<Self, String> {
+    let hexed = cfg
+      .mac
       .split(SEPERATOR)
       .flat_map(|x| hex::decode(x).expect("Invalid mac!"));
     let mut packet = Vec::with_capacity(HEADER.len() + MAC_SIZE * MAC_PER_MAGIC);
     packet.extend(HEADER.iter());
     packet.extend(iter::repeat(hexed).take(MAC_PER_MAGIC).flatten());
-    Ok(Wol { packet })
+    Ok(Wol {
+      packet,
+      ip: cfg.ip.to_owned(),
+    })
   }
-}
 
-impl Wol {
   pub fn is_awake(&self) -> Result<bool, String> {
     // TODO, first see it works
     Ok(false)
