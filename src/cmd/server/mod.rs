@@ -6,6 +6,7 @@ mod wol;
 
 use start::*;
 use stop::*;
+pub use wol::configure;
 
 #[group]
 #[description = "Game Server Management tools, for turning on, off, and switching servers"]

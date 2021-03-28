@@ -4,6 +4,8 @@ use std::{
   net::{IpAddr, Ipv4Addr, SocketAddr, UdpSocket},
   process::{Command, Stdio},
   str::FromStr,
+  sync::{Arc, RwLock},
+  time::{Duration, Instant},
 };
 
 const MAC_SIZE: usize = 6;
@@ -11,28 +13,51 @@ const MAC_PER_MAGIC: usize = 16;
 const SEPERATOR: char = ':';
 static HEADER: [u8; 6] = [0xFF; 6];
 
-#[derive(Debug, Clone)]
+lazy_static! {
+  static ref INSTANCE: RwLock<Option<Arc<Wol>>> = RwLock::new(None);
+  static ref WAIT_SHUTDOWN: Duration = Duration::from_secs(600);
+}
+
+pub fn configure(cfg: &ServerConfig) -> Result<(), String> {
+  let mut inst = INSTANCE
+    .try_write()
+    .map_err(|_| "Failed to get lock on wol instance")?;
+
+  let hexed = cfg
+    .mac
+    .split(SEPERATOR)
+    .flat_map(|x| hex::decode(x).expect("Invalid mac!"));
+  let mut packet = Vec::with_capacity(HEADER.len() + MAC_SIZE * MAC_PER_MAGIC);
+  packet.extend(HEADER.iter());
+  packet.extend(iter::repeat(hexed).take(MAC_PER_MAGIC).flatten());
+  let ip = Ipv4Addr::from_str(&cfg.ip).map_err(|e| format!("Invalid IP: {}", e))?;
+  *inst = Some(Arc::new(Wol {
+    packet,
+    ip: IpAddr::V4(ip),
+    user: cfg.user.to_owned(),
+    last_shutdown: RwLock::new(None),
+  }));
+
+  Ok(())
+}
+
+#[derive(Debug)]
 pub struct Wol {
   packet: Vec<u8>,
   ip: IpAddr,
   user: String,
+  last_shutdown: RwLock<Option<Instant>>,
 }
 
 impl Wol {
-  pub fn new(cfg: &ServerConfig) -> Result<Self, String> {
-    let hexed = cfg
-      .mac
-      .split(SEPERATOR)
-      .flat_map(|x| hex::decode(x).expect("Invalid mac!"));
-    let mut packet = Vec::with_capacity(HEADER.len() + MAC_SIZE * MAC_PER_MAGIC);
-    packet.extend(HEADER.iter());
-    packet.extend(iter::repeat(hexed).take(MAC_PER_MAGIC).flatten());
-    let ip = Ipv4Addr::from_str(&cfg.ip).map_err(|e| format!("Invalid IP: {}", e))?;
-    Ok(Wol {
-      packet,
-      ip: IpAddr::V4(ip),
-      user: cfg.user.to_owned(),
-    })
+  pub fn inst() -> Result<Arc<Self>, String> {
+    match INSTANCE.try_read() {
+      Err(_) => Err("Failed to get wol read lock".into()),
+      Ok(lock) => match &*lock {
+        Some(arc) => Ok(arc.clone()),
+        None => Err("Wol was not configured".into()),
+      },
+    }
   }
 
   pub fn is_awake(&self) -> Result<bool, String> {
@@ -63,21 +88,45 @@ impl Wol {
     Ok(())
   }
 
-  pub fn shutdown(&self) -> Result<(), String> {
+  pub fn shutdown(&self) -> Result<u64, String> {
+    let mut inst = self
+      .last_shutdown
+      .try_write()
+      .map_err(|_| "Failed to get lock on shutdown timer")?;
+
+    let elapsed = match *inst {
+      Some(inst) => inst.elapsed(),
+      None => {
+        *inst = Some(Instant::now());
+        Duration::new(0, 0)
+      }
+    };
+
+    let diff = (WAIT_SHUTDOWN.as_secs() as i64 - elapsed.as_secs() as i64).max(0);
+    if diff > 0 {
+      return Ok(diff as u64);
+    }
+
     let res = Command::new("ssh")
       .arg("-t")
       .arg(format!("{}@{}", &self.user, &self.ip))
       .args(&["-o", "PasswordAuthentication=no"])
+      .args(&["-o", "ConnectTimeout=1"])
+      .args(&["-o", "BatchMode=yes"])
       .arg("sudo shutdown now")
       .stdout(Stdio::null())
       .status()
       .map_err(|e| format!("Failed to run shutdown: {}", e))?
       .code();
 
-    match res {
-      Some(0) => Ok(()),
-      Some(255) => Ok(()), // 255 means error but since the server closes this is fine.
+    let ret = match res {
+      Some(0) => Ok(0),
+      Some(255) => Ok(0), // 255 means error but since the server closes this is fine.
       _ => Err("Failed to stop server".into()),
-    }
+    };
+
+    *inst = Some(Instant::now());
+
+    ret
   }
 }

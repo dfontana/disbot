@@ -40,6 +40,7 @@ async fn main() {
   let config = Config::set(env).expect("Err parsing environment");
   emoji::configure(&config).expect("Failed to setup emoji lookup");
   debug::configure(&config).expect("Failed to setup debug logger");
+  cmd::server::configure(&config.server).expect("Failed to setup game server");
   let framework = StandardFramework::new()
     .configure(|c| c.prefix("!"))
     .group(&GENERAL_GROUP)

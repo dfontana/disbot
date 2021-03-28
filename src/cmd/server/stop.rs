@@ -1,4 +1,4 @@
-use crate::{cmd::server::wol::Wol, debug::Debug, Config};
+use crate::{cmd::server::wol::Wol, debug::Debug};
 use serenity::{
   client::Context,
   framework::standard::{macros::command, Args, CommandResult},
@@ -10,8 +10,7 @@ use serenity::{
 #[usage = "stop"]
 #[example = "stop"]
 async fn stop(ctx: &Context, msg: &Message, _: Args) -> CommandResult {
-  let cfg = Config::inst()?;
-  let wol = Wol::new(&cfg.server)?;
+  let wol = Wol::inst()?;
 
   let is_awake = match wol.is_awake() {
     Ok(v) => v,
@@ -30,8 +29,16 @@ async fn stop(ctx: &Context, msg: &Message, _: Args) -> CommandResult {
   }
 
   match wol.shutdown() {
-    Ok(_) => {
+    Ok(0) => {
       msg.reply_ping(&ctx.http, "Server is stopping").await?;
+    }
+    Ok(left) => {
+      let msg_res = format!(
+        "Stop ran recently, please wait {}m{}s",
+        left / 60,
+        left % 60
+      );
+      msg.reply_ping(&ctx.http, msg_res).await?;
     }
     Err(e) => {
       Debug::inst("server_stop").log(&format!("Failed to stop Game Server - {}", e));
