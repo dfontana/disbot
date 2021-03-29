@@ -1,4 +1,5 @@
 extern crate dotenv;
+extern crate hex;
 #[macro_use]
 extern crate lazy_static;
 extern crate rand;
@@ -19,7 +20,7 @@ use serenity::{
   framework::standard::{macros::group, StandardFramework},
 };
 
-use cmd::{dice_roll::*, help::*, poll::*, Handler};
+use cmd::{dice_roll::*, help::*, poll::*, server::*, Handler};
 use config::Config;
 use env::Environment;
 
@@ -27,23 +28,29 @@ use env::Environment;
 #[description = "Utilities the Sheebs has Graced You With"]
 #[summary = "Utilities Sheebs Givith"]
 #[commands(roll, poll)]
+#[sub_groups(server)]
 struct General;
 
 #[tokio::main]
 async fn main() {
-  let env = std::env::args().nth(1).map_or(Environment::default(), |v| {
-    Environment::from_str(&v).unwrap()
-  });
+  let env = std::env::args()
+    .nth(1)
+    .or_else(|| std::env::var("RUN_ENV").ok())
+    .map_or(Environment::default(), |v| {
+      println!("Given '{}' env to run", &v);
+      Environment::from_str(&v).unwrap()
+    });
   dotenv::from_filename(env.as_file()).ok();
-  let config = Config::new(env).expect("Err parsing environment");
+  let config = Config::set(env).expect("Err parsing environment");
   emoji::configure(&config).expect("Failed to setup emoji lookup");
   debug::configure(&config).expect("Failed to setup debug logger");
+  cmd::server::configure(&config.server).expect("Failed to setup game server");
   let framework = StandardFramework::new()
     .configure(|c| c.prefix("!"))
     .group(&GENERAL_GROUP)
     .help(&HELP);
 
-  let mut client = Client::builder(&config.get_api_key())
+  let mut client = Client::builder(&config.api_key)
     .intents(
       GatewayIntents::GUILDS
         | GatewayIntents::GUILD_EMOJIS

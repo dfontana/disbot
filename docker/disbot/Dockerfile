@@ -17,10 +17,7 @@ ADD *.env ./
 RUN rm target/armv7-unknown-linux-musleabihf/release/deps/disbot*
 RUN cargo build ---target=armv7-unknown-linux-musleabihf --release
 
-###################
-# 2. Run
-###################
-FROM alpine:latest
+
+FROM alpine:3.12
 COPY --from=builder /home/rust/src/cache_build/target/armv7-unknown-linux-musleabihf/release/disbot /app
-COPY --from=builder /home/rust/src/cache_build/prod.env /prod.env
 ENTRYPOINT ["/app"]

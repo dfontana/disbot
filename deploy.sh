@@ -1,8 +1,14 @@
-docker-compose build disbot
-docker save -o disbot.tar disbot:latest
+set -e
+
+env=${1:-dev}
+
+docker build . -f docker/disbot/Dockerfile -t disbot:latest
+id=$(docker create disbot)
+docker cp $id:/app disbot
+docker rm -v $id
 ssh $USER@raspberrypi 'mkdir -p ~/deploy'
-scp disbot.tar $USER@raspberrypi:~/deploy/
-scp docker-compose.yaml $USER@raspberrypi:~/deploy/
-scp prod.env $USER@raspberrypi:~/deploy/
-rm disbot.tar
-ssh $USER@raspberrypi 'cd ~/deploy && docker load -i disbot.tar && docker-compose up -d && docker image prune -fa'
+scp "$env.env" $USER@raspberrypi:~/deploy/
+ssh -t $USER@raspberrypi 'sudo systemctl stop '"disbot-$env"
+scp disbot $USER@raspberrypi:~/deploy/"disbot-$env"
+ssh -t $USER@raspberrypi 'sudo systemctl restart '"disbot-$env"
+rm disbot

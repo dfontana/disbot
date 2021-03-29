@@ -44,7 +44,7 @@ impl ShrugHandler {
     let mentions_user = msg.mentions.iter().find(|user| {
       self
         .config
-        .get_emote_users()
+        .emote_users
         .iter()
         .any(|cname| *cname.to_lowercase() == user.name.to_lowercase())
     });
