@@ -65,6 +65,7 @@ impl Wol {
       .arg(format!("{}", &self.ip))
       .args(&["-c", "1"])
       .args(&["-W", "1"])
+      .stdout(Stdio::null())
       .status()
       .map_err(|e| format!("Failed to run Ping: {}", e))?
       .code();

@@ -49,6 +49,6 @@ async fn stop(ctx: &Context, msg: &Message, _: Args) -> CommandResult {
     }
   }
 
-  Debug::inst("server_start").log("Server has Woken");
+  Debug::inst("server_stop").log("Server has stopped");
   Ok(())
 }
