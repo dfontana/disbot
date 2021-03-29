@@ -25,17 +25,37 @@ SERVER_USER=<game-server-user>
 #You can repeat this for dev.env as well
 ```
 
-1. Launch with `docker-compose up --build` or with `cargo run dev`. Alternatively, if your raspberry pi is configured on the local network as expected, you can run `./deploy.sh`
+1. Launch with `cargo run dev`. Alternatively, if your raspberry pi is configured on the local network as expected, you can run `./deploy.sh`
+
+### (First time Deploy Setup)
+
+1. Create a systemd service file like so:
+
+```
+[Unit]
+Description=Disbot Service File
+After=network.target
+
+[Service]
+Type=simple
+Restart=always
+RestartSec=1
+User=<user>
+ExecStart=/home/<user>/deploy/disbot prod
+WorkingDirectory=/home/<user>/deploy
+
+[Install]
+WantedBy=multi-user.target
+```
+
+1. `systemctl start disbot`
+1. `systemctl enable disbot`
+1. logs: `journalctl -u disbot -b -f` (`-b` is current boot filter)
 
 ### Gotchas
 
 - Ensure the `SERVER_USER` has sudo-er privileged to run `shutdown` without a password. (Eg: `sudo visudo -> [user]\tALL=NOPASSWD:[pathToBin1],[pathtoBin2],...`)
 - Equally, ensure the bot's host can run `ssh` without a password (eg setup it's SSH keys).
-
-When running in docker (eg not `cargo run...`), a related set of gotchas come:
-
-- `SSH_AUTH_SOCK` needs to be set during compose startup, so the docker container can access SSH keys
-- Which the `deploy.sh` script will ensure by running `eval $(ssh-agent)`
 
 ## Invite Shruggin' Shiba to Your Server
 
