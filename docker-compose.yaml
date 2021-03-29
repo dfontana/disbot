@@ -1,11 +1,29 @@
 version: "3.8"
 services:
-  disbot:
-    container_name: disbot
+  disbot-prod:
+    container_name: disbot-prod
     build:
       context: .
       dockerfile: ./docker/disbot/Dockerfile
-    image: disbot:latest
+      args:
+        RUN_ENV: prod
+    environment:
+      RUN_ENV: prod
+    image: disbot-prod:latest
     deploy:
       restart_policy:
         condition: on-failure
+
+  disbot-dev:
+    container_name: disbot-dev
+    build:
+      context: .
+      dockerfile: ./docker/disbot/Dockerfile
+      args:
+        RUN_ENV: dev
+    environment:
+      RUN_ENV: dev
+      SSH_AUTH_SOCK: /tmp/agent.sock
+    volumes:
+      - $SSH_AUTH_SOCK:/tmp/agent.sock
+    image: disbot-dev:latest

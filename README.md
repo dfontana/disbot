@@ -29,8 +29,13 @@ SERVER_USER=<game-server-user>
 
 ### Gotchas
 
-- Ensure the `SERVER_USER` has sudo-er privilage to run `shutdown` without a password. (Eg: `sudo visudo -> [user]\tALL=NOPASSWD:[pathToBin1],[pathtoBin2],...`)
+- Ensure the `SERVER_USER` has sudo-er privileged to run `shutdown` without a password. (Eg: `sudo visudo -> [user]\tALL=NOPASSWD:[pathToBin1],[pathtoBin2],...`)
 - Equally, ensure the bot's host can run `ssh` without a password (eg setup it's SSH keys).
+
+When running in docker (eg not `cargo run...`), a related set of gotchas come:
+
+- `SSH_AUTH_SOCK` needs to be set during compose startup, so the docker container can access SSH keys
+- Which the `deploy.sh` script will ensure by running `eval $(ssh-agent)`
 
 ## Invite Shruggin' Shiba to Your Server
 

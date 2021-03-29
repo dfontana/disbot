@@ -62,7 +62,6 @@ impl Wol {
 
   pub fn is_awake(&self) -> Result<bool, String> {
     let res = Command::new("ping")
-      .stdout(Stdio::null())
       .arg(format!("{}", &self.ip))
       .args(&["-c", "1"])
       .args(&["-W", "1"])
@@ -107,10 +106,15 @@ impl Wol {
       return Ok(diff as u64);
     }
 
+    // This is a bit dangerous piece of code here; given we're not host checking
+    // and relying on running a sudo command on the remote host. Ideally we wouldn't
+    // need to do this, but given there's no known alternate at the moment and
+    // it's a closed system, it's 'good enough'
     let res = Command::new("ssh")
       .arg("-t")
       .arg(format!("{}@{}", &self.user, &self.ip))
       .args(&["-o", "PasswordAuthentication=no"])
+      .args(&["-o", "StrictHostKeyChecking=no"])
       .args(&["-o", "ConnectTimeout=1"])
       .args(&["-o", "BatchMode=yes"])
       .arg("sudo shutdown now")

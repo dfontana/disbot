@@ -33,9 +33,13 @@ struct General;
 
 #[tokio::main]
 async fn main() {
-  let env = std::env::args().nth(1).map_or(Environment::default(), |v| {
-    Environment::from_str(&v).unwrap()
-  });
+  let env = std::env::args()
+    .nth(1)
+    .or_else(|| std::env::var("RUN_ENV").ok())
+    .map_or(Environment::default(), |v| {
+      println!("Given '{}' env to run", &v);
+      Environment::from_str(&v).unwrap()
+    });
   dotenv::from_filename(env.as_file()).ok();
   let config = Config::set(env).expect("Err parsing environment");
   emoji::configure(&config).expect("Failed to setup emoji lookup");

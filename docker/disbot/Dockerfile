@@ -20,7 +20,12 @@ RUN cargo build ---target=armv7-unknown-linux-musleabihf --release
 ###################
 # 2. Run
 ###################
-FROM alpine:latest
+# As of writing (3/28/21) the latest version of Alpine (3.13) has a problem where internet fails
+# for the raspberrypi which breaks literally everything. See https://gitlab.alpinelinux.org/alpine/aports/-/issues/12091
+FROM alpine:3.12
+ARG RUN_ENV
+RUN apk add --no-cache curl ca-certificates openssh
 COPY --from=builder /home/rust/src/cache_build/target/armv7-unknown-linux-musleabihf/release/disbot /app
-COPY --from=builder /home/rust/src/cache_build/prod.env /prod.env
+COPY --from=builder /home/rust/src/cache_build/$RUN_ENV.env /$RUN_ENV.env
+
 ENTRYPOINT ["/app"]
