@@ -8,7 +8,7 @@ docker cp $id:/app disbot
 docker rm -v $id
 ssh $USER@raspberrypi 'mkdir -p ~/deploy'
 scp "$env.env" $USER@raspberrypi:~/deploy/
-ssh -t $USER@raspberrypi 'sudo systemctl stop disbot'
-scp disbot $USER@raspberrypi:~/deploy/
-ssh -t $USER@raspberrypi 'sudo systemctl restart disbot'
+ssh -t $USER@raspberrypi 'sudo systemctl stop '"disbot-$env"
+scp disbot $USER@raspberrypi:~/deploy/"disbot-$env"
+ssh -t $USER@raspberrypi 'sudo systemctl restart '"disbot-$env"
 rm disbot

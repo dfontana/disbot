@@ -29,7 +29,7 @@ SERVER_USER=<game-server-user>
 
 ### (First time Deploy Setup)
 
-1. Create a systemd service file like so:
+1. Create a systemd service file like so (you might repeat for dev):
 
 ```
 [Unit]
@@ -41,7 +41,7 @@ Type=simple
 Restart=always
 RestartSec=1
 User=<user>
-ExecStart=/home/<user>/deploy/disbot prod
+ExecStart=/home/<user>/deploy/disbot-prod prod
 WorkingDirectory=/home/<user>/deploy
 
 [Install]
