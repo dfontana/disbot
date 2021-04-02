@@ -1,7 +1,7 @@
 version: "3.8"
 
 services:
-  mc:
+  valhelsia:
     image: itzg/minecraft-server:java8
     ports:
       - 25565:25565
