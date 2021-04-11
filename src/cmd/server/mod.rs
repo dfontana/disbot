@@ -1,9 +1,11 @@
 use serenity::framework::standard::macros::group;
 
+mod list;
 mod start;
 mod stop;
 mod wol;
 
+use list::*;
 use start::*;
 use stop::*;
 pub use wol::configure;
@@ -12,5 +14,5 @@ pub use wol::configure;
 #[description = "Game Server Management tools, for turning on, off, and switching servers"]
 #[summary = "Sheebs Givith Games"]
 #[prefix = "server"]
-#[commands(stop, start)]
+#[commands(list, stop, start)]
 pub struct Server;

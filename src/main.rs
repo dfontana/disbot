@@ -1,3 +1,5 @@
+#[macro_use]
+extern crate derive_builder;
 extern crate dotenv;
 extern crate hex;
 #[macro_use]
@@ -10,6 +12,7 @@ extern crate select;
 mod cmd;
 mod config;
 mod debug;
+mod docker;
 mod emoji;
 mod env;
 
@@ -45,6 +48,7 @@ async fn main() {
   emoji::configure(&config).expect("Failed to setup emoji lookup");
   debug::configure(&config).expect("Failed to setup debug logger");
   cmd::server::configure(&config.server).expect("Failed to setup game server");
+  docker::configure(&config.server).expect("Failed to setup docker for game server");
   let framework = StandardFramework::new()
     .configure(|c| c.prefix("!"))
     .group(&GENERAL_GROUP)

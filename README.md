@@ -20,6 +20,7 @@ EMOTE_NAME=<your-emote || shrug_dog>
 EMOTE_USERS=<csv of users || User1,User2,User3>
 SERVER_MAC=<game-server-mac>
 SERVER_IP=<game-server-ip>
+SERVER_DOCKER_PORT=<docker-tcp-port-on-game-server>
 SERVER_USER=<game-server-user>
 
 #You can repeat this for dev.env as well
@@ -51,6 +52,26 @@ WantedBy=multi-user.target
 1. `systemctl start disbot`
 1. `systemctl enable disbot`
 1. logs: `journalctl -u disbot -b -f` (`-b` is current boot filter)
+
+### Docker interactions
+
+For docker interactions to work over the local network you'll need to edit the systemd service to enable TCP access over the local network:
+
+```
+sudo vim /etc/systemd/system/snap.docker.dockerd.service
+
+...
+ExecStart=/usr/bin/snap run docker.dockerd -H tcp://0.0.0.0:2375 -H unix:///var/run/docker.sock
+```
+
+And then reload the daemon:
+
+```
+sudo systemctl daemon-reload
+sudo systemctl restart snap.docker.dockerd.service
+```
+
+Validate: `curl http://localhost:2375/v1.40/containers/json`. This will need to be repeated each time the snap is updated. Ideally this isn't a problem if the daemon can be configured from outside the snap, however it's unclear if that's plausible at this point in time.
 
 ### Gotchas
 
