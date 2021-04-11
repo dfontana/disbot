@@ -78,17 +78,18 @@ impl Wol {
   }
 
   pub fn ensure_awake(&self) -> Result<bool, String> {
-    self.is_awake()
-    .map_err(|err| {
-      Debug::inst("wol").log(&format!("Failed to check Game Server is awake - {}", err));
-      "Failed to determine if Game Server is up".into()
-    })
-    .and_then(|is_awake| {
-      if !is_awake {
-        return Err("Server is not awake, please start server".into())
-      }
-      Ok(is_awake)
-    })
+    self
+      .is_awake()
+      .map_err(|err| {
+        Debug::inst("wol").log(&format!("Failed to check Game Server is awake - {}", err));
+        "Failed to determine if Game Server is up".into()
+      })
+      .and_then(|is_awake| {
+        if !is_awake {
+          return Err("Server is not awake, please start server".into());
+        }
+        Ok(is_awake)
+      })
   }
 
   pub fn awake(&self) -> std::io::Result<()> {
