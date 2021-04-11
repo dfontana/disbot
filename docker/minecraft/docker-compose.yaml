@@ -2,11 +2,14 @@ version: "3.8"
 
 services:
   valhelsia:
+    labels:
+      game: "minecraft"
+      version: "valhelsia"
     image: itzg/minecraft-server:java8
     ports:
       - 25565:25565
     environment:
-      MEMORY: 5G
+      MEMORY: 8G
       EULA: "TRUE"
       TYPE: CURSEFORGE
       CF_SERVER_MOD: /modpacks/Valhelsia+3-3.2.3-SERVER.zip
@@ -14,3 +17,4 @@ services:
     volumes:
       - ./modpacks:/modpacks:ro
       - ./valhelsia:/data
+    restart: always
