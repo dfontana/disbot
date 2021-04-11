@@ -21,6 +21,7 @@ pub struct ServerConfig {
   pub mac: String,
   pub ip: String,
   pub user: String,
+  pub port: usize,
 }
 
 impl Default for ServerConfig {
@@ -29,6 +30,7 @@ impl Default for ServerConfig {
       mac: "".to_owned(),
       ip: "".to_owned(),
       user: "".to_owned(),
+      port: 0,
     }
   }
 }
@@ -59,6 +61,12 @@ impl Config {
         mac: env::var("SERVER_MAC")?,
         ip: env::var("SERVER_IP")?,
         user: env::var("SERVER_USER")?,
+        port: env::var("SERVER_DOCKER_PORT")
+          .map(|v| {
+            v.parse::<usize>()
+              .expect("SERVER_DOCKER_PORT not a valid number")
+          })
+          .unwrap_or(2375),
       },
     };
     if let Ok(mut inst) = INSTANCE.try_write() {
