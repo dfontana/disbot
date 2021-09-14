@@ -4,10 +4,10 @@ env=${1:-dev}
 host=${2:-raspberrypi}
 
 # Build on remote
-ssh $USER@$host 'mkdir ~/build' 
-scp src/ $USER@$host:~/build
+ssh $USER@$host 'mkdir -p ~/build' 
+scp -r src/ $USER@$host:~/build
 scp Cargo.* $USER@$host:~/build
-ssh $USER@$host 'cd ~/build && cargo build --release'
+ssh $USER@$host 'cd ~/build && '"/home/$USER/"'.cargo/bin/cargo build --release'
 
 # Deploy
 ssh $USER@$host 'mkdir -p ~/deploy'

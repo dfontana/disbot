@@ -23,6 +23,7 @@ async fn play(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
   // TODO clean this up
   // TODO trackqueue https://serenity-rs.github.io/songbird/current/songbird/tracks/struct.TrackQueue.html
   // TODO form driver https://serenity-rs.github.io/songbird/current/songbird/struct.Call.html
+  // TODO disconnect the bot with the stop command or something
     let guild = msg.guild(&ctx.cache).await.unwrap();
     let guild_id = guild.id;
 
