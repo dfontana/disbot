@@ -15,6 +15,7 @@ mod ready;
 mod reddit_prev;
 pub mod server;
 mod shrug;
+pub mod voice;
 
 pub struct Handler {
   ready: ready::ReadyHandler,
