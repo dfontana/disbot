@@ -33,8 +33,12 @@ SERVER_USER=<game-server-user>
 Install required dependencies for the songbird functionality to work:
 
 ```
-apt install libopus-dev ffmpeg youtube-dl
+apt install libopus-dev ffmpeg
+curl -L https://yt-dl.org/downloads/latest/youtube-dl -o youtube-dl
+mv youtube-dl /usr/local/bin
 ```
+
+(If you need to update `youtube-dl` use the `-U` flag)
 
 1. Create a systemd service file like so (you might repeat for dev):
 
@@ -87,8 +91,6 @@ Validate: `curl http://localhost:2375/v1.40/containers/json`. This will need to 
 ## Invite Shruggin' Shiba to Your Server
 
 [Invite Link](https://discord.com/api/oauth2/authorize?client_id=764937518570536990&permissions=342080&scope=bot)
-
-Note: You need intents: `GUILD_VOICE_STATES`
 
 ## This Project Uses
 

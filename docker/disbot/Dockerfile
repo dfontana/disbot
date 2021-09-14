@@ -2,6 +2,10 @@
 # 0. Prep Builder 
 ####################
 FROM messense/rust-musl-cross:armv7-musleabihf as builder
+# Added these apt for cross compile, but it's currently broken
+# https://github.com/serenity-rs/songbird/issues/80
+RUN apt update
+RUN apt install --no-install-recommends -y pkg-config libssl-dev autoconf libtool libopus-dev ffmpeg youtube-dl
 RUN USER=root cargo new --bin cache_build
 WORKDIR ./cache_build
 COPY ./Cargo.toml ./Cargo.toml
