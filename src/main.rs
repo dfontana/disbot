@@ -24,7 +24,7 @@ use serenity::{
 };
 use songbird::SerenityInit;
 
-use cmd::{dice_roll::*, help::*, poll::*, server::*, voice::*,  Handler};
+use cmd::{dice_roll::*, help::*, poll::*, server::*, voice::*, Handler};
 use config::Config;
 use env::Environment;
 
