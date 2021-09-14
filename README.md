@@ -3,7 +3,7 @@
 A Discord Bot, that I'm not sure what it'll do yet - but I wanted to have something that:
 
 - Powered by Rust
-- Deployed via Docker
+- Deployed via Systemctl 
 - To a locally running Raspberry Pi
 
 The rest I don't really care about at the moment :shrug-dog:
@@ -29,6 +29,18 @@ SERVER_USER=<game-server-user>
 1. Launch with `cargo run dev`. Alternatively, if your raspberry pi is configured on the local network as expected, you can run `./deploy.sh`
 
 ### (First time Deploy Setup)
+
+Install required dependencies for the songbird functionality to work:
+
+```
+apt install libopus-dev ffmpeg
+curl -L https://yt-dl.org/downloads/latest/youtube-dl -o youtube-dl
+mv youtube-dl /usr/local/bin
+```
+
+(If you need to update `youtube-dl` use the `-U` flag)
+
+You'll also need `cross` installed to [cross compile](https://github.com/rust-embedded/cross).
 
 1. Create a systemd service file like so (you might repeat for dev):
 
@@ -85,4 +97,4 @@ Validate: `curl http://localhost:2375/v1.40/containers/json`. This will need to 
 ## This Project Uses
 
 - [Serenity](https://github.com/serenity-rs/serenity) for the Discord API
-- [rust-musl-cross](https://github.com/messense/rust-musl-cross) for local compilation in docker
+- [cross](https://github.com/rust-embedded/cross) for local compilation in docker

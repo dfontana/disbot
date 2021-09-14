@@ -22,8 +22,9 @@ use serenity::{
   client::{bridge::gateway::GatewayIntents, Client},
   framework::standard::{macros::group, StandardFramework},
 };
+use songbird::SerenityInit;
 
-use cmd::{dice_roll::*, help::*, poll::*, server::*, Handler};
+use cmd::{dice_roll::*, help::*, poll::*, server::*, voice::*, Handler};
 use config::Config;
 use env::Environment;
 
@@ -31,7 +32,7 @@ use env::Environment;
 #[description = "Utilities the Sheebs has Graced You With"]
 #[summary = "Utilities Sheebs Givith"]
 #[commands(roll, poll)]
-#[sub_groups(server)]
+#[sub_groups(server, voice)]
 struct General;
 
 #[tokio::main]
@@ -59,9 +60,11 @@ async fn main() {
       GatewayIntents::GUILDS
         | GatewayIntents::GUILD_EMOJIS
         | GatewayIntents::GUILD_MESSAGES
-        | GatewayIntents::GUILD_MESSAGE_REACTIONS,
+        | GatewayIntents::GUILD_MESSAGE_REACTIONS
+        | GatewayIntents::GUILD_VOICE_STATES,
     )
     .framework(framework)
+    .register_songbird()
     .event_handler(Handler::new(config.clone()))
     .await
     .expect("Err creating client");
