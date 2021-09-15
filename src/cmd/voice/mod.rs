@@ -176,8 +176,8 @@ async fn stop(ctx: &Context, msg: &Message, _args: Args) -> CommandResult {
     let handler = handler_lock.lock().await;
     let queue = handler.queue();
     let _ = queue.stop();
-
-    check_msg(msg.channel_id.say(&ctx.http, "Queue cleared.").await);
+    let _dc = manager.remove(guild_id).await;
+    check_msg(msg.channel_id.say(&ctx.http, "Cya later.").await);
   } else {
     check_msg(
       msg
