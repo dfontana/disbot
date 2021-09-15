@@ -1,7 +1,9 @@
+use crate::emoji::EmojiLookup;
 use serenity::{
   client::Context,
   framework::standard::{macros::command, Args, CommandResult},
   model::channel::Message,
+  utils::MessageBuilder,
 };
 
 #[command]
@@ -14,6 +16,8 @@ async fn stop(ctx: &Context, msg: &Message, _args: Args) -> CommandResult {
     .await
     .expect("Songbird Voice client placed in at initialisation.")
     .clone();
+
+  let emoji = EmojiLookup::inst().get(guild_id, &ctx.cache).await?;
 
   match manager.get(guild_id) {
     None => {
@@ -30,7 +34,17 @@ async fn stop(ctx: &Context, msg: &Message, _args: Args) -> CommandResult {
     }
   }
   let _dc = manager.remove(guild_id).await;
-  let _rep = msg.channel_id.say(&ctx.http, "Cya later.").await;
+  let _rep = msg
+    .channel_id
+    .say(
+      &ctx.http,
+      MessageBuilder::new()
+        .mention(&emoji)
+        .push(" Cya later NERD ")
+        .mention(&emoji)
+        .build(),
+    )
+    .await;
 
   Ok(())
 }

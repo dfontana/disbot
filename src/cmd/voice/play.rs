@@ -1,7 +1,9 @@
+use crate::{debug::Debug, emoji::EmojiLookup};
 use serenity::{
   client::Context,
   framework::standard::{macros::command, Args, CommandResult},
   model::channel::Message,
+  utils::MessageBuilder,
 };
 
 use songbird::{
@@ -54,12 +56,14 @@ async fn play(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
   let source = match Restartable::ytdl(url, true).await {
     Ok(source) => source,
     Err(why) => {
-      println!("Err starting source: {:?}", why);
+      Debug::inst("voice").log(&format!("Err starting source: {:?}", why));
       let _ = msg.channel_id.say(&ctx.http, "Error sourcing ffmpeg").await;
       return Ok(());
     }
   };
   let input = Input::from(source);
+
+  let emoji = EmojiLookup::inst().get(guild_id, &ctx.cache).await?;
 
   let title = input
     .metadata
@@ -71,7 +75,17 @@ async fn play(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
   let mut handler = handler_lock.lock().await;
   handler.set_bitrate(Bitrate::Max);
   handler.enqueue_source(input);
-  let reply = format!("**Queued** ({:?}) `{}`", handler.queue().len(), title,);
-  let _ = msg.channel_id.say(&ctx.http, reply).await;
+  let _ = msg
+    .channel_id
+    .say(
+      &ctx.http,
+      MessageBuilder::new()
+        .push_bold("Queued")
+        .push(format!(" ({}) ", handler.queue().len()))
+        .push_mono(title)
+        .mention(&emoji)
+        .build(),
+    )
+    .await;
   Ok(())
 }

@@ -1,7 +1,10 @@
+use crate::emoji::EmojiLookup;
+
 use serenity::{
   client::Context,
   framework::standard::{macros::command, Args, CommandResult},
   model::channel::Message,
+  utils::MessageBuilder,
 };
 
 #[command]
@@ -15,6 +18,8 @@ async fn skip(ctx: &Context, msg: &Message, _args: Args) -> CommandResult {
     .expect("Songbird Voice client placed in at initialisation.")
     .clone();
 
+  let emoji = EmojiLookup::inst().get(guild_id, &ctx.cache).await?;
+
   match manager.get(guild_id) {
     None => {
       let _ = msg
@@ -26,8 +31,16 @@ async fn skip(ctx: &Context, msg: &Message, _args: Args) -> CommandResult {
       let handler = handler_lock.lock().await;
       let queue = handler.queue();
       let _ = queue.skip();
-      let reply = format!("Song skipped: {} in queue.", queue.len());
-      let _res = msg.channel_id.say(&ctx.http, reply).await;
+      let _res = msg
+        .channel_id
+        .say(
+          &ctx.http,
+          MessageBuilder::new()
+            .push("I didn't like that song either ")
+            .mention(&emoji)
+            .build(),
+        )
+        .await;
     }
   }
   Ok(())
