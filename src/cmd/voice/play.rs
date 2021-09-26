@@ -12,6 +12,7 @@ use songbird::{
 };
 
 #[command]
+#[description = "Play a sound clip via link or search term"]
 #[only_in(guilds)]
 async fn play(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
   // Pull out the URL requested if there is one
