@@ -11,7 +11,6 @@ extern crate select;
 
 mod cmd;
 mod config;
-mod debug;
 mod docker;
 mod emoji;
 mod env;
@@ -23,6 +22,8 @@ use serenity::{
   framework::standard::{macros::group, StandardFramework},
 };
 use songbird::SerenityInit;
+use tracing::{error, Level};
+use tracing_subscriber;
 
 use cmd::{dice_roll::*, help::*, poll::*, server::*, voice::*, Handler};
 use config::Config;
@@ -46,10 +47,15 @@ async fn main() {
     });
   dotenv::from_filename(env.as_file()).ok();
   let config = Config::set(env).expect("Err parsing environment");
+
+  tracing_subscriber::fmt()
+    .with_max_level(Level::from_str(&config.log_level).unwrap())
+    .with_target(false)
+    .init();
   emoji::configure(&config).expect("Failed to setup emoji lookup");
-  debug::configure(&config).expect("Failed to setup debug logger");
   cmd::server::configure(&config.server).expect("Failed to setup game server");
   docker::configure(&config.server).expect("Failed to setup docker for game server");
+
   let framework = StandardFramework::new()
     .configure(|c| c.prefix("!"))
     .group(&GENERAL_GROUP)
@@ -70,6 +76,6 @@ async fn main() {
     .expect("Err creating client");
 
   if let Err(why) = client.start().await {
-    println!("Client error: {:?}", why);
+    error!("Failed to start Discord Client {:?}", why);
   }
 }

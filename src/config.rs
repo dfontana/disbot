@@ -13,6 +13,7 @@ pub struct Config {
   pub emote_name: String,
   pub emote_users: Vec<String>,
   pub env: Environment,
+  pub log_level: String,
   pub server: ServerConfig,
 }
 
@@ -42,6 +43,7 @@ impl Default for Config {
       emote_name: "".to_owned(),
       emote_users: Vec::new(),
       env: Environment::DEV,
+      log_level: "INFO".to_string(),
       server: ServerConfig::default(),
     }
   }
@@ -57,6 +59,7 @@ impl Config {
         .map(|x| x.to_string())
         .collect(),
       env,
+      log_level: env::var("LOG_LEVEL")?,
       server: ServerConfig {
         mac: env::var("SERVER_MAC")?,
         ip: env::var("SERVER_IP")?,
@@ -73,14 +76,5 @@ impl Config {
       *inst = c.clone();
     }
     Ok(c.clone())
-  }
-
-  pub fn inst() -> Result<Config, String> {
-    Ok(
-      INSTANCE
-        .try_read()
-        .map_err(|_| "Failed to get config read lock")?
-        .clone(),
-    )
   }
 }
