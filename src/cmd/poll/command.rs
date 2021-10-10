@@ -1,9 +1,10 @@
-use std::{error::Error, time::Duration};
+use std::error::Error;
 
 use crate::{
   cmd::poll::{cache::Cache, pollstate::PollState},
   emoji::EmojiLookup,
 };
+use humantime::format_duration;
 use serenity::{
   client::Context,
   framework::standard::{macros::command, Args, CommandResult},
@@ -14,19 +15,17 @@ use serenity::{
   },
   utils::MessageBuilder,
 };
-use tracing::{error, instrument};
-
-const EXPIRATION: u64 = 86400;
+use tracing::{error, instrument, warn};
 
 lazy_static! {
-  static ref POLL_STATES: Cache<MessageId, PollState> = Cache::new(Duration::from_secs(EXPIRATION));
+  static ref POLL_STATES: Cache<MessageId, PollState> = Cache::new();
 }
 
 #[command]
 #[description = "Create a Poll with up to 9 Options. Double quote each argument."]
-#[usage = "pollQuestion voteItem1 voteItem2 [voteItem3] ... [voteItem9]"]
-#[example = "\"Whats the right pet?\" \"cats\" \"dogs\" will create a 2 option poll"]
-#[min_args(3)]
+#[usage = "poll Duration Question voteItem1 voteItem2 [voteItem3] ... [voteItem9]"]
+#[example = "\"1hour\" \"Whats the right pet?\" \"cats\" \"dogs\" will create a 2 option poll expiiring in 1 hour. Valid time units: 'day', 'hour', 'minute'"]
+#[min_args(4)]
 #[max_args(10)]
 async fn poll(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
   let guild_id = match msg.guild_id {
@@ -55,6 +54,7 @@ async fn poll(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
   }
 
   // Register globally
+  let exp = poll_state.duration.clone();
   POLL_STATES.insert(res_msg.id, poll_state)?;
 
   // Setup the expiration action
@@ -63,12 +63,15 @@ async fn poll(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
   let exp_key = res_msg.id.clone();
   let exp_emote = emoji.clone();
   tokio::spawn(async move {
-    tokio::time::sleep(Duration::from_secs(EXPIRATION)).await;
+    tokio::time::sleep(exp).await;
     let resp = match POLL_STATES.invoke(&exp_key, |p| build_exp_message(&exp_emote, p)) {
       Err(_) => "Poll has ended -- failed to get details".to_string(),
       Ok(v) => v,
     };
     let _ = exp_chan.say(&exp_http, resp).await;
+    if let Err(e) = POLL_STATES.remove(&exp_key) {
+      warn!("Failed to reap poll on exp: {}", e);
+    }
   });
 
   Ok(())
@@ -170,7 +173,7 @@ fn build_poll_message(emoji: &Emoji, poll_state: &PollState) -> String {
     .push_line("")
     .push_line("")
     .push_bold(&poll_state.topic)
-    .push_italic(" (exp in 24hrs)")
+    .push_italic(format!(" (exp in {})", format_duration(poll_state.duration)))
     .push_line("")
     .push_codeblock(&bar_vec.join("\n"), Some("m"))
     .build()

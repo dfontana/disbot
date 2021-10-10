@@ -5,9 +5,12 @@ use std::{
   time::{Duration, Instant},
 };
 
-pub struct Cache<K: Eq + Hash + Clone, V> {
-  expiration: Duration,
+pub struct Cache<K: Eq + Hash + Clone, V: Expiring> {
   cache: RwLock<HashMap<K, Timestamped<V>>>,
+}
+
+pub trait Expiring {
+  fn duration(&self) -> Duration;
 }
 
 struct Timestamped<V> {
@@ -28,10 +31,9 @@ impl<V> Timestamped<V> {
   }
 }
 
-impl<K: Eq + Hash + Clone, V> Cache<K, V> {
-  pub fn new(expiration: Duration) -> Cache<K, V> {
-    Cache {
-      expiration,
+impl<K: Eq + Hash + Clone, V: Expiring> Cache<K, V> {
+  pub fn new() -> Cache<K, V> {
+    Cache { 
       cache: RwLock::new(HashMap::new()),
     }
   }
@@ -47,12 +49,13 @@ impl<K: Eq + Hash + Clone, V> Cache<K, V> {
     match self.cache.write() {
       Err(e) => Err(format!("Failed to aquire lock - {}", e)),
       Ok(mut lock) => {
+        let exp = &value.duration().clone();
         lock.insert(key, Timestamped::new(value));
 
         // Reap expired items
         let drop_keys: Vec<K> = lock
           .iter()
-          .filter_map(|(k, v)| match v.expired(&self.expiration) {
+          .filter_map(|(k, v)| match v.expired(exp) {
             true => Some(k.clone()),
             false => None,
           })
@@ -60,6 +63,16 @@ impl<K: Eq + Hash + Clone, V> Cache<K, V> {
         drop_keys.iter().for_each(|k| {
           lock.remove(&k);
         });
+        Ok(())
+      }
+    }
+  }
+
+  pub fn remove(&self, key: &K) -> Result<(), String> {
+    match self.cache.write() {
+      Err(e) => Err(format!("Failed to aquire lock - {}", e)),
+      Ok(mut lock) => {
+        lock.remove(key);
         Ok(())
       }
     }
