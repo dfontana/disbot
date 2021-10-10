@@ -1,5 +1,6 @@
 use serenity::framework::standard::macros::group;
 
+mod connect_util;
 mod list;
 mod play;
 mod reorder;

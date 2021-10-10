@@ -1,5 +1,5 @@
 use serenity::{model::gateway::Ready, prelude::Context};
-use tracing::{info, info_span};
+use tracing::{info, instrument};
 
 pub struct ReadyHandler {}
 
@@ -8,9 +8,8 @@ impl ReadyHandler {
     ReadyHandler {}
   }
 
+  #[instrument(name = "Ready", level = "INFO", skip(self, ready))]
   pub async fn ready(&self, _: &Context, ready: &Ready) {
-    let span = info_span!("Ready");
-    let _enter = span.enter();
     info!("{} is connected!", ready.user.name);
   }
 }

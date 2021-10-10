@@ -1,10 +1,11 @@
-use crate::emoji::EmojiLookup;
+use crate::{cmd::voice::connect_util::ChannelDisconnectBuilder, emoji::EmojiLookup};
 use serenity::{
   client::Context,
   framework::standard::{macros::command, Args, CommandResult},
   model::channel::Message,
   utils::MessageBuilder,
 };
+
 use tracing::{error, instrument};
 
 use songbird::{
@@ -61,6 +62,17 @@ async fn exec_play(ctx: &Context, msg: &Message, mut args: Args) -> CommandResul
     .expect("Songbird Voice client placed in at initialisation.")
     .clone();
   let (handler_lock, _success) = manager.join(guild_id, connect_to).await;
+
+  // Add disconnect handler as needed
+  let _reg = ChannelDisconnectBuilder::default()
+    .manager(manager)
+    .http(ctx.http.clone())
+    .guild(guild_id)
+    .channel(msg.channel_id.clone())
+    .emoji(EmojiLookup::inst().get(guild_id, &ctx.cache).await?)
+    .build()?
+    .maybe_register_handler(&handler_lock)
+    .await;
 
   // Queue up the source
   let is_url = searchterm.starts_with("http");
