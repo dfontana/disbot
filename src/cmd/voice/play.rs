@@ -11,7 +11,11 @@ use serenity::{
 use std::{sync::Arc, time::Duration};
 use tracing::{error, info, instrument};
 
-use songbird::{Event, EventContext, EventHandler, Songbird, driver::Bitrate, input::{restartable::Restartable, Input}};
+use songbird::{
+  driver::Bitrate,
+  input::{restartable::Restartable, Input},
+  Event, EventContext, EventHandler, Songbird,
+};
 
 lazy_static! {
   static ref HANDLER_ADDED: RwLock<bool> = RwLock::new(false);
@@ -73,7 +77,10 @@ async fn exec_play(ctx: &Context, msg: &Message, mut args: Args) -> CommandResul
     let mut handler = handler_lock.lock().await;
     handler.add_global_event(
       Event::Periodic(Duration::from_secs(30), None),
-      ChannelDisconnect {manager, guild: guild_id},
+      ChannelDisconnect {
+        manager,
+        guild: guild_id,
+      },
     );
   }
 
@@ -133,17 +140,15 @@ impl EventHandler for ChannelDisconnect {
   #[instrument(name = "VoiceTimeoutListener", level = "INFO", skip(self, _ctx))]
   async fn act(&self, _ctx: &EventContext<'_>) -> Option<Event> {
     info!("Checking for inactivity...");
-     match self.manager.get(self.guild) {
-      None => None,
-      Some(handler_lock) => {
-        let handler = handler_lock.lock().await;
-        if handler.queue().is_empty() {
-          info!("Disconnecting client for inactivity");
-          let _dc = self.manager.remove(self.guild).await;
-          info!("Disconnected");
-        }
-        None
-      }
+    let should_close = match self.manager.get(self.guild) {
+      None => false,
+      Some(handler_lock) => handler_lock.lock().await.queue().is_empty(),
+    };
+    if should_close {
+      info!("Disconnecting client for inactivity");
+      let _dc = self.manager.leave(self.guild).await;
+      info!("Disconnected");
     }
+    None
   }
 }

@@ -38,7 +38,7 @@ async fn stop(ctx: &Context, msg: &Message, _args: Args) -> CommandResult {
     }
   }
   info!("Disconnecting from voice");
-  let _dc = manager.remove(guild_id).await;
+  let _dc = manager.leave(guild_id).await;
   let _rep = msg
     .channel_id
     .say(
