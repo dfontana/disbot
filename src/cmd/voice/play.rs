@@ -1,16 +1,21 @@
 use crate::emoji::EmojiLookup;
 use serenity::{
+  async_trait,
   client::Context,
   framework::standard::{macros::command, Args, CommandResult},
-  model::channel::Message,
+  model::{channel::Message, id::GuildId},
+  prelude::RwLock,
   utils::MessageBuilder,
+  FutureExt,
 };
-use tracing::{error, instrument};
+use std::{sync::Arc, time::Duration};
+use tracing::{error, info, instrument};
 
-use songbird::{
-  driver::Bitrate,
-  input::{restartable::Restartable, Input},
-};
+use songbird::{Event, EventContext, EventHandler, Songbird, driver::Bitrate, input::{restartable::Restartable, Input}};
+
+lazy_static! {
+  static ref HANDLER_ADDED: RwLock<bool> = RwLock::new(false);
+}
 
 #[command]
 #[description = "Play a sound clip via link or search term"]
@@ -62,6 +67,16 @@ async fn exec_play(ctx: &Context, msg: &Message, mut args: Args) -> CommandResul
     .clone();
   let (handler_lock, _success) = manager.join(guild_id, connect_to).await;
 
+  // On first connect, add disconnect handler
+  if !HANDLER_ADDED.read().map(|g| *g).await {
+    let _fut = HANDLER_ADDED.write().map(|mut g| *g = true).await;
+    let mut handler = handler_lock.lock().await;
+    handler.add_global_event(
+      Event::Periodic(Duration::from_secs(30), None),
+      ChannelDisconnect {manager, guild: guild_id},
+    );
+  }
+
   // Queue up the source
   let is_url = searchterm.starts_with("http");
   let resolved_src = match is_url {
@@ -106,4 +121,29 @@ async fn exec_play(ctx: &Context, msg: &Message, mut args: Args) -> CommandResul
   }
   let _ = msg.channel_id.say(&ctx.http, build.build()).await;
   Ok(())
+}
+
+struct ChannelDisconnect {
+  manager: Arc<Songbird>,
+  guild: GuildId,
+}
+
+#[async_trait]
+impl EventHandler for ChannelDisconnect {
+  #[instrument(name = "VoiceTimeoutListener", level = "INFO", skip(self, _ctx))]
+  async fn act(&self, _ctx: &EventContext<'_>) -> Option<Event> {
+    info!("Checking for inactivity...");
+     match self.manager.get(self.guild) {
+      None => None,
+      Some(handler_lock) => {
+        let handler = handler_lock.lock().await;
+        if handler.queue().is_empty() {
+          info!("Disconnecting client for inactivity");
+          let _dc = self.manager.remove(self.guild).await;
+          info!("Disconnected");
+        }
+        None
+      }
+    }
+  }
 }

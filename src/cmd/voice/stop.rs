@@ -5,11 +5,14 @@ use serenity::{
   model::channel::Message,
   utils::MessageBuilder,
 };
+use tracing::{info, info_span};
 
 #[command]
 #[description = "Stop all sound immediately & disconnect"]
 #[only_in(guilds)]
 async fn stop(ctx: &Context, msg: &Message, _args: Args) -> CommandResult {
+  let span = info_span!("VoiceStop");
+  let _enter = span.enter();
   let guild = msg.guild(&ctx.cache).await.unwrap();
   let guild_id = guild.id;
 
@@ -24,7 +27,7 @@ async fn stop(ctx: &Context, msg: &Message, _args: Args) -> CommandResult {
     None => {
       let _ = msg
         .channel_id
-        .say(&ctx.http, "Not in a voice channel to play in")
+        .say(&ctx.http, "Not in a voice channel")
         .await;
       return Ok(());
     }
@@ -34,6 +37,7 @@ async fn stop(ctx: &Context, msg: &Message, _args: Args) -> CommandResult {
       let _ = queue.stop();
     }
   }
+  info!("Disconnecting from voice");
   let _dc = manager.remove(guild_id).await;
   let _rep = msg
     .channel_id
