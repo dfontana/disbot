@@ -121,8 +121,10 @@ impl PollHandler {
 
   #[instrument(name = "Poller", level = "INFO", skip(self, ctx, react))]
   pub async fn add_vote(&self, ctx: &Context, react: &Reaction) {
-    let update_op =
-      |msgid: &MessageId, vote: usize| POLL_STATES.invoke_mut(msgid, |p| p.cast_vote(vote));
+    let user = get_user(&ctx, react).await;
+    let update_op = |msgid: &MessageId, vote: usize| {
+      POLL_STATES.invoke_mut(msgid, |p| p.cast_vote(vote, user.to_owned()))
+    };
     match self._update_poll(ctx, react, update_op).await {
       Err(e) => {
         error!("Failed to add vote {:?}", e);
@@ -134,8 +136,10 @@ impl PollHandler {
 
   #[instrument(name = "Poller", level = "INFO", skip(self, ctx, react))]
   pub async fn remove_vote(&self, ctx: &Context, react: &Reaction) {
-    let update_op =
-      |msgid: &MessageId, vote: usize| POLL_STATES.invoke_mut(msgid, |p| p.revoke_vote(vote));
+    let user = get_user(&ctx, react).await;
+    let update_op = |msgid: &MessageId, vote: usize| {
+      POLL_STATES.invoke_mut(msgid, |p| p.revoke_vote(vote, &user))
+    };
     match self._update_poll(ctx, react, update_op).await {
       Err(e) => {
         error!("Failed to remove vote {:?}", e);
@@ -146,11 +150,22 @@ impl PollHandler {
   }
 }
 
+async fn get_user(ctx: &Context, react: &Reaction) -> String {
+  if let Ok(user) = react.user(&ctx.http).await {
+    if let Some(nick) = user.nick_in(&ctx.http, react.guild_id.unwrap()).await {
+      return nick.to_lowercase().to_owned();
+    } else {
+      return user.name.to_lowercase().to_owned();
+    }
+  }
+  "unknown".to_owned()
+}
+
 fn build_poll_message(emoji: &Emoji, poll_state: &PollState) -> String {
   let mut bar_vec = poll_state
     .votes
     .iter()
-    .map(|(idx, (opt, votes))| {
+    .map(|(idx, (opt, votes, _))| {
       format!(
         "{}: {:<opt_width$} | {:#<votes$}{:<bar_width$} | ({})",
         idx,
@@ -166,6 +181,23 @@ fn build_poll_message(emoji: &Emoji, poll_state: &PollState) -> String {
     .collect::<Vec<String>>();
   bar_vec.sort();
 
+  let mut voter_vec = poll_state
+    .votes
+    .iter()
+    .map(|(idx, (_, _, voters))| {
+      format!(
+        "{}: {}",
+        idx,
+        voters
+          .into_iter()
+          .map(|v| v.to_string())
+          .collect::<Vec<String>>()
+          .join(", ")
+      )
+    })
+    .collect::<Vec<String>>();
+  voter_vec.sort();
+
   MessageBuilder::new()
     .mention(emoji)
     .push_underline("Roommate Poll, Bobby, Roommate Poll!")
@@ -173,9 +205,19 @@ fn build_poll_message(emoji: &Emoji, poll_state: &PollState) -> String {
     .push_line("")
     .push_line("")
     .push_bold(&poll_state.topic)
-    .push_italic(format!(" (exp in {})", format_duration(poll_state.duration)))
+    .push_italic(format!(
+      " (exp in {})",
+      format_duration(poll_state.duration)
+    ))
     .push_line("")
-    .push_codeblock(&bar_vec.join("\n"), Some("m"))
+    .push_codeblock(
+      format!(
+        "{}\n\nVoters:\n{}",
+        &bar_vec.join("\n"),
+        voter_vec.join("\n")
+      ),
+      Some("m"),
+    )
     .build()
 }
 
@@ -185,7 +227,7 @@ fn build_exp_message(emoji: &Emoji, poll_state: &PollState) -> String {
     .values()
     .max_by(|a, b| a.1.cmp(&b.1))
     .map(|v| v.0.to_string())
-    .unwrap_or("No one!".to_string());
+    .unwrap_or("<Error Poll Had No Options?>".to_string());
 
   MessageBuilder::new()
     .mention(emoji)

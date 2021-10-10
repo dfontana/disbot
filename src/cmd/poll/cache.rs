@@ -33,7 +33,7 @@ impl<V> Timestamped<V> {
 
 impl<K: Eq + Hash + Clone, V: Expiring> Cache<K, V> {
   pub fn new() -> Cache<K, V> {
-    Cache { 
+    Cache {
       cache: RwLock::new(HashMap::new()),
     }
   }
