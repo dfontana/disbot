@@ -1,10 +1,10 @@
 use crate::config::Config;
-use crate::debug::Debug;
 use crate::emoji::EmojiLookup;
 use serenity::{
   model::{channel::Message, channel::ReactionType, guild::Emoji},
   prelude::Context,
 };
+use tracing::{error, info, instrument};
 
 pub struct ShrugHandler {
   config: Config,
@@ -30,9 +30,10 @@ impl ShrugHandler {
       .map_err(|_| "Failed to react/Send".to_string())
   }
 
+  #[instrument(name = "Shrug", level = "INFO", skip(self, ctx, msg))]
   pub async fn message(&self, ctx: &Context, msg: &Message) {
     if msg.is_own(&ctx.cache).await {
-      Debug::inst("shrug").log("Skipping, self message");
+      info!("Skipping, self message");
       return;
     }
 
@@ -50,7 +51,7 @@ impl ShrugHandler {
     });
 
     if mentions_user.is_none() {
-      Debug::inst("shrug").log("Did not find a matching user mention");
+      info!("Did not find a matching user mention");
       return;
     }
 
@@ -64,13 +65,13 @@ impl ShrugHandler {
     match send {
       Ok(_) => return,
       Err(cause) => {
-        println!("Failed to react {:?}", cause);
+        error!("Failed to react {:?}", cause);
         if let Err(why) = msg
           .channel_id
           .say(&ctx.http, "You taketh my shrug, you taketh me :(")
           .await
         {
-          println!("Failed to send error {:?}", why);
+          error!("Failed to send error {:?}", why);
           return;
         }
       }

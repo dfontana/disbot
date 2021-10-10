@@ -1,23 +1,29 @@
 use std::{thread, time::Duration};
 
-use crate::{cmd::server::wol::Wol, debug::Debug};
+use crate::cmd::server::wol::Wol;
 use serenity::{
   client::Context,
   framework::standard::{macros::command, Args, CommandResult},
   model::channel::Message,
 };
+use tracing::{error, info, instrument};
 
 #[command]
 #[description = "Start the game server"]
 #[usage = "start"]
 #[example = "start"]
 async fn start(ctx: &Context, msg: &Message, _: Args) -> CommandResult {
+  exec_start(ctx, msg).await
+}
+
+#[instrument(name = "ServerStart", level = "INFO", skip(ctx, msg))]
+async fn exec_start(ctx: &Context, msg: &Message) -> CommandResult {
   let wol = Wol::inst()?;
 
   let is_awake = match wol.is_awake() {
     Ok(v) => v,
     Err(e) => {
-      Debug::inst("server_wake").log(&format!("Failed to check Game Server is awake - {}", e));
+      error!("Failed to check Game Server is awake - {}", e);
       msg
         .reply_ping(&ctx.http, "Couldn't start the server :(")
         .await?;
@@ -40,7 +46,7 @@ async fn start(ctx: &Context, msg: &Message, _: Args) -> CommandResult {
         .await?;
     }
     Err(e) => {
-      Debug::inst("server_wake").log(&format!("Failed to start Game Server - {}", e));
+      error!("Failed to start Game Server - {:?}", e);
       msg
         .reply_ping(&ctx.http, "Couldn't start the server :(")
         .await?;
@@ -61,7 +67,7 @@ async fn start(ctx: &Context, msg: &Message, _: Args) -> CommandResult {
       }
       Err(e) => {
         keep_trying = 0;
-        Debug::inst("server_wake").log(&format!("Failed to check if Game Server is live - {}", e));
+        error!("Failed to check if Game Server is live - {:?}", e);
         msg
           .reply_ping(&ctx.http, "Failed to check Game Server is awake")
           .await?;
@@ -69,6 +75,6 @@ async fn start(ctx: &Context, msg: &Message, _: Args) -> CommandResult {
     }
   }
 
-  Debug::inst("server_wake").log("Server has Woken");
+  info!("Server has Woken");
   Ok(())
 }

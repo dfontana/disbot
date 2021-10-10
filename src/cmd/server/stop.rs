@@ -1,21 +1,27 @@
-use crate::{cmd::server::wol::Wol, debug::Debug};
+use crate::cmd::server::wol::Wol;
 use serenity::{
   client::Context,
   framework::standard::{macros::command, Args, CommandResult},
   model::channel::Message,
 };
+use tracing::{error, info, instrument};
 
 #[command]
 #[description = "Stop the game server"]
 #[usage = "stop"]
 #[example = "stop"]
 async fn stop(ctx: &Context, msg: &Message, _: Args) -> CommandResult {
+  exec_stop(ctx, msg).await
+}
+
+#[instrument(name = "ServerStop", level = "INFO", skip(ctx, msg))]
+async fn exec_stop(ctx: &Context, msg: &Message) -> CommandResult {
   let wol = Wol::inst()?;
 
   let is_awake = match wol.is_awake() {
     Ok(v) => v,
     Err(e) => {
-      Debug::inst("server_stop").log(&format!("Failed to check Game Server is awake - {}", e));
+      error!("Failed to check Game Server is awake - {:?}", e);
       msg
         .reply_ping(&ctx.http, "Couldn't stop the server :(")
         .await?;
@@ -41,7 +47,7 @@ async fn stop(ctx: &Context, msg: &Message, _: Args) -> CommandResult {
       msg.reply_ping(&ctx.http, msg_res).await?;
     }
     Err(e) => {
-      Debug::inst("server_stop").log(&format!("Failed to stop Game Server - {}", e));
+      error!("Failed to stop Game Server - {:?}", e);
       msg
         .reply_ping(&ctx.http, "Couldn't stop the server :(")
         .await?;
@@ -49,6 +55,6 @@ async fn stop(ctx: &Context, msg: &Message, _: Args) -> CommandResult {
     }
   }
 
-  Debug::inst("server_stop").log("Server has stopped");
+  info!("Server has stopped");
   Ok(())
 }

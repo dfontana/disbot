@@ -1,9 +1,9 @@
-use crate::debug::Debug;
 use regex::Regex;
 use reqwest::Client;
 use select::document::Document;
 use select::predicate::Class;
 use serenity::{model::channel::Message, prelude::Context};
+use tracing::{error, info, instrument, warn};
 
 pub struct RedditPreviewHandler {}
 
@@ -36,9 +36,10 @@ impl RedditPreviewHandler {
     Some(val.to_owned())
   }
 
+  #[instrument(name = "RedditPreview", level = "INFO", skip(self, ctx, msg))]
   pub async fn message(&self, ctx: &Context, msg: &Message) {
     if msg.is_own(&ctx.cache).await {
-      Debug::inst("reddit_prev").log("Skipping, self message");
+      info!("Skipping, self message");
       return;
     }
     lazy_static! {
@@ -48,26 +49,26 @@ impl RedditPreviewHandler {
     let link = match REDDIT_LINK.captures(&msg.content) {
       Some(caps) => caps.get(1).unwrap().as_str(),
       None => {
-        Debug::inst("reddit_prev").log("No reddit link, skipping");
+        info!("No reddit link, skipping");
         return;
       }
     };
     let body = match self.download_body(link).await {
       Ok(v) => v,
       Err(err) => {
-        println!("Failed to get Body! {:?}", err);
+        error!("Failed to get Body! {:?}", err);
         return;
       }
     };
     let img = match self.get_img_link(body) {
       Some(v) => v,
       None => {
-        Debug::inst("reddit_prev").log("Failed to find image link");
+        warn!("Failed to find image link");
         return;
       }
     };
     if let Err(err) = self.send_preview(&img, &ctx, &msg).await {
-      println!("{:?}", err);
+      error!("Failed to send preview {:?}", err);
     }
   }
 }

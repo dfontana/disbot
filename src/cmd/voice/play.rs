@@ -1,10 +1,11 @@
-use crate::{debug::Debug, emoji::EmojiLookup};
+use crate::emoji::EmojiLookup;
 use serenity::{
   client::Context,
   framework::standard::{macros::command, Args, CommandResult},
   model::channel::Message,
   utils::MessageBuilder,
 };
+use tracing::{error, instrument};
 
 use songbird::{
   driver::Bitrate,
@@ -13,7 +14,12 @@ use songbird::{
 
 #[command]
 #[only_in(guilds)]
-async fn play(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
+async fn play(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
+  exec_play(ctx, msg, args).await
+}
+
+#[instrument(name = "VoicePlay", level = "INFO", skip(ctx, msg, args))]
+async fn exec_play(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
   // Pull out the URL requested if there is one
   let maybe_url = args
     .single::<String>()
@@ -56,7 +62,7 @@ async fn play(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
   let source = match Restartable::ytdl(url, true).await {
     Ok(source) => source,
     Err(why) => {
-      Debug::inst("voice").log(&format!("Err starting source: {:?}", why));
+      error!("Err starting source: {:?}", why);
       let _ = msg.channel_id.say(&ctx.http, "Error sourcing ffmpeg").await;
       return Ok(());
     }

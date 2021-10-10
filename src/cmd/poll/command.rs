@@ -2,7 +2,6 @@ use std::{error::Error, time::Duration};
 
 use crate::{
   cmd::poll::{cache::Cache, pollstate::PollState},
-  debug::Debug,
   emoji::EmojiLookup,
 };
 use serenity::{
@@ -15,6 +14,7 @@ use serenity::{
   },
   utils::MessageBuilder,
 };
+use tracing::{error, instrument};
 
 lazy_static! {
   static ref POLL_STATES: Cache<MessageId, PollState> = Cache::new(Duration::from_secs(86400));
@@ -100,24 +100,26 @@ impl PollHandler {
     Ok(())
   }
 
+  #[instrument(name = "Poller", level = "INFO", skip(self, ctx, react))]
   pub async fn add_vote(&self, ctx: &Context, react: &Reaction) {
     let update_op =
       |msgid: &MessageId, vote: usize| POLL_STATES.invoke_mut(msgid, |p| p.cast_vote(vote));
     match self._update_poll(ctx, react, update_op).await {
       Err(e) => {
-        Debug::inst("poller").log(&format!("Failed - {}", e));
+        error!("Failed to add vote {:?}", e);
         return;
       }
       _ => (),
     }
   }
 
+  #[instrument(name = "Poller", level = "INFO", skip(self, ctx, react))]
   pub async fn remove_vote(&self, ctx: &Context, react: &Reaction) {
     let update_op =
       |msgid: &MessageId, vote: usize| POLL_STATES.invoke_mut(msgid, |p| p.revoke_vote(vote));
     match self._update_poll(ctx, react, update_op).await {
       Err(e) => {
-        Debug::inst("poller").log(&format!("Failed - {}", e));
+        error!("Failed to remove vote {:?}", e);
         return;
       }
       _ => (),

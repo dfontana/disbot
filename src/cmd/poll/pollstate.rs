@@ -1,6 +1,6 @@
-use crate::debug::Debug;
 use serenity::framework::standard::Args;
 use std::collections::HashMap;
+use tracing::{info, instrument};
 
 pub struct PollState {
   pub topic: String,
@@ -19,7 +19,6 @@ impl PollState {
       .map(|arg| arg.unwrap().trim_matches('"').to_owned())
       .collect();
     if items.len() > 10 {
-      Debug::inst("poll").log("Skipping poll, too many args");
       return Err("Too many arguments given".to_string());
     }
 
@@ -37,18 +36,20 @@ impl PollState {
     })
   }
 
+  #[instrument(name = "PollState", level = "INFO", skip(self, vote))]
   pub fn cast_vote(&mut self, vote: usize) {
     if !self.votes.contains_key(&vote) {
-      Debug::inst("poller").log("Vote not present in poll, ignoring");
+      info!("Vote not present in poll, ignoring");
       return;
     }
     self.votes.entry(vote).and_modify(|e| e.1 += 1);
     self.set_highest_vote();
   }
 
+  #[instrument(name = "PollState", level = "INFO", skip(self, vote))]
   pub fn revoke_vote(&mut self, vote: usize) {
     if !self.votes.contains_key(&vote) {
-      Debug::inst("poller").log("Vote not present in poll, ignoring");
+      info!("Vote not present in poll, ignoring");
       return;
     }
     self.votes.entry(vote).and_modify(|e| e.1 -= 1);

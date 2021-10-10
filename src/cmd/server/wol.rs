@@ -1,4 +1,4 @@
-use crate::{config::ServerConfig, debug::Debug};
+use crate::config::ServerConfig;
 use std::{
   iter,
   net::{IpAddr, Ipv4Addr, SocketAddr, UdpSocket},
@@ -7,6 +7,7 @@ use std::{
   sync::{Arc, RwLock},
   time::{Duration, Instant},
 };
+use tracing::error;
 
 const MAC_SIZE: usize = 6;
 const MAC_PER_MAGIC: usize = 16;
@@ -81,7 +82,7 @@ impl Wol {
     self
       .is_awake()
       .map_err(|err| {
-        Debug::inst("wol").log(&format!("Failed to check Game Server is awake - {}", err));
+        error!("Failed to check Game Server is awake - {:?}", err);
         "Failed to determine if Game Server is up".into()
       })
       .and_then(|is_awake| {
