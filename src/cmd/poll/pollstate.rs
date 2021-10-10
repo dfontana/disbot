@@ -1,6 +1,9 @@
 use humantime::parse_duration;
 use serenity::framework::standard::Args;
-use std::{collections::{HashMap, HashSet}, time::Duration};
+use std::{
+  collections::{HashMap, HashSet},
+  time::Duration,
+};
 use tracing::{info, instrument};
 
 use super::cache::Expiring;
@@ -14,14 +17,15 @@ pub struct PollState {
 }
 
 impl Expiring for PollState {
-    fn duration(&self) -> Duration {
-      self.duration
-    }
+  fn duration(&self) -> Duration {
+    self.duration
+  }
 }
 
 impl PollState {
   pub fn from_args(mut args: Args) -> Result<PollState, String> {
-    let duration = parse_duration(&args.single_quoted::<String>().unwrap()).map_err(|_| "Invalid duration given")?;
+    let duration = parse_duration(&args.single_quoted::<String>().unwrap())
+      .map_err(|_| "Invalid duration given")?;
     let topic = args.single_quoted::<String>().unwrap();
     let items: Vec<String> = args
       .trimmed()
