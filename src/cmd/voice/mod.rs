@@ -1,10 +1,14 @@
 use serenity::framework::standard::macros::group;
 
+mod list;
 mod play;
+mod reorder;
 mod skip;
 mod stop;
 
+use list::*;
 use play::*;
+use reorder::*;
 use skip::*;
 use stop::*;
 
@@ -14,5 +18,5 @@ use stop::*;
 #[prefix = "p"]
 #[only_in(guilds)]
 #[default_command(play)]
-#[commands(skip, stop)]
+#[commands(skip, stop, list, reorder)]
 pub struct Voice;

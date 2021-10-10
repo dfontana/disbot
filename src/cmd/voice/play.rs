@@ -13,6 +13,7 @@ use songbird::{
 };
 
 #[command]
+#[description = "Play a sound clip via link or search term"]
 #[only_in(guilds)]
 async fn play(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
   exec_play(ctx, msg, args).await

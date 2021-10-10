@@ -7,6 +7,7 @@ use serenity::{
 };
 
 #[command]
+#[description = "Stop all sound immediately & disconnect"]
 #[only_in(guilds)]
 async fn stop(ctx: &Context, msg: &Message, _args: Args) -> CommandResult {
   let guild = msg.guild(&ctx.cache).await.unwrap();
