@@ -16,8 +16,10 @@ use serenity::{
 };
 use tracing::{error, instrument};
 
+const EXPIRATION: u64 = 86400;
+
 lazy_static! {
-  static ref POLL_STATES: Cache<MessageId, PollState> = Cache::new(Duration::from_secs(86400));
+  static ref POLL_STATES: Cache<MessageId, PollState> = Cache::new(Duration::from_secs(EXPIRATION));
 }
 
 #[command]
@@ -54,6 +56,20 @@ async fn poll(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
 
   // Register globally
   POLL_STATES.insert(res_msg.id, poll_state)?;
+
+  // Setup the expiration action
+  let exp_http = ctx.http.clone();
+  let exp_chan = msg.channel_id.clone();
+  let exp_key = res_msg.id.clone();
+  let exp_emote = emoji.clone();
+  tokio::spawn(async move {
+    tokio::time::sleep(Duration::from_secs(EXPIRATION)).await;
+    let resp = match POLL_STATES.invoke(&exp_key, |p| build_exp_message(&exp_emote, p)) {
+      Err(_) => "Poll has ended -- failed to get details".to_string(),
+      Ok(v) => v,
+    };
+    let _ = exp_chan.say(&exp_http, resp).await;
+  });
 
   Ok(())
 }
@@ -157,5 +173,28 @@ fn build_poll_message(emoji: &Emoji, poll_state: &PollState) -> String {
     .push_italic(" (exp in 24hrs)")
     .push_line("")
     .push_codeblock(&bar_vec.join("\n"), Some("m"))
+    .build()
+}
+
+fn build_exp_message(emoji: &Emoji, poll_state: &PollState) -> String {
+  let winner = poll_state
+    .votes
+    .values()
+    .max_by(|a, b| a.1.cmp(&b.1))
+    .map(|v| v.0.to_string())
+    .unwrap_or("No one!".to_string());
+
+  MessageBuilder::new()
+    .mention(emoji)
+    .push_underline("The Vote has Ended!")
+    .mention(emoji)
+    .push_line("")
+    .push_line("")
+    .push("The winner of \"")
+    .push_bold(&poll_state.topic)
+    .push("\" is: ")
+    .push_bold(&winner)
+    .push_line("")
+    .push_italic("(Ties are resolved by the righteous power vested in me - deal with it)")
     .build()
 }
