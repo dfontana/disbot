@@ -1,35 +1,24 @@
-use crate::emoji::EmojiLookup;
+use crate::{cmd::voice::connect_util::ChannelDisconnectBuilder, emoji::EmojiLookup};
 use serenity::{
-  async_trait,
   client::Context,
   framework::standard::{macros::command, Args, CommandResult},
-  model::{channel::Message, id::GuildId},
-  prelude::RwLock,
+  model::channel::Message,
   utils::MessageBuilder,
-  FutureExt,
 };
-use std::{sync::Arc, time::Duration};
-use tracing::{error, info, instrument};
+
+use tracing::{error, info_span};
 
 use songbird::{
   driver::Bitrate,
   input::{restartable::Restartable, Input},
-  Event, EventContext, EventHandler, Songbird,
 };
-
-lazy_static! {
-  static ref HANDLER_ADDED: RwLock<bool> = RwLock::new(false);
-}
 
 #[command]
 #[description = "Play a sound clip via link or search term"]
 #[only_in(guilds)]
-async fn play(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
-  exec_play(ctx, msg, args).await
-}
-
-#[instrument(name = "VoicePlay", level = "INFO", skip(ctx, msg, args))]
-async fn exec_play(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
+async fn play(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
+  let span = info_span!("VoicePlay");
+  let _enter = span.enter();
   let maybe_args = match args.len() {
     0 => Err("Must provide a url|search string"),
     1 => args
@@ -71,18 +60,16 @@ async fn exec_play(ctx: &Context, msg: &Message, mut args: Args) -> CommandResul
     .clone();
   let (handler_lock, _success) = manager.join(guild_id, connect_to).await;
 
-  // On first connect, add disconnect handler
-  if !HANDLER_ADDED.read().map(|g| *g).await {
-    let _fut = HANDLER_ADDED.write().map(|mut g| *g = true).await;
-    let mut handler = handler_lock.lock().await;
-    handler.add_global_event(
-      Event::Periodic(Duration::from_secs(30), None),
-      ChannelDisconnect {
-        manager,
-        guild: guild_id,
-      },
-    );
-  }
+  // Add disconnect handler as needed
+  let _reg = ChannelDisconnectBuilder::default()
+    .manager(manager)
+    .http(ctx.http.clone())
+    .guild(guild_id)
+    .channel(connect_to)
+    .emoji(EmojiLookup::inst().get(guild_id, &ctx.cache).await?)
+    .build()?
+    .maybe_register_handler(&handler_lock)
+    .await;
 
   // Queue up the source
   let is_url = searchterm.starts_with("http");
@@ -128,27 +115,4 @@ async fn exec_play(ctx: &Context, msg: &Message, mut args: Args) -> CommandResul
   }
   let _ = msg.channel_id.say(&ctx.http, build.build()).await;
   Ok(())
-}
-
-struct ChannelDisconnect {
-  manager: Arc<Songbird>,
-  guild: GuildId,
-}
-
-#[async_trait]
-impl EventHandler for ChannelDisconnect {
-  #[instrument(name = "VoiceTimeoutListener", level = "INFO", skip(self, _ctx))]
-  async fn act(&self, _ctx: &EventContext<'_>) -> Option<Event> {
-    info!("Checking for inactivity...");
-    let should_close = match self.manager.get(self.guild) {
-      None => false,
-      Some(handler_lock) => handler_lock.lock().await.queue().is_empty(),
-    };
-    if should_close {
-      info!("Disconnecting client for inactivity");
-      let _dc = self.manager.leave(self.guild).await;
-      info!("Disconnected");
-    }
-    None
-  }
 }
