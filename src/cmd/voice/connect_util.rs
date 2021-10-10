@@ -40,23 +40,24 @@ impl ChannelDisconnect {
   }
 
   pub async fn stop(&self) {
-    let _dis = self.disconnect(true);
+    let _dis = self.disconnect(true).await;
   }
 
   async fn disconnect(&self, force: bool) {
-    info!("Checking for inactivity...");
     let should_close = match self.manager.get(self.guild) {
       None => {
+        info!("Not in a voice channel");
         let _ = self.channel.say(&self.http, "Not in a voice channel").await;
         false
       }
       Some(handler_lock) => {
         let handler = handler_lock.lock().await;
         if force {
-          let queue = handler.queue();
-          let _ = queue.stop();
+          info!("Stopping queue");
+          handler.queue().stop();
           true
         } else {
+          info!("Checking queue prescense");
           handler.queue().is_empty()
         }
       }
@@ -75,7 +76,6 @@ impl ChannelDisconnect {
             .build(),
         )
         .await;
-
       info!("Disconnected");
     }
   }
@@ -85,6 +85,7 @@ impl ChannelDisconnect {
 impl EventHandler for ChannelDisconnect {
   #[instrument(name = "VoiceTimeoutListener", level = "INFO", skip(self, _ctx))]
   async fn act(&self, _ctx: &EventContext<'_>) -> Option<Event> {
+    info!("Checking for inactivity...");
     let _dis = self.disconnect(false).await;
     None
   }

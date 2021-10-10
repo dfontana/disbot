@@ -6,7 +6,7 @@ use serenity::{
   utils::MessageBuilder,
 };
 
-use tracing::{error, info_span};
+use tracing::{error, instrument};
 
 use songbird::{
   driver::Bitrate,
@@ -16,9 +16,12 @@ use songbird::{
 #[command]
 #[description = "Play a sound clip via link or search term"]
 #[only_in(guilds)]
-async fn play(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
-  let span = info_span!("VoicePlay");
-  let _enter = span.enter();
+async fn play(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
+  exec_play(ctx, msg, args).await
+}
+
+#[instrument(name = "VoicePlay", level = "INFO", skip(ctx, msg, args))]
+async fn exec_play(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
   let maybe_args = match args.len() {
     0 => Err("Must provide a url|search string"),
     1 => args
@@ -65,7 +68,7 @@ async fn play(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
     .manager(manager)
     .http(ctx.http.clone())
     .guild(guild_id)
-    .channel(connect_to)
+    .channel(msg.channel_id.clone())
     .emoji(EmojiLookup::inst().get(guild_id, &ctx.cache).await?)
     .build()?
     .maybe_register_handler(&handler_lock)

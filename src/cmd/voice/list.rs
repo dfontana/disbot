@@ -4,11 +4,17 @@ use serenity::{
   model::channel::Message,
   utils::MessageBuilder,
 };
+use tracing::instrument;
 
 #[command]
 #[description = "Show what's currently queued"]
 #[only_in(guilds)]
 async fn list(ctx: &Context, msg: &Message, _: Args) -> CommandResult {
+  exec_list(ctx, msg).await
+}
+
+#[instrument(name = "VoiceList", level = "INFO", skip(ctx, msg))]
+async fn exec_list(ctx: &Context, msg: &Message) -> CommandResult {
   let guild = msg.guild(&ctx.cache).await.unwrap();
   let guild_id = guild.id;
 

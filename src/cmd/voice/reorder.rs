@@ -5,6 +5,7 @@ use serenity::{
   model::channel::Message,
   utils::MessageBuilder,
 };
+use tracing::instrument;
 
 #[command]
 #[description = "Move a the specified track to a specific position in queue. You cannot move the current track."]
@@ -13,7 +14,12 @@ use serenity::{
 #[example = "move 3 2"]
 #[num_args(2)]
 #[only_in(guilds)]
-async fn reorder(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
+async fn reorder(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
+  exec_reorder(ctx, msg, args).await
+}
+
+#[instrument(name = "VoiceReorder", level = "info", skip(ctx, msg))]
+async fn exec_reorder(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
   // Get the handler
   let guild = msg.guild(&ctx.cache).await.unwrap();
   let guild_id = guild.id;

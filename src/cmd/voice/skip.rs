@@ -6,11 +6,17 @@ use serenity::{
   model::channel::Message,
   utils::MessageBuilder,
 };
+use tracing::instrument;
 
 #[command]
 #[description = "Skip the currently playing sound"]
 #[only_in(guilds)]
 async fn skip(ctx: &Context, msg: &Message, _args: Args) -> CommandResult {
+  exec_skip(ctx, msg).await
+}
+
+#[instrument(name = "VoiceSkip", level = "INFO", skip(ctx, msg))]
+async fn exec_skip(ctx: &Context, msg: &Message) -> CommandResult {
   let guild = msg.guild(&ctx.cache).await.unwrap();
   let guild_id = guild.id;
 

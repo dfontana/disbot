@@ -4,16 +4,20 @@ use serenity::{
   framework::standard::{macros::command, Args, CommandResult},
   model::channel::Message,
 };
-use tracing::info_span;
+use tracing::{info, instrument};
 
 #[command]
 #[description = "Stop all sound immediately & disconnect"]
 #[only_in(guilds)]
 async fn stop(ctx: &Context, msg: &Message, _args: Args) -> CommandResult {
-  let span = info_span!("VoiceStop");
-  let _enter = span.enter();
+  exec_stop(ctx, msg).await
+}
+
+#[instrument(name = "VoiceStop", level = "info", skip(ctx, msg))]
+async fn exec_stop(ctx: &Context, msg: &Message) -> CommandResult {
   let guild_id = msg.guild(&ctx.cache).await.unwrap().id;
 
+  info!("Stopping voice playback");
   let _stop = ChannelDisconnectBuilder::default()
     .manager(
       songbird::get(ctx)
