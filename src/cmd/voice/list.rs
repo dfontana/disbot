@@ -45,7 +45,7 @@ async fn exec_list(ctx: &Context, msg: &Message) -> CommandResult {
         .metadata()
         .track
         .as_ref()
-        .or(trk.metadata().title.as_ref())
+        .or_else(|| trk.metadata().title.as_ref())
         .unwrap_or(&"<UNKNOWN>".to_string())
     ));
   }

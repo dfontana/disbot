@@ -54,13 +54,13 @@ async fn poll(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
   }
 
   // Register globally
-  let exp = poll_state.duration.clone();
+  let exp = poll_state.duration;
   POLL_STATES.insert(res_msg.id, poll_state)?;
 
   // Setup the expiration action
   let exp_http = ctx.http.clone();
-  let exp_chan = msg.channel_id.clone();
-  let exp_key = res_msg.id.clone();
+  let exp_chan = msg.channel_id;
+  let exp_key = res_msg.id;
   let exp_emote = emoji.clone();
   tokio::spawn(async move {
     tokio::time::sleep(exp).await;
@@ -121,31 +121,23 @@ impl PollHandler {
 
   #[instrument(name = "Poller", level = "INFO", skip(self, ctx, react))]
   pub async fn add_vote(&self, ctx: &Context, react: &Reaction) {
-    let user = get_user(&ctx, react).await;
+    let user = get_user(ctx, react).await;
     let update_op = |msgid: &MessageId, vote: usize| {
       POLL_STATES.invoke_mut(msgid, |p| p.cast_vote(vote, user.to_owned()))
     };
-    match self._update_poll(ctx, react, update_op).await {
-      Err(e) => {
-        error!("Failed to add vote {:?}", e);
-        return;
-      }
-      _ => (),
+    if let Err(e) = self._update_poll(ctx, react, update_op).await {
+      error!("Failed to add vote {:?}", e);
     }
   }
 
   #[instrument(name = "Poller", level = "INFO", skip(self, ctx, react))]
   pub async fn remove_vote(&self, ctx: &Context, react: &Reaction) {
-    let user = get_user(&ctx, react).await;
+    let user = get_user(ctx, react).await;
     let update_op = |msgid: &MessageId, vote: usize| {
       POLL_STATES.invoke_mut(msgid, |p| p.revoke_vote(vote, &user))
     };
-    match self._update_poll(ctx, react, update_op).await {
-      Err(e) => {
-        error!("Failed to remove vote {:?}", e);
-        return;
-      }
-      _ => (),
+    if let Err(e) = self._update_poll(ctx, react, update_op).await {
+      error!("Failed to remove vote {:?}", e);
     }
   }
 }
@@ -153,9 +145,9 @@ impl PollHandler {
 async fn get_user(ctx: &Context, react: &Reaction) -> String {
   if let Ok(user) = react.user(&ctx.http).await {
     if let Some(nick) = user.nick_in(&ctx.http, react.guild_id.unwrap()).await {
-      return nick.to_lowercase().to_owned();
+      return nick.to_lowercase();
     } else {
-      return user.name.to_lowercase().to_owned();
+      return user.name.to_lowercase();
     }
   }
   "unknown".to_owned()
@@ -189,7 +181,7 @@ fn build_poll_message(emoji: &Emoji, poll_state: &PollState) -> String {
         "{}: {}",
         idx,
         voters
-          .into_iter()
+          .iter()
           .map(|v| v.to_string())
           .collect::<Vec<String>>()
           .join(", ")
@@ -227,7 +219,7 @@ fn build_exp_message(emoji: &Emoji, poll_state: &PollState) -> String {
     .values()
     .max_by(|a, b| a.1.cmp(&b.1))
     .map(|v| v.0.to_string())
-    .unwrap_or("<Error Poll Had No Options?>".to_string());
+    .unwrap_or_else(|| "<Error Poll Had No Options?>".to_string());
 
   MessageBuilder::new()
     .mention(emoji)

@@ -6,13 +6,13 @@ use serde::Deserialize;
 #[derive(Clone, Deserialize, Debug, PartialEq)]
 #[serde(rename_all = "lowercase")]
 pub enum ContainerState {
-  CREATED,
-  RESTARTING,
-  RUNNING,
-  REMOVING,
-  PAUSED,
-  EXITED,
-  DEAD,
+  Created,
+  Restarted,
+  Running,
+  Removed,
+  Paused,
+  Exited,
+  Dead,
 }
 
 #[derive(Builder, Default, Deserialize, Debug, PartialEq)]
@@ -50,7 +50,7 @@ pub struct ContainerInspectConfig {
 
 impl Default for ContainerState {
   fn default() -> Self {
-    ContainerState::EXITED
+    ContainerState::Exited
   }
 }
 
@@ -143,7 +143,7 @@ mod tests {
       .id("4ad194bf2a9e177d48f11441f21cf9b97098de973434f8db40470e8e7a3551df".into())
       .label(("game".into(), "minecraft".into()))
       .label(("version".into(), "valhelsia".into()))
-      .state(ContainerState::RUNNING)
+      .state(ContainerState::Running)
       .build()
       .unwrap()];
     assert_eq!(actual, expected);
@@ -160,7 +160,7 @@ mod tests {
       .id("4ad194bf2a9e177d48f11441f21cf9b97098de973434f8db40470e8e7a3551df".into())
       .config(ContainerInspectConfig { labels })
       .state(ContainerInspectState {
-        status: ContainerState::RUNNING,
+        status: ContainerState::Running,
       })
       .build()
       .unwrap();

@@ -28,7 +28,7 @@ async fn exec_play(ctx: &Context, msg: &Message, mut args: Args) -> CommandResul
       .single::<String>()
       .map_err(|_| "Must provide a url|search string"),
     _ => Ok(args.iter::<String>().fold(String::new(), |mut a, b| {
-      a.push_str(" ");
+      a.push(' ');
       a.push_str(&b.unwrap());
       a
     })),
@@ -68,7 +68,7 @@ async fn exec_play(ctx: &Context, msg: &Message, mut args: Args) -> CommandResul
     .manager(manager)
     .http(ctx.http.clone())
     .guild(guild_id)
-    .channel(msg.channel_id.clone())
+    .channel(msg.channel_id)
     .emoji(EmojiLookup::inst().get(guild_id, &ctx.cache).await?)
     .build()?
     .maybe_register_handler(&handler_lock)
@@ -96,11 +96,11 @@ async fn exec_play(ctx: &Context, msg: &Message, mut args: Args) -> CommandResul
   let title = metadata
     .track
     .or(metadata.title)
-    .unwrap_or("<UNKNOWN>".to_string())
+    .unwrap_or_else(|| "<UNKNOWN>".to_string())
     .to_string();
   let source_url = metadata
     .source_url
-    .unwrap_or("Unknown Source".to_string())
+    .unwrap_or_else(|| "Unknown Source".to_string())
     .to_string();
 
   let mut handler = handler_lock.lock().await;

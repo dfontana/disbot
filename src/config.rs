@@ -42,7 +42,7 @@ impl Default for Config {
       api_key: "".to_owned(),
       emote_name: "".to_owned(),
       emote_users: Vec::new(),
-      env: Environment::DEV,
+      env: Environment::Dev,
       log_level: "INFO".to_string(),
       server: ServerConfig::default(),
     }
@@ -55,7 +55,7 @@ impl Config {
       api_key: env::var("API_KEY")?,
       emote_name: env::var("EMOTE_NAME")?,
       emote_users: env::var("EMOTE_USERS")?
-        .split(",")
+        .split(',')
         .map(|x| x.to_string())
         .collect(),
       env,
@@ -75,6 +75,6 @@ impl Config {
     if let Ok(mut inst) = INSTANCE.try_write() {
       *inst = c.clone();
     }
-    Ok(c.clone())
+    Ok(c)
   }
 }

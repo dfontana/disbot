@@ -15,7 +15,7 @@ mod ready;
 mod reddit_prev;
 pub mod server;
 mod shrug;
-// pub mod voice;
+pub mod voice;
 
 pub struct Handler {
   ready: ready::ReadyHandler,
@@ -28,7 +28,7 @@ impl Handler {
   pub fn new(config: Config) -> Self {
     Handler {
       ready: ready::ReadyHandler::new(),
-      shrug: shrug::ShrugHandler::new(config.clone()),
+      shrug: shrug::ShrugHandler::new(config),
       reddit: reddit_prev::RedditPreviewHandler::new(),
       poller: poll::PollHandler::new(),
     }

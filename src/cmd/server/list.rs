@@ -16,13 +16,10 @@ async fn list(ctx: &Context, msg: &Message, _: Args) -> CommandResult {
 
 #[instrument(name = "ServerList", level = "INFO", skip(ctx, msg))]
 async fn exec_list(ctx: &Context, msg: &Message) -> CommandResult {
-  match Wol::inst()?.ensure_awake() {
-    Err(err) => {
-      info!("error {:?}", err);
-      msg.reply_ping(&ctx.http, err).await?;
-      return Ok(());
-    }
-    _ => (),
+  if let Err(err) = Wol::inst()?.ensure_awake() {
+    info!("error {:?}", err);
+    msg.reply_ping(&ctx.http, err).await?;
+    return Ok(());
   };
 
   let docker = Docker::client()?.containers();

@@ -27,7 +27,7 @@ async fn exec_stop(ctx: &Context, msg: &Message) -> CommandResult {
     )
     .http(ctx.http.clone())
     .guild(guild_id)
-    .channel(msg.channel_id.clone())
+    .channel(msg.channel_id)
     .emoji(EmojiLookup::inst().get(guild_id, &ctx.cache).await?)
     .build()?
     .stop()

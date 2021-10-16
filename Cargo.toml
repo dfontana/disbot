@@ -22,3 +22,8 @@ songbird = {features = ["builtin-queue"], git = "https://github.com/dfontana/son
 tokio = { version = "1.0", features = ["full"] }
 tracing = "0.1.28"
 tracing-subscriber = "0.2.24"
+
+[patch.crates-io]
+# Need to patch since songbird pulls in a version, we need to make the same
+# Can go away once we're back on an official version number and not git
+serenity = {git ="https://github.com/serenity-rs/serenity", rev="2da46a8402926f2acc90d183a44d370f8708dad0"}
