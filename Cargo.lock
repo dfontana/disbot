@@ -233,8 +233,7 @@ dependencies = [
 [[package]]
 name = "command_attr"
 version = "0.3.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8a6c3666f685cb1efc0628b8c984dbad9c372d080450736c7732089c385ed81d"
+source = "git+https://github.com/acdenisSK/serenity?branch=apple_quotes_args#45c2b96cb6c14e2106058652cdf2cc9762cc9300"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -392,7 +391,7 @@ dependencies = [
  "select",
  "serde",
  "serde_json",
- "serenity",
+ "serenity 0.10.9 (git+https://github.com/acdenisSK/serenity?branch=apple_quotes_args)",
  "songbird",
  "tokio",
  "tracing",
@@ -1720,6 +1719,29 @@ dependencies = [
  "bitflags",
  "bytes 1.0.0",
  "chrono",
+ "flate2",
+ "futures",
+ "percent-encoding",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tracing",
+ "typemap_rev",
+ "url",
+]
+
+[[package]]
+name = "serenity"
+version = "0.10.9"
+source = "git+https://github.com/acdenisSK/serenity?branch=apple_quotes_args#45c2b96cb6c14e2106058652cdf2cc9762cc9300"
+dependencies = [
+ "async-trait",
+ "async-tungstenite 0.11.0",
+ "base64 0.13.0",
+ "bitflags",
+ "bytes 1.0.0",
+ "chrono",
  "command_attr",
  "flate2",
  "futures",
@@ -1827,7 +1849,7 @@ dependencies = [
  "rand 0.8.2",
  "serde",
  "serde_json",
- "serenity",
+ "serenity 0.10.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "serenity-voice-model",
  "spin_sleep",
  "streamcatcher",
