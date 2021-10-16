@@ -233,7 +233,7 @@ dependencies = [
 [[package]]
 name = "command_attr"
 version = "0.3.7"
-source = "git+https://github.com/acdenisSK/serenity?branch=apple_quotes_args#45c2b96cb6c14e2106058652cdf2cc9762cc9300"
+source = "git+https://github.com/serenity-rs/serenity?rev=2da46a8402926f2acc90d183a44d370f8708dad0#2da46a8402926f2acc90d183a44d370f8708dad0"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -391,7 +391,7 @@ dependencies = [
  "select",
  "serde",
  "serde_json",
- "serenity 0.10.9 (git+https://github.com/acdenisSK/serenity?branch=apple_quotes_args)",
+ "serenity 0.10.9 (git+https://github.com/serenity-rs/serenity?rev=2da46a8402926f2acc90d183a44d370f8708dad0)",
  "songbird",
  "tokio",
  "tracing",
@@ -1734,7 +1734,7 @@ dependencies = [
 [[package]]
 name = "serenity"
 version = "0.10.9"
-source = "git+https://github.com/acdenisSK/serenity?branch=apple_quotes_args#45c2b96cb6c14e2106058652cdf2cc9762cc9300"
+source = "git+https://github.com/serenity-rs/serenity?rev=2da46a8402926f2acc90d183a44d370f8708dad0#2da46a8402926f2acc90d183a44d370f8708dad0"
 dependencies = [
  "async-trait",
  "async-tungstenite 0.11.0",

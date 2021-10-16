@@ -17,7 +17,7 @@ reqwest = { version = "0.11", features = ["json"] }
 select = "0.5.0"
 serde = { version = "1.0.125", features = ["derive"] }
 serde_json = "1.0"
-serenity = {features = ["client", "cache", "gateway", "model","rustls_backend", "framework", "standard_framework", "voice"], git ="https://github.com/acdenisSK/serenity", branch="apple_quotes_args"}
+serenity = {features = ["client", "cache", "gateway", "model","rustls_backend", "framework", "standard_framework", "voice"], git ="https://github.com/serenity-rs/serenity", rev="2da46a8402926f2acc90d183a44d370f8708dad0"}
 songbird = {features = ["builtin-queue"], git = "https://github.com/dfontana/songbird"}
 tokio = { version = "1.0", features = ["full"] }
 tracing = "0.1.28"
