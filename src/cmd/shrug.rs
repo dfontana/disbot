@@ -58,12 +58,12 @@ impl ShrugHandler {
     let emoji = EmojiLookup::inst().get(guild_id, &ctx.cache).await;
 
     let send = match emoji {
-      Ok(e) => self.react_and_send(e, &ctx, &msg).await,
+      Ok(e) => self.react_and_send(e, ctx, msg).await,
       Err(cause) => Err(cause),
     };
 
     match send {
-      Ok(_) => return,
+      Ok(_) => {}
       Err(cause) => {
         error!("Failed to react {:?}", cause);
         if let Err(why) = msg

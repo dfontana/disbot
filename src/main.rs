@@ -23,7 +23,6 @@ use serenity::{
 };
 use songbird::SerenityInit;
 use tracing::{error, Level};
-use tracing_subscriber;
 
 use cmd::{dice_roll::*, help::*, poll::*, server::*, voice::*, Handler};
 use config::Config;

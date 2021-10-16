@@ -61,7 +61,7 @@ impl<K: Eq + Hash + Clone, V: Expiring> Cache<K, V> {
           })
           .collect();
         drop_keys.iter().for_each(|k| {
-          lock.remove(&k);
+          lock.remove(k);
         });
         Ok(())
       }
@@ -99,7 +99,10 @@ impl<K: Eq + Hash + Clone, V: Expiring> Cache<K, V> {
       Err(e) => Err(format!("Failed to aquire lock - {}", e)),
       Ok(mut lock) => match lock.get_mut(key) {
         None => Err("Key does not exist in cache to invoke".into()),
-        Some(v) => Ok(apply(&mut v.val)),
+        Some(v) => {
+          apply(&mut v.val);
+          Ok(())
+        }
       },
     }
   }

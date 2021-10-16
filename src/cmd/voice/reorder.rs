@@ -104,5 +104,5 @@ fn validate_position<T>(maybe_pos: Result<usize, T>, queue_size: usize) -> Resul
   if pos > queue_size {
     return Err("Can only move item to end of queue".into());
   }
-  return Ok(pos);
+  Ok(pos)
 }

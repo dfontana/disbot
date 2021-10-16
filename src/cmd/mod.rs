@@ -28,7 +28,7 @@ impl Handler {
   pub fn new(config: Config) -> Self {
     Handler {
       ready: ready::ReadyHandler::new(),
-      shrug: shrug::ShrugHandler::new(config.clone()),
+      shrug: shrug::ShrugHandler::new(config),
       reddit: reddit_prev::RedditPreviewHandler::new(),
       poller: poll::PollHandler::new(),
     }

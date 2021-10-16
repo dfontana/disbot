@@ -67,7 +67,7 @@ impl RedditPreviewHandler {
         return;
       }
     };
-    if let Err(err) = self.send_preview(&img, &ctx, &msg).await {
+    if let Err(err) = self.send_preview(&img, ctx, msg).await {
       error!("Failed to send preview {:?}", err);
     }
   }

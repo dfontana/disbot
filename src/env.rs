@@ -2,15 +2,15 @@ use std::str::FromStr;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Environment {
-  PROD,
-  DEV,
+  Prod,
+  Dev,
 }
 
 impl Environment {
   pub fn as_file(&self) -> String {
     match &self {
-      Environment::PROD => String::from("prod.env"),
-      Environment::DEV => String::from("dev.env"),
+      Environment::Prod => String::from("prod.env"),
+      Environment::Dev => String::from("dev.env"),
     }
   }
 }
@@ -19,8 +19,8 @@ impl FromStr for Environment {
   type Err = String;
   fn from_str(s: &str) -> Result<Self, Self::Err> {
     match s {
-      "prod" => Ok(Environment::PROD),
-      "dev" => Ok(Environment::DEV),
+      "prod" => Ok(Environment::Prod),
+      "dev" => Ok(Environment::Dev),
       _ => Err("Unknown Environment Given".to_string()),
     }
   }
@@ -28,6 +28,6 @@ impl FromStr for Environment {
 
 impl Default for Environment {
   fn default() -> Self {
-    Environment::PROD
+    Environment::Prod
   }
 }

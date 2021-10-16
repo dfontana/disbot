@@ -47,7 +47,7 @@ impl EmojiLookup {
     let maybe_emoji = cache
       .guild_field(guild_id, |guild| guild.emojis.clone())
       .await
-      .ok_or("Failed to pull emojis for Guild".to_string())?;
+      .ok_or_else(|| "Failed to pull emojis for Guild".to_string())?;
 
     // If we do, though, we should find the emoji from the config
     let emoji = match INSTANCE.try_read() {
@@ -62,7 +62,7 @@ impl EmojiLookup {
             }
           },
         )
-        .ok_or("Server does not have expected Emoji".to_string())?,
+        .ok_or_else(|| "Server does not have expected Emoji".to_string())?,
       Err(_) => return Err("Failed to get read on Emoji".to_string()),
     };
 
