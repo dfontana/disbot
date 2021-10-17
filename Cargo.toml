@@ -3,6 +3,9 @@ name = "disbot"
 version = "0.1.0"
 authors = ["dfontana <dyfontana@gmail.com>"]
 edition = "2018"
+[[bin]]
+name = "disbot"
+path = "src/main.rs"
 
 [dependencies]
 derive_builder = "0.10.0"

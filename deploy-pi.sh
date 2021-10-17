@@ -1,7 +1,8 @@
+#!/bin/bash
 set -e
 
 env=${1:-dev}
-host=${2:-raspberrypi}
+host=${2:-raspberrypi.local}
 
 cross build --release --target armv7-unknown-linux-gnueabihf
 ssh $USER@$host 'mkdir -p ~/deploy'
