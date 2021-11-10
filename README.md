@@ -34,11 +34,11 @@ Install required dependencies for the songbird functionality to work:
 
 ```
 apt install libopus-dev ffmpeg
-curl -L https://yt-dl.org/downloads/latest/youtube-dl -o youtube-dl
-mv youtube-dl /usr/local/bin
+sudo curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o /usr/local/bin/yt-dlp
+sudo chmod a+rx /usr/local/bin/yt-dlp
 ```
 
-(If you need to update `youtube-dl` use the `-U` flag)
+(If you need to update `yt-dlp` use the `-U` flag)
 
 You'll also need `cross` installed to [cross compile](https://github.com/rust-embedded/cross).
 
