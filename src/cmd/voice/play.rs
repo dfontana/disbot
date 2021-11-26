@@ -13,11 +13,17 @@ use songbird::{
   input::{restartable::Restartable, Input},
 };
 
+use super::connect_util::ChannelDisconnect;
+
 #[command]
 #[description = "Play a sound clip via link or search term"]
 #[only_in(guilds)]
 async fn play(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
-  exec_play(ctx, msg, args).await
+  let chan = ChannelDisconnect::get_chan();
+  let _ = chan.send(true).await;
+  let res = exec_play(ctx, msg, args).await;
+  let _ = chan.send(false).await;
+  res
 }
 
 #[instrument(name = "VoicePlay", level = "INFO", skip(ctx, msg, args))]
