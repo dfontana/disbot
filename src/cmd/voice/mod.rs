@@ -16,7 +16,7 @@ use stop::*;
 #[group]
 #[description = "Stream sound to the channel"]
 #[summary = "Sheebs Givith Loud Noises"]
-#[prefix = "p"]
+#[prefixes("p","play")]
 #[only_in(guilds)]
 #[default_command(play)]
 #[commands(skip, stop, list, reorder)]
