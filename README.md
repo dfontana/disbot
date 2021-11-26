@@ -22,6 +22,7 @@ SERVER_MAC=<game-server-mac>
 SERVER_IP=<game-server-ip>
 SERVER_DOCKER_PORT=<docker-tcp-port-on-game-server>
 SERVER_USER=<game-server-user>
+LOG_LEVEL=INFO
 
 #You can repeat this for dev.env as well
 ```
