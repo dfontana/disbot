@@ -1,9 +1,14 @@
+use once_cell::sync::Lazy;
 use regex::Regex;
 use reqwest::Client;
 use select::document::Document;
 use select::predicate::Class;
 use serenity::{model::channel::Message, prelude::Context};
 use tracing::{error, info, instrument, warn};
+
+static HTTP: Lazy<Client> = Lazy::new(|| Client::new());
+static REDDIT_LINK: Lazy<Regex> =
+  Lazy::new(|| Regex::new(r"(http[s]{0,1}://www\.reddit\.com[^\s]+)").unwrap());
 
 pub struct RedditPreviewHandler {}
 
@@ -13,9 +18,6 @@ impl RedditPreviewHandler {
   }
 
   async fn download_body(&self, url: &str) -> Result<String, reqwest::Error> {
-    lazy_static! {
-      static ref HTTP: Client = Client::new();
-    }
     HTTP.get(url).send().await?.text().await
   }
 
@@ -41,10 +43,6 @@ impl RedditPreviewHandler {
     if msg.is_own(&ctx.cache).await {
       info!("Skipping, self message");
       return;
-    }
-    lazy_static! {
-      static ref REDDIT_LINK: Regex =
-        Regex::new(r"(http[s]{0,1}://www\.reddit\.com[^\s]+)").unwrap();
     }
     let link = match REDDIT_LINK.captures(&msg.content) {
       Some(caps) => caps.get(1).unwrap().as_str(),

@@ -376,7 +376,6 @@ dependencies = [
  "dotenv",
  "hex",
  "humantime",
- "lazy_static",
  "once_cell",
  "openssl",
  "rand 0.8.4",
