@@ -5,6 +5,7 @@ use crate::{
   emoji::EmojiLookup,
 };
 use humantime::format_duration;
+use once_cell::sync::Lazy;
 use serenity::{
   client::Context,
   framework::standard::{macros::command, Args, CommandResult},
@@ -17,9 +18,7 @@ use serenity::{
 };
 use tracing::{error, instrument, warn};
 
-lazy_static! {
-  static ref POLL_STATES: Cache<MessageId, PollState> = Cache::new();
-}
+static POLL_STATES: Lazy<Cache<MessageId, PollState>> = Lazy::new(|| Cache::new());
 
 #[command]
 #[description = "Create a Poll with up to 9 Options. Double quote each argument."]

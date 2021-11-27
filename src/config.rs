@@ -1,11 +1,10 @@
+use once_cell::sync::Lazy;
+
 use crate::Environment;
-use lazy_static::lazy_static;
 use std::sync::RwLock;
 use std::{env, env::VarError};
 
-lazy_static! {
-  static ref INSTANCE: RwLock<Config> = RwLock::new(Config::default());
-}
+static INSTANCE: Lazy<RwLock<Config>> = Lazy::new(|| RwLock::new(Config::default()));
 
 #[derive(Debug, Clone)]
 pub struct Config {

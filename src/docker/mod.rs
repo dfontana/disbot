@@ -4,13 +4,12 @@ use std::sync::RwLock;
 
 use container::DockerContainers;
 pub use container::{Container, ContainerBuilder};
+use once_cell::sync::Lazy;
 use reqwest::Client;
 
 use crate::config::ServerConfig;
 
-lazy_static! {
-  static ref URI: RwLock<Option<String>> = RwLock::new(None);
-}
+static URI: Lazy<RwLock<Option<String>>> = Lazy::new(|| RwLock::new(None));
 
 pub fn configure(cfg: &ServerConfig) -> Result<(), String> {
   let mut inst = URI

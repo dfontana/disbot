@@ -1,4 +1,5 @@
 use crate::config::ServerConfig;
+use once_cell::sync::Lazy;
 use std::{
   iter,
   net::{IpAddr, Ipv4Addr, SocketAddr, UdpSocket},
@@ -14,10 +15,8 @@ const MAC_PER_MAGIC: usize = 16;
 const SEPERATOR: char = ':';
 static HEADER: [u8; 6] = [0xFF; 6];
 
-lazy_static! {
-  static ref INSTANCE: RwLock<Option<Arc<Wol>>> = RwLock::new(None);
-  static ref WAIT_SHUTDOWN: Duration = Duration::from_secs(600);
-}
+static INSTANCE: Lazy<RwLock<Option<Arc<Wol>>>> = Lazy::new(|| RwLock::new(None));
+static WAIT_SHUTDOWN: Lazy<Duration> = Lazy::new(|| Duration::from_secs(600));
 
 pub fn configure(cfg: &ServerConfig) -> Result<(), String> {
   let mut inst = INSTANCE
