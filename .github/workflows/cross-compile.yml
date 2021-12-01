@@ -14,6 +14,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
+      - name: Cache
+        uses: actions/cache@v2
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            ~/.rustup
+            target
+          key: ${{ runner.os }}-rust
       - uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
@@ -23,7 +32,7 @@ jobs:
         with:
           use-cross: true
           command: build
-          args: --target armv7-unknown-linux-gnueabihf
+          args: --release --target armv7-unknown-linux-gnueabihf
       - name: Package Artifacts
         run: |
           src=$(pwd)
