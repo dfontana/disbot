@@ -27,7 +27,9 @@ LOG_LEVEL=INFO
 #You can repeat this for dev.env as well
 ```
 
-1. Launch with `cargo run dev`. Alternatively, if your raspberry pi is configured on the local network as expected, you can run `./deploy.sh`
+1. If your raspberry pi is configured on the local network as expected, you can run `./deploy.sh`.
+  - If you are on `x86_64`-like machine, running `deploy.sh` will require `cross` installed to [cross compile](https://github.com/rust-embedded/cross)
+  - If you are on `arm`-like machine, running `deploy.sh` will download the latest release tagged to deploy.
 
 ### (First time Deploy Setup)
 
@@ -41,7 +43,7 @@ sudo chmod a+rx /usr/local/bin/yt-dlp
 
 (If you need to update `yt-dlp` use the `-U` flag)
 
-You'll also need `cross` installed to [cross compile](https://github.com/rust-embedded/cross).
+
 
 1. Create a systemd service file like so (you might repeat for dev):
 
@@ -90,6 +92,10 @@ Validate: `curl http://localhost:2375/v1.40/containers/json`. This will need to 
 
 - Ensure the `SERVER_USER` has sudo-er privileged to run `shutdown` without a password. (Eg: `sudo visudo -> [user]\tALL=NOPASSWD:[pathToBin1],[pathtoBin2],...`)
 - Equally, ensure the bot's host can run `ssh` without a password (eg setup it's SSH keys).
+
+#### Releasing Through Github Actions
+
+Due to `cross` not supporting M1 at the moment, a github action is setup to help cross compile from an `x86_64` machine. This process is triggered on tag creation; which can be done with the `release.sh` 
 
 ## Invite Shruggin' Shiba to Your Server
 
