@@ -50,6 +50,7 @@ jobs:
           echo "ASSET_PATH=$ASSET_PATH" >> $GITHUB_ENV
           echo "CHECKSUM_PATH=$CHECKSUM_PATH" >> $GITHUB_ENV
           ls .
+          echo $ASSET_NAME
           echo $ASSET_PATH
           tar czf $ASSET_PATH *
           cd $src
