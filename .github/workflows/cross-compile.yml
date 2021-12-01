@@ -1,8 +1,9 @@
 name: ARMv7 Release
-on:
-  push:
-    tags:
-      - v*
+on: [push]
+# on:
+#   push:
+#     tags:
+#       - v*
 
 env:
   CARGO_TERM_COLOR: always
@@ -40,7 +41,7 @@ jobs:
           sha256sum $ASSET_NAME > $CHECKSUM_PATH
       - name: Release
         uses: softprops/action-gh-release@v1
-        if: startsWith(github.ref, 'refs/tags/')
+        #if: startsWith(github.ref, 'refs/tags/')
         with:
           files: |
             ${{ env.ASSET_PATH }}
