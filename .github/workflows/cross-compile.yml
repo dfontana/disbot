@@ -1,0 +1,59 @@
+name: ARMv7 Release
+on:
+  push:
+    tags:
+      - v*
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  linux_arm7:
+    name: Linux ARMv7
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Cache
+        uses: actions/cache@v2
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            ~/.rustup
+            target
+          key: ${{ runner.os }}-rust
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          target: armv7-unknown-linux-gnueabihf
+          override: true
+      - uses: actions-rs/cargo@v1
+        with:
+          use-cross: true
+          command: build
+          args: --release --target armv7-unknown-linux-gnueabihf
+      - name: Package Artifacts
+        run: |
+          src=$(pwd)
+          stage=$(mktemp -d)
+          RELEASE_VERSION=$(git rev-parse --short "$GITHUB_SHA")
+          cp target/armv7-unknown-linux-gnueabihf/release/disbot $stage/
+          cd $stage 
+          ASSET_NAME="disbot-$RELEASE_VERSION.tar.gz"
+          ASSET_PATH="$src/$ASSET_NAME"
+          CHECKSUM_PATH="$ASSET_PATH.sha256"
+          echo "ASSET_PATH=$ASSET_PATH" >> $GITHUB_ENV
+          echo "CHECKSUM_PATH=$CHECKSUM_PATH" >> $GITHUB_ENV
+          ls .
+          echo $ASSET_NAME
+          echo $ASSET_PATH
+          tar czf $ASSET_PATH *
+          cd $src
+          sha256sum $ASSET_NAME > $CHECKSUM_PATH
+      - name: Release
+        uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: |
+            ${{ env.ASSET_PATH }}
+            ${{ env.CHECKSUM_PATH }}
