@@ -43,7 +43,7 @@ jobs:
           stage=$(mktemp -d)
           cp target/armv7-unknown-linux-gnueabihf/release/disbot $stage/
           cd $stage
-          RELEASE_VERSION=${GITHUB_REF#refs/tags/}
+          RELEASE_VERSION$(git rev-parse --short "$GITHUB_SHA")
           ASSET_NAME="disbot-$RELEASE_VERSION.tar.gz"
           ASSET_PATH="$src/$ASSET_NAME"
           CHECKSUM_PATH="$ASSET_PATH.sha256"
