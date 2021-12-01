@@ -1,9 +1,8 @@
 name: ARMv7 Release
-on: [push]
-# on:
-#   push:
-#     tags:
-#       - v*
+on:
+  push:
+    tags:
+      - v*
 
 env:
   CARGO_TERM_COLOR: always
@@ -28,15 +27,11 @@ jobs:
           toolchain: stable
           target: armv7-unknown-linux-gnueabihf
           override: true
-      # - uses: actions-rs/cargo@v1
-      #   with:
-      #     use-cross: true
-      #     command: build
-      #     args: --release --target armv7-unknown-linux-gnueabihf
-      - name: Test Package
-        run: |
-          mkdir -p target/armv7-unknown-linux-gnueabihf/release/
-          echo "meow" > target/armv7-unknown-linux-gnueabihf/release/disbot
+      - uses: actions-rs/cargo@v1
+        with:
+          use-cross: true
+          command: build
+          args: --release --target armv7-unknown-linux-gnueabihf
       - name: Package Artifacts
         run: |
           src=$(pwd)
@@ -57,7 +52,7 @@ jobs:
           sha256sum $ASSET_NAME > $CHECKSUM_PATH
       - name: Release
         uses: softprops/action-gh-release@v1
-        #if: startsWith(github.ref, 'refs/tags/')
+        if: startsWith(github.ref, 'refs/tags/')
         with:
           files: |
             ${{ env.ASSET_PATH }}
