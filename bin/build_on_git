@@ -1,4 +1,6 @@
 #!/bin/bash
+# Create a tag for release & push it, which will trigger github action
+# This is an alternate way to build the bot for Armv7
 set -e
 
 SHA=${1:0:8}

@@ -8,10 +8,32 @@ A Discord Bot, that I'm not sure what it'll do yet - but I wanted to have someth
 
 The rest I don't really care about at the moment :shrug-dog:
 
-## Deploying
+## Building
 
-1. Clone the project to your deploy location
-1. Define a `prod.env` file inside the the root of this repo:
+For ArmV7 - eg Raspberry Pi. Note: the deploy script will do this for you. 3 Ways:
+
+- __Github Actions__
+  - Builds on the remote server whenever you push a tag. You can then download this from releases. See `.github/workflows`
+  ```
+  ./bin/build_on_git {commit-sha} {message}
+  ```
+- __Cross__
+  - Only works on non-`aarch64` machines. [`cross`](https://github.com/rust-embedded/cross), simply put: 
+  ```
+  cargo install cross
+  cross build --release --target armv7-unknown-linux-gnueabihf
+  ```
+- __Native Toolchains__
+  - Uses [`messense/homebrew-macos-cross-toolchains`](https://github.com/messense/homebrew-macos-cross-toolchains)
+  ```
+  brew tap messense/macos-cross-toolchains
+  brew install armv7-unknown-linux-gnueabihf
+  ./bin/build
+  ```
+
+## Deploying
+ 
+1. Define a `prod.env` file inside the root of this repo:
 
 ```
 #prod.env
@@ -27,11 +49,10 @@ LOG_LEVEL=INFO
 #You can repeat this for dev.env as well
 ```
 
-1. If your raspberry pi is configured on the local network as expected, you can run `./deploy.sh`.
-  - If you are on `x86_64`-like machine, running `deploy.sh` will require `cross` installed to [cross compile](https://github.com/rust-embedded/cross)
-  - If you are on `arm`-like machine, running `deploy.sh` will download the latest release tagged to deploy.
+1. `./deploy.sh {dev|prod} {raspberrypi.local}`
+  - You can use github to build the binary by setting `BUILD_GITHUB=1`. This assumes you've already cut the release
 
-### (First time Deploy Setup)
+### (First time Deploy Setup on Remote Host)
 
 Install required dependencies for the songbird functionality to work:
 
@@ -42,8 +63,6 @@ sudo chmod a+rx /usr/local/bin/yt-dlp
 ```
 
 (If you need to update `yt-dlp` use the `-U` flag)
-
-
 
 1. Create a systemd service file like so (you might repeat for dev):
 
@@ -92,10 +111,6 @@ Validate: `curl http://localhost:2375/v1.40/containers/json`. This will need to 
 
 - Ensure the `SERVER_USER` has sudo-er privileged to run `shutdown` without a password. (Eg: `sudo visudo -> [user]\tALL=NOPASSWD:[pathToBin1],[pathtoBin2],...`)
 - Equally, ensure the bot's host can run `ssh` without a password (eg setup it's SSH keys).
-
-#### Releasing Through Github Actions
-
-Due to `cross` not supporting M1 at the moment, a github action is setup to help cross compile from an `x86_64` machine. This process is triggered on tag creation; which can be done with the `release.sh` 
 
 ## Invite Shruggin' Shiba to Your Server
 

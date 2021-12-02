@@ -1,0 +1,11 @@
+#!/bin/bash
+# Cross compile to armv7; should run from root of repo
+TARGET=armv7-unknown-linux-gnueabihf
+export TARGET_CC=$TARGET-gcc
+export TARGET_AR=$TARGET-ar
+export CC_armv7_unknown_linux_gnu=$TARGET-gcc
+export CXX_armv7_unknown_linux_gnu=$TARGET-g++
+export AR_armv7_unknown_linux_gnu=$TARGET-ar
+export CARGO_TARGET_ARMV7_UNKNOWN_LINUX_GNUEABIHF_LINKER=$TARGET-gcc
+export CMAKE_TOOLCHAIN_FILE_armv7_unknown_linux_gnueabihf=$(pwd)/bin/armv7.cmake
+cargo build --release --target $TARGET

@@ -1,11 +1,14 @@
+#!/bin/bash
 set -e
 
 env=${1:-dev}
 host=${2:-raspberrypi.local}
+on_github=${BUILD_GITHUB:-0}
 
-if [[ $(uname -p) == 'arm' ]]; then
-  # we must download from releases
-  echo "On ARM machine, downloading release..."
+echo "Building binary..."
+if [[ on_github == 1 ]]; then
+  echo "Using Github Release"
+  echo "Downloading release..."
   tmp=$(mktemp -d -t tmp)
   wrk=$(pwd)
   cd $tmp
@@ -16,16 +19,20 @@ if [[ $(uname -p) == 'arm' ]]; then
   cd $wrk
   mkdir -p target/armv7-unknown-linux-gnueabihf/release
   mv $tmp/disbot target/armv7-unknown-linux-gnueabihf/release/disbot
-  rm -r $tmp
+  rm -r $tmp 
+elif [[ $(uname -p) == 'arm' ]]; then
+  echo "Building with Native Toolchains..."
+  source ./bin/build
 else
-  # we can cross compile on x86_64
   echo "Cross Compiling..."
   cross build --release --target armv7-unknown-linux-gnueabihf
 fi
 echo "Binary built."
-
+echo "Coping files to remote $host..."
 ssh $USER@$host 'mkdir -p ~/deploy'
 scp "$env.env" $USER@$host:~/deploy/
+echo "Restarting disbot-$env service on $host"
 ssh -t $USER@$host 'sudo systemctl stop '"disbot-$env"
 scp target/armv7-unknown-linux-gnueabihf/release/disbot $USER@$host:~/deploy/"disbot-$env"
 ssh -t $USER@$host 'sudo systemctl restart '"disbot-$env"
+echo "Done."
