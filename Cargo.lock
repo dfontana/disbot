@@ -208,7 +208,6 @@ dependencies = [
  "num-integer",
  "num-traits 0.2.14",
  "serde",
- "time",
  "winapi",
 ]
 
@@ -232,8 +231,8 @@ dependencies = [
 
 [[package]]
 name = "command_attr"
-version = "0.3.7"
-source = "git+https://github.com/serenity-rs/serenity?rev=2da46a8402926f2acc90d183a44d370f8708dad0#2da46a8402926f2acc90d183a44d370f8708dad0"
+version = "0.3.8"
+source = "git+https://github.com/serenity-rs/serenity?rev=bae3319539a2a306d26e43259cdd258420f78c20#bae3319539a2a306d26e43259cdd258420f78c20"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1672,8 +1671,8 @@ dependencies = [
 
 [[package]]
 name = "serenity"
-version = "0.10.9"
-source = "git+https://github.com/serenity-rs/serenity?rev=2da46a8402926f2acc90d183a44d370f8708dad0#2da46a8402926f2acc90d183a44d370f8708dad0"
+version = "0.10.10"
+source = "git+https://github.com/serenity-rs/serenity?rev=bae3319539a2a306d26e43259cdd258420f78c20#bae3319539a2a306d26e43259cdd258420f78c20"
 dependencies = [
  "async-trait",
  "async-tungstenite 0.11.0",
