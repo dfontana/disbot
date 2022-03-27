@@ -38,6 +38,7 @@ For ArmV7 - eg Raspberry Pi. Note: the deploy script will do this for you. 3 Way
 ```
 #prod.env
 API_KEY=<Your Bot's Token Here>
+APP_ID=<Your Bot's Application Id Here>
 EMOTE_NAME=<your-emote || shrug_dog>
 EMOTE_USERS=<csv of users || User1,User2,User3>
 SERVER_MAC=<game-server-mac>

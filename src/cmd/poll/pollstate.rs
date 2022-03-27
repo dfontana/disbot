@@ -5,15 +5,17 @@ use std::{
   time::Duration,
 };
 use tracing::{info, instrument};
+use uuid::Uuid;
 
 use super::cache::Expiring;
 
 pub struct PollState {
+  pub id: Uuid,
   pub duration: Duration,
   pub topic: String,
   pub longest_option: usize,
   pub most_votes: usize,
-  pub votes: HashMap<usize, (String, usize, HashSet<String>)>,
+  pub votes: HashMap<String, (String, usize, HashSet<String>)>,
 }
 
 impl Expiring for PollState {
@@ -40,10 +42,11 @@ impl PollState {
     let opt_width = items.iter().map(String::len).max().unwrap_or(1);
     let mut votes = HashMap::new();
     items.iter().enumerate().for_each(|(idx, it)| {
-      votes.insert(idx + 1, (it.to_owned(), 0, HashSet::new()));
+      votes.insert(format!("{}", idx + 1), (it.to_owned(), 0, HashSet::new()));
     });
 
     Ok(PollState {
+      id: Uuid::new_v4(),
       duration,
       topic,
       longest_option: opt_width,
@@ -52,29 +55,26 @@ impl PollState {
     })
   }
 
-  #[instrument(name = "PollState", level = "INFO", skip(self, vote, voter))]
-  pub fn cast_vote(&mut self, vote: usize, voter: String) {
-    if !self.votes.contains_key(&vote) {
+  #[instrument(name = "PollState", level = "INFO", skip(self))]
+  pub fn update_vote(&mut self, vote: &String, voter: &String) {
+    if !self.votes.contains_key(vote) {
       info!("Vote not present in poll, ignoring");
       return;
     }
-    self.votes.entry(vote).and_modify(|e| {
-      e.1 += 1;
-      e.2.insert(voter);
-    });
-    self.set_highest_vote();
-  }
-
-  #[instrument(name = "PollState", level = "INFO", skip(self, vote, voter))]
-  pub fn revoke_vote(&mut self, vote: usize, voter: &str) {
-    if !self.votes.contains_key(&vote) {
-      info!("Vote not present in poll, ignoring");
-      return;
-    }
-    self.votes.entry(vote).and_modify(|e| {
-      e.1 -= 1;
-      e.2.remove(voter);
-    });
+    info!("Casting vote");
+    self
+      .votes
+      .entry(vote.into())
+      .and_modify(|e| match e.2.contains(voter) {
+        false => {
+          e.1 += 1;
+          e.2.insert(voter.into());
+        }
+        true => {
+          e.1 -= 1;
+          e.2.remove(voter);
+        }
+      });
     self.set_highest_vote();
   }
 

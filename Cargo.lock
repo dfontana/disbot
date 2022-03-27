@@ -208,7 +208,6 @@ dependencies = [
  "num-integer",
  "num-traits 0.2.14",
  "serde",
- "time",
  "winapi",
 ]
 
@@ -232,8 +231,8 @@ dependencies = [
 
 [[package]]
 name = "command_attr"
-version = "0.3.7"
-source = "git+https://github.com/serenity-rs/serenity?rev=2da46a8402926f2acc90d183a44d370f8708dad0#2da46a8402926f2acc90d183a44d370f8708dad0"
+version = "0.3.8"
+source = "git+https://github.com/serenity-rs/serenity?rev=bae3319539a2a306d26e43259cdd258420f78c20#bae3319539a2a306d26e43259cdd258420f78c20"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -389,6 +388,7 @@ dependencies = [
  "tokio",
  "tracing",
  "tracing-subscriber",
+ "uuid 1.0.0-alpha.1",
 ]
 
 [[package]]
@@ -1672,8 +1672,8 @@ dependencies = [
 
 [[package]]
 name = "serenity"
-version = "0.10.9"
-source = "git+https://github.com/serenity-rs/serenity?rev=2da46a8402926f2acc90d183a44d370f8708dad0#2da46a8402926f2acc90d183a44d370f8708dad0"
+version = "0.10.10"
+source = "git+https://github.com/serenity-rs/serenity?rev=bae3319539a2a306d26e43259cdd258420f78c20#bae3319539a2a306d26e43259cdd258420f78c20"
 dependencies = [
  "async-trait",
  "async-tungstenite 0.11.0",
@@ -1796,7 +1796,7 @@ dependencies = [
  "tracing-futures",
  "typemap_rev",
  "url",
- "uuid",
+ "uuid 0.8.2",
  "xsalsa20poly1305",
 ]
 
@@ -2272,6 +2272,28 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bc5cf98d8186244414c848017f0e2676b3fcb46807f6668a97dfe67359a3c4b7"
 dependencies = [
  "getrandom 0.2.3",
+]
+
+[[package]]
+name = "uuid"
+version = "1.0.0-alpha.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bb3ab47baa004111b323696c6eaa2752e7356f7f77cf6b6dc7a2087368ce1ca4"
+dependencies = [
+ "getrandom 0.2.3",
+ "rand 0.8.4",
+ "uuid-macro-internal",
+]
+
+[[package]]
+name = "uuid-macro-internal"
+version = "1.0.0-alpha.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8840edd0c528bd9c74bb58a2ed578009a2200f7036bd7206c76873b4e8b7a881"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]

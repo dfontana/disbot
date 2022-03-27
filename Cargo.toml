@@ -17,13 +17,21 @@ reqwest = { version = "0.11", features = ["json"] }
 select = "0.5.0"
 serde = { version = "1.0.125", features = ["derive"] }
 serde_json = "1.0"
-serenity = {features = ["client", "cache", "gateway", "model","rustls_backend", "framework", "standard_framework", "voice"], git ="https://github.com/serenity-rs/serenity", rev="2da46a8402926f2acc90d183a44d370f8708dad0"}
+serenity = {features = ["client", "cache", "gateway", "model","rustls_backend","unstable_discord_api", "framework", "standard_framework", "voice"], git ="https://github.com/serenity-rs/serenity", rev="bae3319539a2a306d26e43259cdd258420f78c20"}
 songbird = {features = ["builtin-queue", "yt-dlp"], git = "https://github.com/dfontana/songbird"}
 tokio = { version = "1.0", features = ["full"] }
 tracing = "0.1.28"
 tracing-subscriber = "0.2.24"
 
+[dependencies.uuid]
+version = "1.0.0-alpha.1"
+features = [
+    "v4",                # Lets you generate random UUIDs
+    "fast-rng",          # Use a faster (but still sufficiently random) RNG
+    "macro-diagnostics", # Enable better diagnostics for compile-time UUIDs
+]
+
 [patch.crates-io]
 # Need to patch since songbird pulls in a version, we need to make the same
 # Can go away once we're back on an official version number and not git
-serenity = {git ="https://github.com/serenity-rs/serenity", rev="2da46a8402926f2acc90d183a44d370f8708dad0"}
+serenity = {git ="https://github.com/serenity-rs/serenity", rev="bae3319539a2a306d26e43259cdd258420f78c20"}

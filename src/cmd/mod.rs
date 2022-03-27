@@ -1,10 +1,7 @@
 use crate::config::Config;
 use serenity::{
   async_trait,
-  model::{
-    channel::{Message, Reaction},
-    gateway::Ready,
-  },
+  model::{channel::Message, gateway::Ready, interactions::Interaction},
   prelude::*,
 };
 
@@ -48,11 +45,10 @@ impl EventHandler for Handler {
     self.ready.ready(&ctx, &rdy).await
   }
 
-  async fn reaction_add(&self, ctx: Context, react: Reaction) {
-    self.poller.add_vote(&ctx, &react).await
-  }
-
-  async fn reaction_remove(&self, ctx: Context, react: Reaction) {
-    self.poller.remove_vote(&ctx, &react).await
+  async fn interaction_create(&self, ctx: Context, itx: Interaction) {
+    match itx {
+      Interaction::MessageComponent(d) => self.poller.handle(&ctx, d).await,
+      _ => (),
+    }
   }
 }
