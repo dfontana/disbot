@@ -2,27 +2,12 @@ use crate::config::Config;
 use once_cell::sync::Lazy;
 use serenity::{
   cache::Cache,
-  model::{channel::ReactionType, guild::Emoji, id::GuildId},
+  model::{guild::Emoji, id::GuildId},
 };
 
-use std::{collections::HashMap, sync::RwLock};
+use std::sync::RwLock;
 
 static INSTANCE: Lazy<RwLock<String>> = Lazy::new(|| RwLock::new("".to_string()));
-static NUMBERS: Lazy<HashMap<usize, String>> = Lazy::new(|| {
-  let mut m = HashMap::new();
-  m.insert(0, "\u{30}\u{fe0f}\u{20e3}".to_string());
-  m.insert(1, "\u{31}\u{fe0f}\u{20e3}".to_string());
-  m.insert(2, "\u{32}\u{fe0f}\u{20e3}".to_string());
-  m.insert(3, "\u{33}\u{fe0f}\u{20e3}".to_string());
-  m.insert(4, "\u{34}\u{fe0f}\u{20e3}".to_string());
-  m.insert(5, "\u{35}\u{fe0f}\u{20e3}".to_string());
-  m.insert(6, "\u{36}\u{fe0f}\u{20e3}".to_string());
-  m.insert(7, "\u{37}\u{fe0f}\u{20e3}".to_string());
-  m.insert(8, "\u{38}\u{fe0f}\u{20e3}".to_string());
-  m.insert(9, "\u{39}\u{fe0f}\u{20e3}".to_string());
-  m.insert(10, "\u{01F51F}".to_string());
-  m
-});
 
 pub struct EmojiLookup {}
 
@@ -63,16 +48,5 @@ impl EmojiLookup {
     };
 
     Ok(emoji.clone())
-  }
-
-  pub fn get_numbers(&self) -> HashMap<usize, String> {
-    NUMBERS.to_owned()
-  }
-
-  pub fn to_number(&self, emoji: &ReactionType) -> Option<usize> {
-    NUMBERS
-      .iter()
-      .find(|(_, v)| emoji.unicode_eq(v))
-      .map(|(num, _)| *num)
   }
 }

@@ -69,6 +69,7 @@ async fn main() {
     .framework(framework)
     .register_songbird()
     .event_handler(Handler::new(config.clone()))
+    .application_id(config.app_id)
     .await
     .expect("Err creating client");
 

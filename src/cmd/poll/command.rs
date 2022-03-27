@@ -7,18 +7,20 @@ use crate::{
 use humantime::format_duration;
 use once_cell::sync::Lazy;
 use serenity::{
+  builder::{CreateActionRow, CreateComponents},
   client::Context,
   framework::standard::{macros::command, Args, CommandResult},
   model::{
-    channel::{Message, Reaction, ReactionType},
+    channel::{Message, ReactionType},
     guild::Emoji,
-    id::MessageId,
+    interactions::message_component::MessageComponentInteraction,
   },
   utils::MessageBuilder,
 };
 use tracing::{error, instrument, warn};
+use uuid::Uuid;
 
-static POLL_STATES: Lazy<Cache<MessageId, PollState>> = Lazy::new(|| Cache::new());
+static POLL_STATES: Lazy<Cache<Uuid, PollState>> = Lazy::new(|| Cache::new());
 
 #[command]
 #[description = "Create a Poll with up to 9 Options. Double quote each argument."]
@@ -37,29 +39,49 @@ async fn poll(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
   let poll_state = PollState::from_args(args)?;
 
   // Send the poll message
-  let res_msg = msg
-    .reply(&ctx.http, build_poll_message(&emoji, &poll_state))
-    .await?;
+  msg
+    .channel_id
+    .send_message(&ctx.http, |builder| {
+      let poll_msg = build_poll_message(&emoji, &poll_state);
+      let mut component = CreateComponents::default();
+      let mut action_row = CreateActionRow::default();
 
-  // Add reactions for users to vote
-  let number_emoji = EmojiLookup::inst().get_numbers();
-  let emotes: Vec<ReactionType> = (1..poll_state.votes.len() + 1)
-    .map(|i| number_emoji.get(&i))
-    .filter(Option::is_some)
-    .map(|em| ReactionType::Unicode(em.unwrap().to_owned()))
-    .collect();
-  for emote in emotes {
-    res_msg.react(&ctx.http, emote).await?;
-  }
+      action_row.create_select_menu(|select| {
+        select
+          .placeholder("Choose your Answers")
+          .custom_id(poll_state.id)
+          .min_values(1)
+          .max_values(poll_state.votes.len() as u64)
+          .options(|opts| {
+            poll_state.votes.iter().for_each(|(k, v)| {
+              opts.create_option(|opt| {
+                opt
+                  .label(v.0.to_owned())
+                  .value(k.to_owned())
+                  .emoji(ReactionType::Custom {
+                    name: None,
+                    animated: false,
+                    id: emoji.id,
+                  })
+              });
+            });
+            opts
+          })
+      });
+
+      component.add_action_row(action_row);
+      builder.content(poll_msg).set_components(component)
+    })
+    .await?;
 
   // Register globally
   let exp = poll_state.duration;
-  POLL_STATES.insert(res_msg.id, poll_state)?;
+  let exp_key = poll_state.id;
+  POLL_STATES.insert(poll_state.id, poll_state)?;
 
   // Setup the expiration action
   let exp_http = ctx.http.clone();
   let exp_chan = msg.channel_id;
-  let exp_key = res_msg.id;
   let exp_emote = emoji.clone();
   tokio::spawn(async move {
     tokio::time::sleep(exp).await;
@@ -83,73 +105,53 @@ impl PollHandler {
     PollHandler {}
   }
 
-  async fn _update_poll<F>(
+  #[instrument(name = "Poller", level = "INFO", skip(self, ctx, itx))]
+  pub async fn handle(&self, ctx: &Context, mut itx: MessageComponentInteraction) {
+    if let Err(e) = self._handle(ctx, &mut itx).await {
+      error!("Failed to update poll {:?}", e);
+    }
+  }
+
+  async fn _handle(
     &self,
     ctx: &Context,
-    react: &Reaction,
-    apply: F,
-  ) -> Result<(), Box<dyn Error>>
-  where
-    F: FnOnce(&MessageId, usize) -> Result<(), String>,
-  {
-    if react.user_id.unwrap() == ctx.cache.as_ref().current_user().await.id {
-      return Err("Skipping, self reaction".into());
-    }
-    if !POLL_STATES.contains_key(&react.message_id)? {
-      return Err("Skipping, not a poll reaction".into());
+    itx: &mut MessageComponentInteraction,
+  ) -> Result<(), Box<dyn Error>> {
+    let poll_id = Uuid::parse_str(&itx.data.custom_id)?;
+    if !POLL_STATES.contains_key(&poll_id)? {
+      itx.defer(&ctx.http).await?;
+      return Err("Skipping, poll has ended or not a poll interaction".into());
     }
 
-    let vote = EmojiLookup::inst().to_number(&react.emoji);
-    if vote.is_none() {
-      return Err("Skipping, not a valid poll emote".into());
+    let user = get_user(&ctx, &itx).await;
+    for value in itx.data.values.iter() {
+      POLL_STATES.invoke_mut(&poll_id, |p| p.update_vote(value, &user))?;
     }
 
-    apply(&react.message_id, vote.unwrap())?;
-
-    let guild_id = match react.guild_id {
+    let guild_id = match itx.guild_id {
       Some(g) => g,
-      None => return Err("No Guild Id on Reaction".into()),
+      None => {
+        itx.defer(&ctx.http).await?;
+        return Err("No Guild Id on Interaction".into());
+      }
     };
-    let mut msg = react.message(&ctx.http).await?;
     let emoji = EmojiLookup::inst().get(guild_id, &ctx.cache).await?;
-    let new_body = POLL_STATES.invoke(&react.message_id, |p| build_poll_message(&emoji, p))?;
-    msg.edit(&ctx, |body| body.content(new_body)).await?;
-
+    let new_body = POLL_STATES.invoke(&poll_id, |p| build_poll_message(&emoji, p))?;
+    itx
+      .message
+      .edit(&ctx, |body| body.content(new_body))
+      .await?;
+    itx.defer(&ctx.http).await?;
     Ok(())
-  }
-
-  #[instrument(name = "Poller", level = "INFO", skip(self, ctx, react))]
-  pub async fn add_vote(&self, ctx: &Context, react: &Reaction) {
-    let user = get_user(ctx, react).await;
-    let update_op = |msgid: &MessageId, vote: usize| {
-      POLL_STATES.invoke_mut(msgid, |p| p.cast_vote(vote, user.to_owned()))
-    };
-    if let Err(e) = self._update_poll(ctx, react, update_op).await {
-      error!("Failed to add vote {:?}", e);
-    }
-  }
-
-  #[instrument(name = "Poller", level = "INFO", skip(self, ctx, react))]
-  pub async fn remove_vote(&self, ctx: &Context, react: &Reaction) {
-    let user = get_user(ctx, react).await;
-    let update_op = |msgid: &MessageId, vote: usize| {
-      POLL_STATES.invoke_mut(msgid, |p| p.revoke_vote(vote, &user))
-    };
-    if let Err(e) = self._update_poll(ctx, react, update_op).await {
-      error!("Failed to remove vote {:?}", e);
-    }
   }
 }
 
-async fn get_user(ctx: &Context, react: &Reaction) -> String {
-  if let Ok(user) = react.user(&ctx.http).await {
-    if let Some(nick) = user.nick_in(&ctx.http, react.guild_id.unwrap()).await {
-      return nick.to_lowercase();
-    } else {
-      return user.name.to_lowercase();
-    }
+async fn get_user(ctx: &Context, itx: &MessageComponentInteraction) -> String {
+  if let Some(nick) = itx.user.nick_in(&ctx.http, itx.guild_id.unwrap()).await {
+    return nick.to_lowercase();
+  } else {
+    return itx.user.name.to_lowercase();
   }
-  "unknown".to_owned()
 }
 
 fn build_poll_message(emoji: &Emoji, poll_state: &PollState) -> String {
