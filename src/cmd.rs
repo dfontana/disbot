@@ -51,7 +51,7 @@ impl Handler {
       ],
       app_interactors: vec![
         poll,
-        // dice_roll::DiceRoll::default(),
+        Box::new(dice_roll::DiceRoll::default()),
         // voice::Voice::default(),
         // server::Server::new(config),
       ],
