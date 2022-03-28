@@ -15,23 +15,13 @@ mod env;
 
 use std::str::FromStr;
 
-use serenity::{
-  client::{bridge::gateway::GatewayIntents, Client},
-  framework::standard::{macros::group, StandardFramework},
-};
+use serenity::client::{bridge::gateway::GatewayIntents, Client};
 use songbird::SerenityInit;
 use tracing::{error, Level};
 
-use cmd::{dice_roll::*, help::*, poll::*, server::*, voice::*, Handler};
+use cmd::Handler;
 use config::Config;
 use env::Environment;
-
-#[group]
-#[description = "Utilities the Sheebs has Graced You With"]
-#[summary = "Utilities Sheebs Givith"]
-#[commands(roll, poll)]
-#[sub_groups(server, voice)]
-struct General;
 
 #[tokio::main]
 async fn main() {
@@ -50,13 +40,7 @@ async fn main() {
     .with_target(false)
     .init();
   emoji::configure(&config).expect("Failed to setup emoji lookup");
-  cmd::server::configure(&config.server).expect("Failed to setup game server");
   docker::configure(&config.server).expect("Failed to setup docker for game server");
-
-  let framework = StandardFramework::new()
-    .configure(|c| c.prefix("!"))
-    .group(&GENERAL_GROUP)
-    .help(&HELP);
 
   let mut client = Client::builder(&config.api_key)
     .intents(
@@ -66,7 +50,6 @@ async fn main() {
         | GatewayIntents::GUILD_MESSAGE_REACTIONS
         | GatewayIntents::GUILD_VOICE_STATES,
     )
-    .framework(framework)
     .register_songbird()
     .event_handler(Handler::new(config.clone()))
     .application_id(config.app_id)

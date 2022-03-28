@@ -1,10 +1,13 @@
 use crate::config::Config;
 use crate::emoji::EmojiLookup;
 use serenity::{
+  async_trait,
   model::{channel::Message, channel::ReactionType, guild::Emoji},
   prelude::Context,
 };
 use tracing::{error, info, instrument};
+
+use super::MessageListener;
 
 pub struct ShrugHandler {
   config: Config,
@@ -29,9 +32,12 @@ impl ShrugHandler {
       .map(|_| ())
       .map_err(|_| "Failed to react/Send".to_string())
   }
+}
 
+#[async_trait]
+impl MessageListener for ShrugHandler {
   #[instrument(name = "Shrug", level = "INFO", skip(self, ctx, msg))]
-  pub async fn message(&self, ctx: &Context, msg: &Message) {
+  async fn message(&self, ctx: &Context, msg: &Message) {
     if msg.is_own(&ctx.cache).await {
       info!("Skipping, self message");
       return;

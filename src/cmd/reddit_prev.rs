@@ -1,22 +1,20 @@
+use super::MessageListener;
 use once_cell::sync::Lazy;
 use regex::Regex;
 use reqwest::Client;
 use select::document::Document;
 use select::predicate::Class;
-use serenity::{model::channel::Message, prelude::Context};
+use serenity::{async_trait, model::channel::Message, prelude::Context};
 use tracing::{error, info, instrument, warn};
 
 static HTTP: Lazy<Client> = Lazy::new(|| Client::new());
 static REDDIT_LINK: Lazy<Regex> =
   Lazy::new(|| Regex::new(r"(http[s]{0,1}://www\.reddit\.com[^\s]+)").unwrap());
 
+#[derive(Default)]
 pub struct RedditPreviewHandler {}
 
 impl RedditPreviewHandler {
-  pub fn new() -> Self {
-    RedditPreviewHandler {}
-  }
-
   async fn download_body(&self, url: &str) -> Result<String, reqwest::Error> {
     HTTP.get(url).send().await?.text().await
   }
@@ -37,9 +35,12 @@ impl RedditPreviewHandler {
       .attr("href")?;
     Some(val.to_owned())
   }
+}
 
+#[async_trait]
+impl MessageListener for RedditPreviewHandler {
   #[instrument(name = "RedditPreview", level = "INFO", skip(self, ctx, msg))]
-  pub async fn message(&self, ctx: &Context, msg: &Message) {
+  async fn message(&self, ctx: &Context, msg: &Message) {
     if msg.is_own(&ctx.cache).await {
       info!("Skipping, self message");
       return;
