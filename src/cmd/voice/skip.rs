@@ -1,54 +1,66 @@
+use std::error::Error;
+
 use crate::emoji::EmojiLookup;
 
+use super::SubCommandHandler;
 use serenity::{
+  async_trait,
   client::Context,
-  framework::standard::{macros::command, Args, CommandResult},
-  model::channel::Message,
+  model::interactions::application_command::{
+    ApplicationCommandInteraction, ApplicationCommandInteractionDataOption,
+  },
   utils::MessageBuilder,
 };
-use tracing::instrument;
 
-#[command]
-#[description = "Skip the currently playing sound"]
-#[only_in(guilds)]
-async fn skip(ctx: &Context, msg: &Message, _args: Args) -> CommandResult {
-  exec_skip(ctx, msg).await
-}
+#[derive(Default)]
+pub struct Skip {}
 
-#[instrument(name = "VoiceSkip", level = "INFO", skip(ctx, msg))]
-async fn exec_skip(ctx: &Context, msg: &Message) -> CommandResult {
-  let guild = msg.guild(&ctx.cache).await.unwrap();
-  let guild_id = guild.id;
+#[async_trait]
+impl SubCommandHandler for Skip {
+  async fn handle(
+    &self,
+    ctx: &Context,
+    itx: &ApplicationCommandInteraction,
+    _subopt: &ApplicationCommandInteractionDataOption,
+  ) -> Result<(), Box<dyn Error>> {
+    let guild_id = match itx.guild_id {
+      Some(g) => g,
+      None => {
+        return Err("No Guild Id on Interaction".into());
+      }
+    };
 
-  let manager = songbird::get(ctx)
-    .await
-    .expect("Songbird Voice client placed in at initialisation.")
-    .clone();
+    let manager = songbird::get(ctx)
+      .await
+      .expect("Songbird Voice client placed in at initialisation.")
+      .clone();
 
-  let emoji = EmojiLookup::inst().get(guild_id, &ctx.cache).await?;
+    let emoji = EmojiLookup::inst().get(guild_id, &ctx.cache).await?;
 
-  match manager.get(guild_id) {
-    None => {
-      let _ = msg
-        .channel_id
-        .say(&ctx.http, "Not in a voice channel to play in")
-        .await;
+    match manager.get(guild_id) {
+      None => {
+        itx
+          .edit_original_interaction_response(&ctx.http, |f| {
+            f.content("Not in a voice channel to play in")
+          })
+          .await?;
+      }
+      Some(handler_lock) => {
+        let handler = handler_lock.lock().await;
+        let queue = handler.queue();
+        let _ = queue.skip();
+        itx
+          .edit_original_interaction_response(&ctx.http, |f| {
+            f.content(
+              MessageBuilder::new()
+                .push("I didn't like that song either ")
+                .mention(&emoji)
+                .build(),
+            )
+          })
+          .await?;
+      }
     }
-    Some(handler_lock) => {
-      let handler = handler_lock.lock().await;
-      let queue = handler.queue();
-      let _ = queue.skip();
-      let _res = msg
-        .channel_id
-        .say(
-          &ctx.http,
-          MessageBuilder::new()
-            .push("I didn't like that song either ")
-            .mention(&emoji)
-            .build(),
-        )
-        .await;
-    }
+    Ok(())
   }
-  Ok(())
 }

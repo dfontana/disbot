@@ -1,5 +1,7 @@
 use humantime::parse_duration;
-use serenity::framework::standard::Args;
+use serenity::model::interactions::application_command::{
+  ApplicationCommandInteractionDataOption, ApplicationCommandInteractionDataOptionValue,
+};
 use std::{
   collections::{HashMap, HashSet},
   time::Duration,
@@ -25,18 +27,48 @@ impl Expiring for PollState {
 }
 
 impl PollState {
-  pub fn from_args(mut args: Args) -> Result<PollState, String> {
-    let duration = parse_duration(&args.single_quoted::<String>().unwrap())
-      .map_err(|_| "Invalid duration given")?;
-    let topic = args.single_quoted::<String>().unwrap();
-    let items: Vec<String> = args
-      .trimmed()
-      .quoted()
-      .iter::<String>()
-      .map(|arg| arg.unwrap().trim_matches('"').to_owned())
+  pub fn from_args(
+    args: &Vec<ApplicationCommandInteractionDataOption>,
+  ) -> Result<PollState, String> {
+    let map: HashMap<String, _> = args
+      .iter()
+      .map(|d| (d.name.to_owned(), d.resolved.to_owned()))
       .collect();
-    if items.len() > 10 {
-      return Err("Too many arguments given".to_string());
+
+    let duration: Duration = map
+      .get("duration")
+      .map(|v| v.to_owned())
+      .flatten()
+      .and_then(|d| match d {
+        ApplicationCommandInteractionDataOptionValue::String(v) => Some(v),
+        _ => None,
+      })
+      .ok_or("No duration given")
+      .and_then(|s| parse_duration(&s).map_err(|_| "Invalid duration given"))?;
+
+    let topic: String = map
+      .get("topic")
+      .map(|v| v.to_owned())
+      .flatten()
+      .and_then(|d| match d {
+        ApplicationCommandInteractionDataOptionValue::String(v) => Some(v),
+        _ => None,
+      })
+      .ok_or("No topic given")?;
+
+    let items: Vec<String> = { 0..9 }
+      .into_iter()
+      .map(|i| format!("option_{}", i))
+      .map(|key| map.get(&key))
+      .flatten()
+      .filter_map(|d| match d {
+        Some(ApplicationCommandInteractionDataOptionValue::String(v)) => Some(v.to_owned()),
+        _ => None,
+      })
+      .collect();
+
+    if items.is_empty() {
+      return Err("None or Malformed options given".into());
     }
 
     let opt_width = items.iter().map(String::len).max().unwrap_or(1);

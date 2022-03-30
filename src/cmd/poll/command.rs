@@ -1,156 +1,240 @@
 use std::error::Error;
 
 use crate::{
-  cmd::poll::{cache::Cache, pollstate::PollState},
+  cmd::{
+    poll::{cache::Cache, pollstate::PollState},
+    AppInteractor,
+  },
   emoji::EmojiLookup,
 };
 use humantime::format_duration;
 use once_cell::sync::Lazy;
 use serenity::{
-  builder::{CreateActionRow, CreateComponents},
+  async_trait,
+  builder::{CreateActionRow, CreateApplicationCommands, CreateComponents},
   client::Context,
-  framework::standard::{macros::command, Args, CommandResult},
   model::{
-    channel::{Message, ReactionType},
+    channel::ReactionType,
     guild::Emoji,
-    interactions::message_component::MessageComponentInteraction,
+    interactions::{
+      application_command::{
+        ApplicationCommandInteraction, ApplicationCommandOptionType, ApplicationCommandType,
+      },
+      message_component::MessageComponentInteraction,
+      InteractionResponseType,
+    },
   },
   utils::MessageBuilder,
 };
 use tracing::{error, instrument, warn};
 use uuid::Uuid;
 
+const NAME: &'static str = "poll";
 static POLL_STATES: Lazy<Cache<Uuid, PollState>> = Lazy::new(|| Cache::new());
 
-#[command]
-#[description = "Create a Poll with up to 9 Options. Double quote each argument."]
-#[usage = "poll Duration Question voteItem1 voteItem2 [voteItem3] ... [voteItem9]"]
-#[example = "\"1hour\" \"Whats the right pet?\" \"cats\" \"dogs\" will create a 2 option poll expiiring in 1 hour. Valid time units: 'day', 'hour', 'minute'"]
-#[min_args(4)]
-#[max_args(10)]
-async fn poll(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
-  let guild_id = match msg.guild_id {
-    Some(id) => id,
-    None => return Ok(()),
-  };
-  let emoji = EmojiLookup::inst().get(guild_id, &ctx.cache).await?;
+#[derive(Default)]
+pub struct Poll {}
 
-  // Create the poll
-  let poll_state = PollState::from_args(args)?;
+#[async_trait]
+impl AppInteractor for Poll {
+  #[instrument(name = "Poller", level = "INFO", skip(self, commands))]
+  fn register(&self, commands: &mut CreateApplicationCommands) {
+    commands.create_application_command(|command| {
+      command
+        .name(NAME)
+        .description("Create a Poll with up to 9 Options")
+        .kind(ApplicationCommandType::ChatInput)
+        .create_option(|option| {
+          option
+            .kind(ApplicationCommandOptionType::String)
+            .name("duration")
+            .description(
+              "How long until poll closes. Valid time units: 'day', 'hour', 'minute'. ex: 30minute",
+            )
+            .required(true)
+        })
+        .create_option(|option| {
+          option
+            .kind(ApplicationCommandOptionType::String)
+            .name("topic")
+            .description("Question or topic of the poll")
+            .required(true)
+        });
 
-  // Send the poll message
-  msg
-    .channel_id
-    .send_message(&ctx.http, |builder| {
-      let poll_msg = build_poll_message(&emoji, &poll_state);
-      let mut component = CreateComponents::default();
-      let mut action_row = CreateActionRow::default();
+      for i in 0..2 {
+        command.create_option(|option| {
+          option
+            .kind(ApplicationCommandOptionType::String)
+            .name(format!("option_{}", i))
+            .description(format!("Option to add to poll #{}", i))
+            .required(true)
+        });
+      }
 
-      action_row.create_select_menu(|select| {
-        select
-          .placeholder("Choose your Answers")
-          .custom_id(poll_state.id)
-          .min_values(1)
-          .max_values(poll_state.votes.len() as u64)
-          .options(|opts| {
-            poll_state.votes.iter().for_each(|(k, v)| {
-              opts.create_option(|opt| {
-                opt
-                  .label(v.0.to_owned())
-                  .value(k.to_owned())
-                  .emoji(ReactionType::Custom {
-                    name: None,
-                    animated: false,
-                    id: emoji.id,
-                  })
-              });
-            });
-            opts
-          })
-      });
-
-      component.add_action_row(action_row);
-      builder.content(poll_msg).set_components(component)
-    })
-    .await?;
-
-  // Register globally
-  let exp = poll_state.duration;
-  let exp_key = poll_state.id;
-  POLL_STATES.insert(poll_state.id, poll_state)?;
-
-  // Setup the expiration action
-  let exp_http = ctx.http.clone();
-  let exp_chan = msg.channel_id;
-  let exp_emote = emoji.clone();
-  tokio::spawn(async move {
-    tokio::time::sleep(exp).await;
-    let resp = match POLL_STATES.invoke(&exp_key, |p| build_exp_message(&exp_emote, p)) {
-      Err(_) => "Poll has ended -- failed to get details".to_string(),
-      Ok(v) => v,
-    };
-    let _ = exp_chan.say(&exp_http, resp).await;
-    if let Err(e) = POLL_STATES.remove(&exp_key) {
-      warn!("Failed to reap poll on exp: {}", e);
-    }
-  });
-
-  Ok(())
-}
-
-pub struct PollHandler {}
-
-impl PollHandler {
-  pub fn new() -> Self {
-    PollHandler {}
+      for i in 2..9 {
+        command.create_option(|option| {
+          option
+            .kind(ApplicationCommandOptionType::String)
+            .name(format!("option_{}", i))
+            .description(format!("Option to add to poll #{}", i))
+            .required(false)
+        });
+      }
+      command
+    });
   }
 
   #[instrument(name = "Poller", level = "INFO", skip(self, ctx, itx))]
-  pub async fn handle(&self, ctx: &Context, mut itx: MessageComponentInteraction) {
-    if let Err(e) = self._handle(ctx, &mut itx).await {
-      error!("Failed to update poll {:?}", e);
+  async fn app_interact(&self, ctx: &Context, itx: &ApplicationCommandInteraction) {
+    let mut err = false;
+    if let Err(e) = self._handle_app(ctx, itx).await {
+      error!("Failed to create poll {:?}", e);
+      err = true;
     }
+    if err {
+      if let Err(e) = itx
+        .create_interaction_response(&ctx.http, |bld| {
+          bld
+            .kind(InteractionResponseType::ChannelMessageWithSource)
+            .interaction_response_data(|f| f.content("Command failed"))
+        })
+        .await
+      {
+        error!("Failed to notify app failed {:?}", e);
+      }
+    }
+  }
+
+  #[instrument(name = "Poller", level = "INFO", skip(self, ctx, itx))]
+  async fn msg_interact(&self, ctx: &Context, itx: &MessageComponentInteraction) {
+    let mut err = false;
+    if let Err(e) = self._handle(ctx, itx).await {
+      error!("Failed to update poll {:?}", e);
+      err = true;
+    }
+    if err {
+      if let Err(e) = itx.defer(&ctx.http).await {
+        error!("Failed to notify app failed {:?}", e);
+      }
+    }
+  }
+}
+
+impl Poll {
+  async fn _handle_app(
+    &self,
+    ctx: &Context,
+    itx: &ApplicationCommandInteraction,
+  ) -> Result<(), Box<dyn Error>> {
+    if !itx.data.name.as_str().eq(NAME) {
+      return Ok(());
+    }
+    let guild_id = match itx.guild_id {
+      Some(g) => g,
+      None => {
+        return Err("No Guild Id on Interaction".into());
+      }
+    };
+    let emoji = EmojiLookup::inst().get(guild_id, &ctx.cache).await?;
+
+    // Create the poll
+    let poll_state = PollState::from_args(&itx.data.options)?;
+
+    // Send the poll message
+    itx
+      .create_interaction_response(&ctx.http, |builder| {
+        let poll_msg = build_poll_message(&emoji, &poll_state);
+        let mut component = CreateComponents::default();
+        let mut action_row = CreateActionRow::default();
+
+        action_row.create_select_menu(|select| {
+          select
+            .placeholder("Choose your Answers")
+            .custom_id(poll_state.id)
+            .min_values(1)
+            .max_values(poll_state.votes.len() as u64)
+            .options(|opts| {
+              poll_state.votes.iter().for_each(|(k, v)| {
+                opts.create_option(|opt| {
+                  opt
+                    .label(v.0.to_owned())
+                    .value(k.to_owned())
+                    .emoji(ReactionType::Custom {
+                      name: None,
+                      animated: false,
+                      id: emoji.id,
+                    })
+                });
+              });
+              opts
+            })
+        });
+
+        component.add_action_row(action_row);
+
+        builder
+          .kind(InteractionResponseType::ChannelMessageWithSource)
+          .interaction_response_data(|f| f.content(poll_msg).set_components(component))
+      })
+      .await?;
+
+    // Register globally
+    let exp = poll_state.duration;
+    let exp_key = poll_state.id;
+    POLL_STATES.insert(poll_state.id, poll_state)?;
+
+    // Setup the expiration action
+    let exp_http = ctx.http.clone();
+    let exp_chan = itx.channel_id;
+    let exp_emote = emoji.clone();
+    tokio::spawn(async move {
+      tokio::time::sleep(exp).await;
+      let resp = match POLL_STATES.invoke(&exp_key, |p| build_exp_message(&exp_emote, p)) {
+        Err(_) => "Poll has ended -- failed to get details".to_string(),
+        Ok(v) => v,
+      };
+      let _ = exp_chan.say(&exp_http, resp).await;
+      if let Err(e) = POLL_STATES.remove(&exp_key) {
+        warn!("Failed to reap poll on exp: {}", e);
+      }
+    });
+
+    Ok(())
   }
 
   async fn _handle(
     &self,
     ctx: &Context,
-    itx: &mut MessageComponentInteraction,
+    itx: &MessageComponentInteraction,
   ) -> Result<(), Box<dyn Error>> {
     let poll_id = Uuid::parse_str(&itx.data.custom_id)?;
     if !POLL_STATES.contains_key(&poll_id)? {
-      itx.defer(&ctx.http).await?;
       return Err("Skipping, poll has ended or not a poll interaction".into());
     }
 
-    let user = get_user(&ctx, &itx).await;
+    let user = if let Some(nick) = itx.user.nick_in(&ctx.http, itx.guild_id.unwrap()).await {
+      nick.to_lowercase()
+    } else {
+      itx.user.name.to_lowercase()
+    };
+
     for value in itx.data.values.iter() {
       POLL_STATES.invoke_mut(&poll_id, |p| p.update_vote(value, &user))?;
     }
 
     let guild_id = match itx.guild_id {
       Some(g) => g,
-      None => {
-        itx.defer(&ctx.http).await?;
-        return Err("No Guild Id on Interaction".into());
-      }
+      None => return Err("No Guild Id on Interaction".into()),
     };
     let emoji = EmojiLookup::inst().get(guild_id, &ctx.cache).await?;
     let new_body = POLL_STATES.invoke(&poll_id, |p| build_poll_message(&emoji, p))?;
     itx
       .message
+      .clone()
       .edit(&ctx, |body| body.content(new_body))
       .await?;
     itx.defer(&ctx.http).await?;
     Ok(())
-  }
-}
-
-async fn get_user(ctx: &Context, itx: &MessageComponentInteraction) -> String {
-  if let Some(nick) = itx.user.nick_in(&ctx.http, itx.guild_id.unwrap()).await {
-    return nick.to_lowercase();
-  } else {
-    return itx.user.name.to_lowercase();
   }
 }
 
