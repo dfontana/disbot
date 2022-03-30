@@ -1,3 +1,5 @@
+use std::error::Error;
+
 use crate::config::Config;
 use serenity::{
   async_trait,
@@ -8,8 +10,11 @@ use serenity::{
     gateway::Ready,
     id::GuildId,
     interactions::{
-      application_command::ApplicationCommandInteraction,
-      message_component::MessageComponentInteraction, Interaction,
+      application_command::{
+        ApplicationCommandInteraction, ApplicationCommandInteractionDataOption,
+      },
+      message_component::MessageComponentInteraction,
+      Interaction,
     },
   },
   prelude::*,
@@ -32,7 +37,19 @@ trait MessageListener: Send + Sync {
 trait AppInteractor: Send + Sync {
   fn register(&self, commands: &mut CreateApplicationCommands);
   async fn app_interact(&self, ctx: &Context, itx: &ApplicationCommandInteraction);
-  async fn msg_interact(&self, ctx: &Context, itx: &MessageComponentInteraction);
+  async fn msg_interact(&self, _: &Context, _: &MessageComponentInteraction) {
+    // Default is no-op
+  }
+}
+
+#[async_trait]
+trait SubCommandHandler: Send + Sync {
+  async fn handle(
+    &self,
+    ctx: &Context,
+    itx: &ApplicationCommandInteraction,
+    subopt: &ApplicationCommandInteractionDataOption,
+  ) -> Result<(), Box<dyn Error>>;
 }
 
 pub struct Handler {
@@ -52,7 +69,7 @@ impl Handler {
       app_interactors: vec![
         poll,
         Box::new(dice_roll::DiceRoll::default()),
-        // voice::Voice::default(),
+        Box::new(voice::Voice::default()),
         // server::Server::new(config),
       ],
       ready: ready::ReadyHandler::default(),

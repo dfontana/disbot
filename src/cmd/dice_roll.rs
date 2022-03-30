@@ -7,17 +7,13 @@ use serenity::{
   async_trait,
   builder::CreateApplicationCommands,
   client::Context,
-  model::{
-    channel::Message,
-    interactions::{
-      application_command::{
-        ApplicationCommandInteraction, ApplicationCommandInteractionDataOption,
-        ApplicationCommandInteractionDataOptionValue, ApplicationCommandOptionType,
-        ApplicationCommandType,
-      },
-      message_component::MessageComponentInteraction,
-      InteractionApplicationCommandCallbackDataFlags, InteractionResponseType,
+  model::interactions::{
+    application_command::{
+      ApplicationCommandInteraction, ApplicationCommandInteractionDataOption,
+      ApplicationCommandInteractionDataOptionValue, ApplicationCommandOptionType,
+      ApplicationCommandType,
     },
+    InteractionResponseType,
   },
   utils::MessageBuilder,
 };
@@ -70,10 +66,6 @@ impl AppInteractor for DiceRoll {
         error!("Failed to notify app failed {:?}", e);
       }
     }
-  }
-
-  async fn msg_interact(&self, _: &Context, _: &MessageComponentInteraction) {
-    // No op, so ignore
   }
 }
 

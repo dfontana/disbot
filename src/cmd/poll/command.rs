@@ -61,7 +61,7 @@ impl AppInteractor for Poll {
             .required(true)
         });
 
-      for i in { 0..2 } {
+      for i in 0..2 {
         command.create_option(|option| {
           option
             .kind(ApplicationCommandOptionType::String)
@@ -71,7 +71,7 @@ impl AppInteractor for Poll {
         });
       }
 
-      for i in { 2..9 } {
+      for i in 2..9 {
         command.create_option(|option| {
           option
             .kind(ApplicationCommandOptionType::String)
