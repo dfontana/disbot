@@ -35,7 +35,7 @@ impl SubCommandHandler for List {
     let handler_lock = match manager.get(guild_id) {
       None => {
         itx
-          .create_followup_message(&ctx.http, |f| {
+          .edit_original_interaction_response(&ctx.http, |f| {
             f.content("I'm currently not in a voice channel")
           })
           .await?;
@@ -62,7 +62,7 @@ impl SubCommandHandler for List {
     }
 
     itx
-      .create_followup_message(&ctx.http, |f| {
+      .edit_original_interaction_response(&ctx.http, |f| {
         f.content(bld.push_codeblock(body, None).build())
       })
       .await?;

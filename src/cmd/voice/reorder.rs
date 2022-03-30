@@ -5,9 +5,11 @@ use crate::emoji::EmojiLookup;
 use serenity::{
   async_trait,
   client::Context,
-  model::interactions::application_command::{
-    ApplicationCommandInteraction, ApplicationCommandInteractionDataOption,
-    ApplicationCommandInteractionDataOptionValue,
+  model::interactions::{
+    application_command::{
+      ApplicationCommandInteraction, ApplicationCommandInteractionDataOption,
+      ApplicationCommandInteractionDataOptionValue,
+    },
   },
   utils::MessageBuilder,
 };
@@ -44,7 +46,7 @@ impl SubCommandHandler for Reorder {
     let handler_lock = match manager.get(guild_id) {
       None => {
         itx
-          .create_followup_message(&ctx.http, |f| f.content("Not in a voice channel"))
+          .edit_original_interaction_response(&ctx.http, |f| f.content("Not in a voice channel"))
           .await?;
         return Ok(());
       }
@@ -58,7 +60,7 @@ impl SubCommandHandler for Reorder {
       Ok(v) => v,
       Err(e) => {
         itx
-          .create_followup_message(&ctx.http, |f| f.content(&e))
+          .edit_original_interaction_response(&ctx.http, |f| f.content(&e))
           .await?;
         return Ok(());
       }
@@ -67,14 +69,14 @@ impl SubCommandHandler for Reorder {
       Ok(v) => v,
       Err(e) => {
         itx
-          .create_followup_message(&ctx.http, |f| f.content(&e))
+          .edit_original_interaction_response(&ctx.http, |f| f.content(&e))
           .await?;
         return Ok(());
       }
     };
     if posa == posb {
       itx
-        .create_followup_message(&ctx.http, |f| f.content("A touch psychotic are we?"))
+        .edit_original_interaction_response(&ctx.http, |f| f.content("A touch psychotic are we?"))
         .await?;
       return Ok(());
     }
@@ -93,7 +95,7 @@ impl SubCommandHandler for Reorder {
 
     let emoji = EmojiLookup::inst().get(guild_id, &ctx.cache).await?;
     itx
-      .create_followup_message(&ctx.http, |f| {
+      .edit_original_interaction_response(&ctx.http, |f| {
         f.content(
           MessageBuilder::new()
             .mention(&emoji)

@@ -62,7 +62,10 @@ impl AppInteractor for DiceRoll {
       err = true;
     }
     if err {
-      if let Err(e) = itx.defer(&ctx.http).await {
+      if let Err(e) = itx
+        .edit_original_interaction_response(&ctx.http, |f| f.content("Command failed"))
+        .await
+      {
         error!("Failed to notify app failed {:?}", e);
       }
     }
@@ -78,11 +81,20 @@ impl DiceRoll {
     if !itx.data.name.as_str().eq(NAME) {
       return Ok(());
     }
+
+    itx
+      .create_interaction_response(&ctx.http, |bld| {
+        bld
+          .kind(InteractionResponseType::ChannelMessageWithSource)
+          .interaction_response_data(|f| f.content("Rolling..."))
+      })
+      .await?;
+
     let (lower, upper) = match validate(&itx.data.options) {
       Ok(v) => v,
       Err(e) => {
         itx
-          .create_followup_message(&ctx.http, |f| f.content(e))
+          .edit_original_interaction_response(&ctx.http, |f| f.content(e))
           .await?;
         return Ok(());
       }
@@ -117,10 +129,7 @@ impl DiceRoll {
       .build();
 
     itx
-      .create_interaction_response(&ctx.http, |f| {
-        f.kind(InteractionResponseType::ChannelMessageWithSource)
-          .interaction_response_data(|d| d.content(resp_string))
-      })
+      .edit_original_interaction_response(&ctx.http, |f| f.content(resp_string))
       .await?;
 
     Ok(())

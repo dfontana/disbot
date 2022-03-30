@@ -50,7 +50,7 @@ impl SubCommandHandler for Play {
       .collect();
 
     let maybe_args = args
-      .get("link")
+      .get("link_or_search")
       .map(|v| v.to_owned())
       .flatten()
       .and_then(|d| match d {
@@ -62,7 +62,7 @@ impl SubCommandHandler for Play {
       Ok(v) => v.trim().to_string(),
       Err(e) => {
         itx
-          .create_followup_message(&ctx.http, |f| f.content(&format!("{:?}", e)))
+          .edit_original_interaction_response(&ctx.http, |f| f.content(&format!("{:?}", e)))
           .await?;
         return Ok(());
       }
@@ -81,7 +81,7 @@ impl SubCommandHandler for Play {
       Some(channel) => channel,
       None => {
         itx
-          .create_followup_message(&ctx.http, |f| f.content("Not in a voice channel"))
+          .edit_original_interaction_response(&ctx.http, |f| f.content("Not in a voice channel"))
           .await?;
         return Ok(());
       }
@@ -117,7 +117,7 @@ impl SubCommandHandler for Play {
       Err(why) => {
         error!("Err starting source: {:?}", why);
         itx
-          .create_followup_message(&ctx.http, |f| f.content("Error sourcing ffmpeg"))
+          .edit_original_interaction_response(&ctx.http, |f| f.content("Error sourcing ffmpeg"))
           .await?;
         return Ok(());
       }
@@ -150,7 +150,7 @@ impl SubCommandHandler for Play {
       build.push_line("").push(source_url);
     }
     itx
-      .create_followup_message(&ctx.http, |f| f.content(build.build()))
+      .edit_original_interaction_response(&ctx.http, |f| f.content(build.build()))
       .await?;
 
     let _ = chan.send(false).await;

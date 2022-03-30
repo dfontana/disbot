@@ -40,7 +40,7 @@ impl SubCommandHandler for Skip {
     match manager.get(guild_id) {
       None => {
         itx
-          .create_followup_message(&ctx.http, |f| {
+          .edit_original_interaction_response(&ctx.http, |f| {
             f.content("Not in a voice channel to play in")
           })
           .await?;
@@ -50,7 +50,7 @@ impl SubCommandHandler for Skip {
         let queue = handler.queue();
         let _ = queue.skip();
         itx
-          .create_followup_message(&ctx.http, |f| {
+          .edit_original_interaction_response(&ctx.http, |f| {
             f.content(
               MessageBuilder::new()
                 .push("I didn't like that song either ")

@@ -92,7 +92,14 @@ impl AppInteractor for Poll {
       err = true;
     }
     if err {
-      if let Err(e) = itx.defer(&ctx.http).await {
+      if let Err(e) = itx
+        .create_interaction_response(&ctx.http, |bld| {
+          bld
+            .kind(InteractionResponseType::ChannelMessageWithSource)
+            .interaction_response_data(|f| f.content("Command failed"))
+        })
+        .await
+      {
         error!("Failed to notify app failed {:?}", e);
       }
     }

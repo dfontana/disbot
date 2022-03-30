@@ -18,8 +18,11 @@ use serenity::{
   async_trait,
   builder::CreateApplicationCommands,
   client::Context,
-  model::interactions::application_command::{
-    ApplicationCommandInteraction, ApplicationCommandOptionType, ApplicationCommandType,
+  model::interactions::{
+    application_command::{
+      ApplicationCommandInteraction, ApplicationCommandOptionType, ApplicationCommandType,
+    },
+    InteractionResponseType,
   },
 };
 use skip::*;
@@ -54,8 +57,8 @@ impl AppInteractor for Voice {
             .create_sub_option(|subopt| {
               subopt
                 .kind(ApplicationCommandOptionType::String)
-                .name("link")
-                .description("Link to YT")
+                .name("link_or_search")
+                .description("Link or search on YT")
                 .required(true)
             })
         })
@@ -110,7 +113,10 @@ impl AppInteractor for Voice {
       err = true;
     }
     if err {
-      if let Err(e) = itx.defer(&ctx.http).await {
+      if let Err(e) = itx
+        .edit_original_interaction_response(&ctx.http, |f| f.content("Command failed"))
+        .await
+      {
         error!("Failed to notify app failed {:?}", e);
       }
     }
@@ -126,6 +132,13 @@ impl Voice {
     if !itx.data.name.as_str().eq(NAME) {
       return Ok(());
     }
+    itx
+      .create_interaction_response(&ctx.http, |bld| {
+        bld
+          .kind(InteractionResponseType::ChannelMessageWithSource)
+          .interaction_response_data(|f| f.content("Loading..."))
+      })
+      .await?;
 
     // This is a bit annoying of an interface but when we're talking
     // subcommands here the options vec should only ever be 1 long
