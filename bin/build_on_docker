@@ -1,0 +1,8 @@
+#!/bin/bash
+# Build a docker image to deploy with
+
+env=$1
+docker build -f docker/Dockerfile . \
+  --build-arg name=disbot \
+  --build-arg env=$env \
+  -t disbot-$env:latest

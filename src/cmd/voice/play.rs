@@ -13,10 +13,7 @@ use serenity::{
 
 use tracing::error;
 
-use songbird::{
-  driver::Bitrate,
-  input::{restartable::Restartable, Input},
-};
+use songbird::{driver::Bitrate, input::{Input, ytdl_search}, ytdl};
 
 use super::connect_util::ChannelDisconnect;
 use super::SubCommandHandler;
@@ -108,8 +105,8 @@ impl SubCommandHandler for Play {
     // Queue up the source
     let is_url = searchterm.starts_with("http");
     let resolved_src = match is_url {
-      true => Restartable::ytdl(searchterm, true).await,
-      false => Restartable::ytdl_search(searchterm, true).await,
+      true => ytdl(searchterm).await,
+      false => ytdl_search(searchterm).await,
     };
 
     let input = match resolved_src {
