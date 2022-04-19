@@ -5,11 +5,9 @@ use crate::emoji::EmojiLookup;
 use serenity::{
   async_trait,
   client::Context,
-  model::interactions::{
-    application_command::{
-      ApplicationCommandInteraction, ApplicationCommandInteractionDataOption,
-      ApplicationCommandInteractionDataOptionValue,
-    },
+  model::interactions::application_command::{
+    ApplicationCommandInteraction, ApplicationCommandInteractionDataOption,
+    ApplicationCommandInteractionDataOptionValue,
   },
   utils::MessageBuilder,
 };

@@ -5,8 +5,8 @@ use crate::{cmd::voice::connect_util::ChannelDisconnectBuilder, emoji::EmojiLook
 use serenity::{
   async_trait,
   client::Context,
-  model::interactions::{
-    application_command::{ApplicationCommandInteraction, ApplicationCommandInteractionDataOption},
+  model::interactions::application_command::{
+    ApplicationCommandInteraction, ApplicationCommandInteractionDataOption,
   },
 };
 use tracing::info;
