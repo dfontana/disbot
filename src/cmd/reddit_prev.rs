@@ -160,6 +160,7 @@ impl MessageListener for RedditPreviewHandler {
       - Figure out how to construct the final message
       - Maybe snag video posts too (first frame is sent client side)
       - Check that comments on multi-line are handled right
+      - May want to truncate if super long text post
 
     TODO (IDE)
       - Format shortcut is broken :thinkies: Is formatter not registered right anymore
