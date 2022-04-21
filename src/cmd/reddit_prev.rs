@@ -7,29 +7,22 @@ use reqwest::Client;
 use select::predicate::{Class, Name, Predicate};
 use select::{document::Document, predicate::Attr};
 use serenity::{async_trait, model::channel::Message, prelude::Context};
-use tracing::{error, info, instrument, warn};
+use tracing::{info, instrument, warn};
 
 static HTTP: Lazy<Client> = Lazy::new(|| Client::new());
 static REDDIT_LINK: Lazy<Regex> = Lazy::new(|| {
   Regex::new(
-    r"
-  (?x)(?i)             # Comment + any-case mode
-  (?P<url>             # capture just url
-    http[s]{0,1}:\/\/  # find http or https
-    www\.reddit\.com   # is reddit.com
-    \/r\/[^\s]+\/      # skip over the subreddit
-    comments\/         # post-id comes after this
-    (?P<postid>        # capture post-id
-      (?:(?!\/|$).)*   # any non-slash or EOL
-    )
-    (?:                # may be a comment link
-      \/comment\/      # if so, comment is next
-      (?P<commentid>   # capture comment-id
-        (?:(?!\/|$).)* # any non-slash or EOL
+    r"(?x)(?i)
+      (?P<url>                    # capture just url
+        http[s]{0,1}://           # find http or https
+        www.reddit.com            # is reddit.com
+        /r/[^\s]+/                # skip over the subreddit
+        comments/                 # post-id comes after this    
+        (?P<postid>[a-z1-9]+)     # capture postid
+        (?:/comment/)*            # maybe will be a comment
+        (?P<commentid>[a-z1-9]+)? # capture comment id if it's there
       )
-    )?                 # (Optional)
-  )
-",
+    ",
   )
   .unwrap()
 });
@@ -88,25 +81,35 @@ impl RedditPreviewHandler {
     // .Comment .t1_{comment-id} > .RichTextJSON-root
     // Loop over all children & map to their .text(), concatenate with newlines(? or maybe only ps, else it's spaces)
     let comm_box = format!("t1_{}", commentid);
-    Some(
-      doc
-        .find(
-          Class(comm_box.as_str())
-            .and(Class("Comment"))
-            .descendant(Class("RichTextJSON-root")),
-        )
-        .next()?
-        .children()
-        .map(|node| node.as_text().unwrap())
-        .collect::<Vec<&str>>()
-        .join("\n"),
-    )
+    let mut comm = doc
+      .find(
+        Class(comm_box.as_str())
+          .and(Class("Comment"))
+          .descendant(Class("RichTextJSON-root")),
+      )
+      .next()?
+      .children()
+      .map(|node| node.as_text().unwrap())
+      .collect::<Vec<&str>>()
+      .join("\n");
+    comm.truncate(200);
+    Some(comm)
   }
 
   async fn get_document(&self, url: &str) -> Result<Document, reqwest::Error> {
     let body = self.download_body(url).await?;
     return Ok(Document::from(body.as_str()));
   }
+}
+
+fn cap_as_map(inp: &String) -> Option<HashMap<&str, &str>> {
+  let caps = REDDIT_LINK.captures(inp)?;
+  let cap_dict: HashMap<&str, &str> = REDDIT_LINK
+    .capture_names()
+    .flatten()
+    .filter_map(|n| Some((n, caps.name(n)?.as_str())))
+    .collect();
+  Some(cap_dict)
 }
 
 #[async_trait]
@@ -117,19 +120,14 @@ impl MessageListener for RedditPreviewHandler {
       info!("Skipping, self message");
       return;
     }
-    let caps = match REDDIT_LINK.captures(&msg.content) {
+
+    let cap_dict = match cap_as_map(&msg.content) {
       Some(c) => c,
       None => {
         info!("No reddit link, skipping");
         return;
       }
     };
-    let cap_dict: HashMap<&str, &str> = REDDIT_LINK
-      .capture_names()
-      .flatten()
-      .filter_map(|n| Some((n, caps.name(n)?.as_str())))
-      .collect();
-
     let url = cap_dict.get("url").unwrap();
     let doc = match self.get_document(url).await {
       Ok(v) => v,
@@ -149,6 +147,11 @@ impl MessageListener for RedditPreviewHandler {
       maybe_comment = self.get_comment(&doc, commentid);
     }
 
+    println!(
+      "{:?}\n{:?}\n{:?}\n{:?}",
+      maybe_title, maybe_image, maybe_user, maybe_comment
+    );
+
     /*
     TODO see Test Discord for examples (Pinned)
       A) Grab post Title
@@ -157,17 +160,75 @@ impl MessageListener for RedditPreviewHandler {
       D) Maybe Grab Comment
 
     TODO
+      - Debug
       - Figure out how to construct the final message
       - Maybe snag video posts too (first frame is sent client side)
       - Check that comments on multi-line are handled right
       - May want to truncate if super long text post
-
-    TODO (IDE)
-      - Format shortcut is broken :thinkies: Is formatter not registered right anymore
     */
 
     // if let Err(err) = self.send_preview(&img, ctx, msg).await {
     //   error!("Failed to send preview {:?}", err);
     // }
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::cap_as_map;
+  use test_case::test_case;
+
+  #[test_case("http://www.google.com/".to_owned(), None, None, None ; "Not Reddit")]
+  #[test_case("http://www.reddit.com/r/Eldenring/comments/".to_owned(), None, None, None ; "Reddit, but no Post")]
+  #[test_case(
+    "https://www.reddit.com/r/Eldenring/comments/tz1ycq".to_owned(),
+    Some(&"https://www.reddit.com/r/Eldenring/comments/tz1ycq"), Some(&"tz1ycq"), None;
+    "Secure Post"
+  )]
+  #[test_case(
+    "http://www.reddit.com/r/Eldenring/comments/tz1ycq".to_owned(), 
+    Some(&"http://www.reddit.com/r/Eldenring/comments/tz1ycq"), Some(&"tz1ycq"), None;
+    "Post"
+  )]
+  #[test_case(
+    "http://www.reddit.com/r/Eldenring/comments/tz1ycq/".to_owned(),
+    Some(&"http://www.reddit.com/r/Eldenring/comments/tz1ycq"), Some(&"tz1ycq"), None;
+    "Post Trailing"
+  )]
+  #[test_case(
+    "http://www.reddit.com/r/Eldenring/comments/tz1ycq/comment".to_owned(), 
+    Some(&"http://www.reddit.com/r/Eldenring/comments/tz1ycq"), Some(&"tz1ycq"), None;
+    "Partial Comment"
+  )]
+  #[test_case(
+    "http://www.reddit.com/r/Eldenring/comments/tz1ycq/comment/".to_owned(), 
+    Some(&"http://www.reddit.com/r/Eldenring/comments/tz1ycq/comment/"), Some(&"tz1ycq"), None;
+    "Partial Comment Trailing"
+  )]
+  #[test_case(
+    "http://www.reddit.com/r/Eldenring/comments/tz1ycq/comment/aTes3t".to_owned(), 
+    Some(&"http://www.reddit.com/r/Eldenring/comments/tz1ycq/comment/aTes3t"), Some(&"tz1ycq"), Some(&"aTes3t");
+    "Comment"
+  )]
+  #[test_case(
+    "http://www.reddit.com/r/Eldenring/comments/tz1ycq/comment/aTes3t/".to_owned(), 
+    Some(&"http://www.reddit.com/r/Eldenring/comments/tz1ycq/comment/aTes3t"), Some(&"tz1ycq"), Some(&"aTes3t");
+    "Comment Trailing"
+  )]
+  fn verify_regex(
+    url: String,
+    exp_url: Option<&&str>,
+    exp_postid: Option<&&str>,
+    exp_cmid: Option<&&str>,
+  ) {
+    let mybeact = cap_as_map(&url);
+    if exp_url.is_some() {
+      let act = mybeact.unwrap();
+      assert_eq!(act.get("url"), exp_url);
+      assert_eq!(act.get("postid"), exp_postid);
+      assert_eq!(act.get("commentid"), exp_cmid);
+    } else {
+      assert!(mybeact.is_none());
+    }
   }
 }
