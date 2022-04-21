@@ -48,7 +48,7 @@ impl RedditPreviewHandler {
     doc
       .find(Attr("id", post_box.as_str()).descendant(Name("h1")))
       .next()
-      .map(|node| node.as_text().unwrap().to_owned())
+      .map(|node| node.text())
       .ok_or("No Post title found".into())
   }
 
@@ -65,16 +65,14 @@ impl RedditPreviewHandler {
     )
   }
 
-  fn get_usr(&self, doc: &Document, commentid: &str) -> Option<String> {
+  fn get_usr(&self, doc: &Document, commentid: &str, prefix: &str) -> Result<String, String> {
     // UserInfoTooltip--t1_{comment-id}
-    let comm_box = format!("UserInfoTooltip--t1_{}", commentid);
-    Some(
-      doc
-        .find(Attr("id", comm_box.as_str()).descendant(Name("a")))
-        .next()?
-        .as_text()?
-        .to_owned(),
-    )
+    let comm_box = format!("UserInfoTooltip--{}_{}", prefix, commentid);
+    doc
+      .find(Attr("id", comm_box.as_str()).descendant(Name("a")))
+      .next()
+      .map(|node| node.text())
+      .ok_or("User could not be found".into())
   }
 
   fn get_comment(&self, doc: &Document, commentid: &str) -> Option<String> {
@@ -89,8 +87,8 @@ impl RedditPreviewHandler {
       )
       .next()?
       .children()
-      .map(|node| node.as_text().unwrap())
-      .collect::<Vec<&str>>()
+      .map(|node| node.text())
+      .collect::<Vec<String>>()
       .join("\n");
     comm.truncate(200);
     Some(comm)
@@ -140,10 +138,12 @@ impl MessageListener for RedditPreviewHandler {
     let postid = cap_dict.get("postid").unwrap();
     let maybe_title = self.get_post_title(&doc, postid);
     let maybe_image = self.get_img(&doc, postid);
-    let mut maybe_user = None;
+    let maybe_user = match cap_dict.get("commentid") {
+      Some(commid) => self.get_usr(&doc, commid, "t1"),
+      None => self.get_usr(&doc, postid, "t3"),
+    };
     let mut maybe_comment = None;
     if let Some(commentid) = cap_dict.get("commentid") {
-      maybe_user = self.get_usr(&doc, commentid);
       maybe_comment = self.get_comment(&doc, commentid);
     }
 
