@@ -6,8 +6,9 @@ use regex::Regex;
 use reqwest::Client;
 use select::predicate::{Class, Name, Predicate};
 use select::{document::Document, predicate::Attr};
+use serenity::utils::{EmbedMessageBuilding, MessageBuilder};
 use serenity::{async_trait, model::channel::Message, prelude::Context};
-use tracing::{info, instrument, warn};
+use tracing::{error, info, instrument, warn};
 
 static HTTP: Lazy<Client> = Lazy::new(|| Client::new());
 static REDDIT_LINK: Lazy<Regex> = Lazy::new(|| {
@@ -31,17 +32,6 @@ static REDDIT_LINK: Lazy<Regex> = Lazy::new(|| {
 pub struct RedditPreviewHandler {}
 
 impl RedditPreviewHandler {
-  async fn download_body(&self, url: &str) -> Result<String, reqwest::Error> {
-    HTTP.get(url).send().await?.text().await
-  }
-
-  async fn send_preview(&self, img: &str, ctx: &Context, msg: &Message) -> Result<(), String> {
-    let message = msg.channel_id.say(&ctx.http, img);
-    tokio::try_join!(message)
-      .map_err(|err| format!("Failed to send image preview! {:?}", err))
-      .map(|_| ())
-  }
-
   fn get_post_title(&self, doc: &Document, postid: &str) -> Result<String, String> {
     // #t3_{post-id} h1 => .text()
     let post_box = format!("t3_{}", postid);
@@ -66,7 +56,9 @@ impl RedditPreviewHandler {
   }
 
   fn get_usr(&self, doc: &Document, commentid: &str, prefix: &str) -> Result<String, String> {
-    // UserInfoTooltip--t1_{comment-id}
+    // UserInfoTooltip--t{1|3}_{comment-id}
+    // TODO this doesn't work and it smells like lazy loading of the user name to the DOM.
+    //      so we'll have to revisit this one at a later date
     let comm_box = format!("UserInfoTooltip--{}_{}", prefix, commentid);
     doc
       .find(Attr("id", comm_box.as_str()).descendant(Name("a")))
@@ -95,7 +87,7 @@ impl RedditPreviewHandler {
   }
 
   async fn get_document(&self, url: &str) -> Result<Document, reqwest::Error> {
-    let body = self.download_body(url).await?;
+    let body = HTTP.get(url).send().await?.text().await?;
     return Ok(Document::from(body.as_str()));
   }
 }
@@ -127,49 +119,54 @@ impl MessageListener for RedditPreviewHandler {
       }
     };
     let url = cap_dict.get("url").unwrap();
-    let doc = match self.get_document(url).await {
-      Ok(v) => v,
-      Err(err) => {
-        warn!("Failed to find parse reddit post: {}", err);
+    let postid = cap_dict.get("postid").unwrap();
+
+    let preview = {
+      let doc = match self.get_document(url).await {
+        Ok(v) => v,
+        Err(err) => {
+          warn!("Failed to find parse reddit post: {}", err);
+          return;
+        }
+      };
+
+      let maybe_title = self.get_post_title(&doc, postid);
+      let maybe_image = self.get_img(&doc, postid);
+      let maybe_user = match cap_dict.get("commentid") {
+        Some(commid) => self.get_usr(&doc, commid, "t1"),
+        None => self.get_usr(&doc, postid, "t3"),
+      };
+      let mut maybe_comment = None;
+      let mut post_type = "Image";
+      if let Some(commentid) = cap_dict.get("commentid") {
+        maybe_comment = self.get_comment(&doc, commentid);
+        post_type = "Comment";
+      }
+
+      if maybe_image.is_none() && maybe_comment.is_none() {
+        info!("Skipping non-comment/image Reddit post");
         return;
       }
+
+      let mut bld = MessageBuilder::new();
+      bld
+        .push_line(format!(
+          "Why I gotta do everything here... {} Summary",
+          post_type
+        ))
+        .push_bold_line(maybe_title.unwrap_or("".into()));
+      if let Some(img) = maybe_image {
+        bld.push_line(img);
+      }
+      if let Some(cmt) = maybe_comment {
+        bld.push_quote_line(cmt);
+      }
+      bld.to_string()
     };
 
-    let postid = cap_dict.get("postid").unwrap();
-    let maybe_title = self.get_post_title(&doc, postid);
-    let maybe_image = self.get_img(&doc, postid);
-    let maybe_user = match cap_dict.get("commentid") {
-      Some(commid) => self.get_usr(&doc, commid, "t1"),
-      None => self.get_usr(&doc, postid, "t3"),
-    };
-    let mut maybe_comment = None;
-    if let Some(commentid) = cap_dict.get("commentid") {
-      maybe_comment = self.get_comment(&doc, commentid);
+    if let Err(err) = msg.channel_id.say(&ctx.http, preview).await {
+      error!("Failed to send preview {:?}", err);
     }
-
-    println!(
-      "{:?}\n{:?}\n{:?}\n{:?}",
-      maybe_title, maybe_image, maybe_user, maybe_comment
-    );
-
-    /*
-    TODO see Test Discord for examples (Pinned)
-      A) Grab post Title
-      B) Maybe Grab Post Content (img) or ignore if not present
-      C) Maybe Grab Commenter or ignore if not present
-      D) Maybe Grab Comment
-
-    TODO
-      - Debug
-      - Figure out how to construct the final message
-      - Maybe snag video posts too (first frame is sent client side)
-      - Check that comments on multi-line are handled right
-      - May want to truncate if super long text post
-    */
-
-    // if let Err(err) = self.send_preview(&img, ctx, msg).await {
-    //   error!("Failed to send preview {:?}", err);
-    // }
   }
 }
 
