@@ -1,12 +1,22 @@
 #!/bin/bash
+# Example:
+#   ARM Deployment:
+#     For RPi on x86 Machine: ./bin/deploy prod           (Cross compiles via `cross` & sends to raspberrypi.local)
+#     For RPi on ARM Machine: ./bin/deploy prod           (Cross compiles with native tools & sends to raspberrypi.local)
+#     For RPi CI Machine BUILD_GITHUB=1 ./bin/deploy prod (Cross compiles on Github Action & sends to raspberrypi.local)
+#   x86 Linux Deploy:
+#     ARCH=x86_64-unknown-linux-gnu ./bin/deploy prod server.local
+#
 set -e
 
+ARM_ARCH=armv7-unknown-linux-gnueabihf
 env=${1:-dev}
 host=${2:-raspberrypi.local}
 on_github=${BUILD_GITHUB:-0}
+arch=${ARCH:-$ARM_ARCH}
 
 echo "Building binary..."
-if [[ on_github == 1 ]]; then
+if [[ on_github == 1 && $ARCH == $ARM_ARCH ]]; then
   echo "Using Github Release"
   echo "Downloading release..."
   tmp=$(mktemp -d -t tmp)
@@ -20,12 +30,12 @@ if [[ on_github == 1 ]]; then
   mkdir -p target/armv7-unknown-linux-gnueabihf/release
   mv $tmp/disbot target/armv7-unknown-linux-gnueabihf/release/disbot
   rm -r $tmp 
-elif [[ $(uname -p) == 'arm' ]]; then
+elif [[ $(uname -p) == 'arm' && $ARCH == $ARM_ARCH ]]; then
   echo "Building with Native Toolchains..."
   source ./bin/build
 else
   echo "Cross Compiling..."
-  cross build --release --target armv7-unknown-linux-gnueabihf
+  cross build --release --target $ARCH
 fi
 echo "Binary built."
 echo "Coping files to remote $host..."
@@ -33,6 +43,6 @@ ssh $USER@$host 'mkdir -p ~/deploy'
 scp "$env.env" $USER@$host:~/deploy/
 echo "Restarting disbot-$env service on $host"
 ssh -t $USER@$host 'sudo systemctl stop '"disbot-$env"
-scp target/armv7-unknown-linux-gnueabihf/release/disbot $USER@$host:~/deploy/"disbot-$env"
+scp target/$ARCH/release/disbot $USER@$host:~/deploy/"disbot-$env"
 ssh -t $USER@$host 'sudo systemctl restart '"disbot-$env"
 echo "Done."
