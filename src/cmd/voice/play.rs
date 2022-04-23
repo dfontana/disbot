@@ -1,6 +1,7 @@
 use std::{collections::HashMap, error::Error};
 
 use crate::{cmd::voice::connect_util::ChannelDisconnectBuilder, emoji::EmojiLookup};
+use derive_new::new;
 use serenity::{
   async_trait,
   client::Context,
@@ -21,8 +22,10 @@ use songbird::{
 use super::connect_util::ChannelDisconnect;
 use super::SubCommandHandler;
 
-#[derive(Default)]
-pub struct Play {}
+#[derive(new)]
+pub struct Play {
+  emoji: EmojiLookup,
+}
 
 #[async_trait]
 impl SubCommandHandler for Play {
@@ -72,7 +75,6 @@ impl SubCommandHandler for Play {
     let channel_id = ctx
       .cache
       .guild(guild_id)
-      .await
       .unwrap()
       .voice_states
       .get(&itx.user.id)
@@ -100,7 +102,7 @@ impl SubCommandHandler for Play {
       .http(ctx.http.clone())
       .guild(guild_id)
       .channel(itx.channel_id)
-      .emoji(EmojiLookup::inst().get(guild_id, &ctx.cache).await?)
+      .emoji(self.emoji.get(&ctx.http, &ctx.cache, guild_id).await?)
       .build()?
       .maybe_register_handler(&handler_lock)
       .await;
@@ -123,7 +125,7 @@ impl SubCommandHandler for Play {
       }
     };
 
-    let emoji = EmojiLookup::inst().get(guild_id, &ctx.cache).await?;
+    let emoji = self.emoji.get(&ctx.http, &ctx.cache, guild_id).await?;
 
     let metadata = input.metadata.clone();
     let title = metadata

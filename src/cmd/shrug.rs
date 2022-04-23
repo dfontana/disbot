@@ -1,5 +1,6 @@
 use crate::config::Config;
 use crate::emoji::EmojiLookup;
+use derive_new::new;
 use serenity::{
   async_trait,
   model::{channel::Message, channel::ReactionType, guild::Emoji},
@@ -9,15 +10,13 @@ use tracing::{error, info, instrument};
 
 use super::MessageListener;
 
+#[derive(new)]
 pub struct ShrugHandler {
   config: Config,
+  emoji: EmojiLookup,
 }
 
 impl ShrugHandler {
-  pub fn new(config: Config) -> Self {
-    ShrugHandler { config }
-  }
-
   async fn react_and_send(&self, emoji: Emoji, ctx: &Context, msg: &Message) -> Result<(), String> {
     let react = msg.react(
       &ctx.http,
@@ -38,7 +37,7 @@ impl ShrugHandler {
 impl MessageListener for ShrugHandler {
   #[instrument(name = "Shrug", level = "INFO", skip(self, ctx, msg))]
   async fn message(&self, ctx: &Context, msg: &Message) {
-    if msg.is_own(&ctx.cache).await {
+    if msg.is_own(&ctx.cache) {
       info!("Skipping, self message");
       return;
     }
@@ -61,7 +60,7 @@ impl MessageListener for ShrugHandler {
       return;
     }
 
-    let emoji = EmojiLookup::inst().get(guild_id, &ctx.cache).await;
+    let emoji = self.emoji.get(&ctx.http, &ctx.cache, guild_id).await;
 
     let send = match emoji {
       Ok(e) => self.react_and_send(e, ctx, msg).await,

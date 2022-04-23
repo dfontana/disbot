@@ -1,6 +1,6 @@
 use std::error::Error;
 
-use crate::config::Config;
+use crate::{config::Config, emoji::EmojiLookup};
 use serenity::{
   async_trait,
   builder::CreateApplicationCommands,
@@ -59,17 +59,16 @@ pub struct Handler {
 }
 
 impl Handler {
-  pub fn new(config: Config) -> Self {
-    let poll = Box::new(poll::Poll::default());
+  pub fn new(config: Config, emoji: EmojiLookup) -> Self {
     Handler {
       listeners: vec![
-        Box::new(shrug::ShrugHandler::new(config)),
+        Box::new(shrug::ShrugHandler::new(config, emoji.clone())),
         Box::new(reddit_prev::RedditPreviewHandler::default()),
       ],
       app_interactors: vec![
-        poll,
-        Box::new(dice_roll::DiceRoll::default()),
-        Box::new(voice::Voice::default()),
+        Box::new(poll::Poll::new(emoji.clone())),
+        Box::new(dice_roll::DiceRoll::new(emoji.clone())),
+        Box::new(voice::Voice::new(emoji.clone())),
         // server::Server::new(config),
       ],
       ready: ready::ReadyHandler::default(),
@@ -85,7 +84,7 @@ impl EventHandler for Handler {
 
   async fn ready(&self, ctx: Context, rdy: Ready) {
     // Register Slash commands with each guild that Shibba is connected to
-    for guild_id in ctx.cache.guilds().await {
+    for guild_id in ctx.cache.guilds() {
       GuildId::set_application_commands(&guild_id, &ctx.http, |commands| {
         self.app_interactors.iter().for_each(|app| {
           app.register(commands);
