@@ -2,6 +2,7 @@ use std::error::Error;
 
 use super::SubCommandHandler;
 use crate::{cmd::voice::connect_util::ChannelDisconnectBuilder, emoji::EmojiLookup};
+use derive_new::new;
 use serenity::{
   async_trait,
   client::Context,
@@ -11,8 +12,10 @@ use serenity::{
 };
 use tracing::info;
 
-#[derive(Default)]
-pub struct Stop {}
+#[derive(new)]
+pub struct Stop {
+  emoji: EmojiLookup,
+}
 
 #[async_trait]
 impl SubCommandHandler for Stop {
@@ -40,7 +43,7 @@ impl SubCommandHandler for Stop {
       .http(ctx.http.clone())
       .guild(guild_id)
       .channel(itx.channel_id)
-      .emoji(EmojiLookup::inst().get(guild_id, &ctx.cache).await?)
+      .emoji(self.emoji.get(&ctx.http, &ctx.cache, guild_id).await?)
       .build()?
       .stop()
       .await;

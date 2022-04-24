@@ -7,6 +7,7 @@ use crate::{
   },
   emoji::EmojiLookup,
 };
+use derive_new::new;
 use humantime::format_duration;
 use once_cell::sync::Lazy;
 use serenity::{
@@ -32,8 +33,10 @@ use uuid::Uuid;
 const NAME: &'static str = "poll";
 static POLL_STATES: Lazy<Cache<Uuid, PollState>> = Lazy::new(|| Cache::new());
 
-#[derive(Default)]
-pub struct Poll {}
+#[derive(new)]
+pub struct Poll {
+  emoji: EmojiLookup,
+}
 
 #[async_trait]
 impl AppInteractor for Poll {
@@ -135,7 +138,7 @@ impl Poll {
         return Err("No Guild Id on Interaction".into());
       }
     };
-    let emoji = EmojiLookup::inst().get(guild_id, &ctx.cache).await?;
+    let emoji = self.emoji.get(&ctx.http, &ctx.cache, guild_id).await?;
 
     // Create the poll
     let poll_state = PollState::from_args(&itx.data.options)?;
@@ -226,7 +229,7 @@ impl Poll {
       Some(g) => g,
       None => return Err("No Guild Id on Interaction".into()),
     };
-    let emoji = EmojiLookup::inst().get(guild_id, &ctx.cache).await?;
+    let emoji = self.emoji.get(&ctx.http, &ctx.cache, guild_id).await?;
     let new_body = POLL_STATES.invoke(&poll_id, |p| build_poll_message(&emoji, p))?;
     itx
       .message

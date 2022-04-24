@@ -1,6 +1,6 @@
-// use serenity::framework::standard::macros::group;
-
 use std::error::Error;
+
+use crate::emoji::EmojiLookup;
 
 use super::{AppInteractor, SubCommandHandler};
 
@@ -31,13 +31,24 @@ use tracing::{instrument, log::error};
 
 const NAME: &'static str = "play";
 
-#[derive(Default)]
 pub struct Voice {
   play: Play,
   stop: Stop,
   skip: Skip,
   list: List,
   reorder: Reorder,
+}
+
+impl Voice {
+  pub fn new(emoji: EmojiLookup) -> Self {
+    Voice {
+      play: Play::new(emoji.clone()),
+      stop: Stop::new(emoji.clone()),
+      skip: Skip::new(emoji.clone()),
+      list: List::default(),
+      reorder: Reorder::new(emoji),
+    }
+  }
 }
 
 #[async_trait]

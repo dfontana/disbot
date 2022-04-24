@@ -3,6 +3,7 @@ use std::error::Error;
 use crate::emoji::EmojiLookup;
 
 use super::SubCommandHandler;
+use derive_new::new;
 use serenity::{
   async_trait,
   client::Context,
@@ -12,8 +13,10 @@ use serenity::{
   utils::MessageBuilder,
 };
 
-#[derive(Default)]
-pub struct Skip {}
+#[derive(new)]
+pub struct Skip {
+  emoji: EmojiLookup,
+}
 
 #[async_trait]
 impl SubCommandHandler for Skip {
@@ -35,7 +38,7 @@ impl SubCommandHandler for Skip {
       .expect("Songbird Voice client placed in at initialisation.")
       .clone();
 
-    let emoji = EmojiLookup::inst().get(guild_id, &ctx.cache).await?;
+    let emoji = self.emoji.get(&ctx.http, &ctx.cache, guild_id).await?;
 
     match manager.get(guild_id) {
       None => {

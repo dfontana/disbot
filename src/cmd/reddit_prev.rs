@@ -6,7 +6,7 @@ use regex::Regex;
 use reqwest::Client;
 use select::predicate::{Class, Name, Predicate};
 use select::{document::Document, predicate::Attr};
-use serenity::utils::{EmbedMessageBuilding, MessageBuilder};
+use serenity::utils::MessageBuilder;
 use serenity::{async_trait, model::channel::Message, prelude::Context};
 use tracing::{error, info, instrument, warn};
 
@@ -106,7 +106,7 @@ fn cap_as_map(inp: &String) -> Option<HashMap<&str, &str>> {
 impl MessageListener for RedditPreviewHandler {
   #[instrument(name = "RedditPreview", level = "INFO", skip(self, ctx, msg))]
   async fn message(&self, ctx: &Context, msg: &Message) {
-    if msg.is_own(&ctx.cache).await {
+    if msg.is_own(&ctx.cache) {
       info!("Skipping, self message");
       return;
     }

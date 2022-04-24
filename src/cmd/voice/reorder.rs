@@ -2,6 +2,7 @@ use std::{collections::HashMap, error::Error};
 
 use super::SubCommandHandler;
 use crate::emoji::EmojiLookup;
+use derive_new::new;
 use serenity::{
   async_trait,
   client::Context,
@@ -12,8 +13,10 @@ use serenity::{
   utils::MessageBuilder,
 };
 
-#[derive(Default)]
-pub struct Reorder {}
+#[derive(new)]
+pub struct Reorder {
+  emoji: EmojiLookup,
+}
 
 #[async_trait]
 impl SubCommandHandler for Reorder {
@@ -91,7 +94,7 @@ impl SubCommandHandler for Reorder {
       }
     });
 
-    let emoji = EmojiLookup::inst().get(guild_id, &ctx.cache).await?;
+    let emoji = self.emoji.get(&ctx.http, &ctx.cache, guild_id).await?;
     itx
       .edit_original_interaction_response(&ctx.http, |f| {
         f.content(

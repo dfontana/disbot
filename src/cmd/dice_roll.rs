@@ -2,6 +2,7 @@ use std::error::Error;
 
 use super::AppInteractor;
 use crate::emoji::EmojiLookup;
+use derive_new::new;
 use rand::Rng;
 use serenity::{
   async_trait,
@@ -21,8 +22,10 @@ use tracing::{instrument, log::error};
 
 const NAME: &'static str = "roll";
 
-#[derive(Default)]
-pub struct DiceRoll {}
+#[derive(new)]
+pub struct DiceRoll {
+  emoji: EmojiLookup,
+}
 
 #[async_trait]
 impl AppInteractor for DiceRoll {
@@ -104,7 +107,7 @@ impl DiceRoll {
       Some(id) => id,
       None => return Ok(()),
     };
-    let emoji = EmojiLookup::inst().get(guild_id, &ctx.cache).await?;
+    let emoji = self.emoji.get(&ctx.http, &ctx.cache, guild_id).await?;
     let mut response = MessageBuilder::new();
     response
       .push(format!("<@{}>", itx.user.id))

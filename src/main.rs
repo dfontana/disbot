@@ -15,7 +15,7 @@ mod env;
 
 use std::str::FromStr;
 
-use serenity::client::{bridge::gateway::GatewayIntents, Client};
+use serenity::{client::Client, prelude::GatewayIntents};
 use songbird::SerenityInit;
 use tracing::{error, Level};
 
@@ -39,22 +39,22 @@ async fn main() {
     .with_max_level(Level::from_str(&config.log_level).unwrap())
     .with_target(false)
     .init();
-  emoji::configure(&config).expect("Failed to setup emoji lookup");
+  let emoji = emoji::EmojiLookup::new(&config);
   docker::configure(&config.server).expect("Failed to setup docker for game server");
 
-  let mut client = Client::builder(&config.api_key)
-    .intents(
-      GatewayIntents::GUILDS
-        | GatewayIntents::GUILD_EMOJIS
-        | GatewayIntents::GUILD_MESSAGES
-        | GatewayIntents::GUILD_MESSAGE_REACTIONS
-        | GatewayIntents::GUILD_VOICE_STATES,
-    )
-    .register_songbird()
-    .event_handler(Handler::new(config.clone()))
-    .application_id(config.app_id)
-    .await
-    .expect("Err creating client");
+  let mut client = Client::builder(
+    &config.api_key,
+    GatewayIntents::GUILDS
+      | GatewayIntents::GUILD_EMOJIS_AND_STICKERS
+      | GatewayIntents::GUILD_MESSAGES
+      | GatewayIntents::GUILD_MESSAGE_REACTIONS
+      | GatewayIntents::GUILD_VOICE_STATES,
+  )
+  .register_songbird()
+  .event_handler(Handler::new(config.clone(), emoji))
+  .application_id(config.app_id)
+  .await
+  .expect("Err creating client");
 
   if let Err(why) = client.start().await {
     error!("Failed to start Discord Client {:?}", why);
