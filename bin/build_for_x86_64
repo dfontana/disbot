@@ -1,0 +1,11 @@
+#!/bin/bash
+# Cross compile to linux x86_64; should run from root of repo
+TARGET=x86_64-unknown-linux-gnu
+export TARGET_CC=$TARGET-gcc
+export TARGET_AR=$TARGET-ar
+export CC_x86_64_unknown_linux_gnu=$TARGET-gcc
+export CXX_x86_64_unknown_linux_gnu=$TARGET-g++
+export AR_x86_64_unknown_linux_gnu=$TARGET-ar
+export CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER=$TARGET-gcc
+export CMAKE_TOOLCHAIN_FILE_x86_64_unknown_linux_gnu=$(pwd)/bin/x86_64.cmake
+cargo build --release --target $TARGET

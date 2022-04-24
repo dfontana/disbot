@@ -30,13 +30,21 @@ if [[ on_github == 1 && $ARCH == $ARM_ARCH ]]; then
   mkdir -p target/armv7-unknown-linux-gnueabihf/release
   mv $tmp/disbot target/armv7-unknown-linux-gnueabihf/release/disbot
   rm -r $tmp 
-elif [[ $(uname -p) == 'arm' && $ARCH == $ARM_ARCH ]]; then
+elif [[ $(uname -p) == 'arm' ]]; then
   echo "Building with Native Toolchains..."
-  source ./bin/build
-else
+  if [[ $ARCH == $ARM_ARCH ]]; then
+    source ./bin/build_for_arm
+  else
+    source ./bin/build_for_x86_64
+  fi
+elif [[ $ARCH == $ARM_ARCH ]]; then
   echo "Cross Compiling..."
   cross build --release --target $ARCH
+else 
+  echo "Compiling Natively..."
+  cargo build --release
 fi
+
 echo "Binary built."
 echo "Coping files to remote $host..."
 ssh $USER@$host 'mkdir -p ~/deploy'

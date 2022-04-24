@@ -8,28 +8,33 @@ A Discord Bot, that I'm not sure what it'll do yet - but I wanted to have someth
 
 The rest I don't really care about at the moment :shrug-dog:
 
-## Building
+## Building (Optional Before Deploying)
 
-For ArmV7 - eg Raspberry Pi. Note: the deploy script will do this for you. 3 Ways:
+For ArmV7 (eg Raspberry Pi) or `x86_64` Linux (eg Linux Server). 
 
 - __Github Actions__
   - Builds on the remote server whenever you push a tag. You can then download this from releases. See `.github/workflows`
   ```
   ./bin/build_on_git {commit-sha} {message}
   ```
+  - Note: Running `./bin/deploy` will NOT build this for you, it'll just download the latest release from CI
 - __Cross__
-  - Only works on non-`aarch64` machines. [`cross`](https://github.com/rust-embedded/cross), simply put: 
+  - Only works on non-`aarch64` machines (Eg NOT M1 Macs). [`cross`](https://github.com/rust-embedded/cross), simply put: 
   ```
   cargo install cross
   cross build --release --target armv7-unknown-linux-gnueabihf
   ```
-- __Native Toolchains__
+  - Note: Running `./bin/deploy` WILL do this for you
+- __Native Toolchains__ (Eg from an aarch64 machine)
   - Uses [`messense/homebrew-macos-cross-toolchains`](https://github.com/messense/homebrew-macos-cross-toolchains)
   ```
   brew tap messense/macos-cross-toolchains
-  brew install armv7-unknown-linux-gnueabihf
-  ./bin/build
+  brew install armv7-unknown-linux-gnueabihf x86_64-unknown-linux-gnu
+  ./bin/build_for_arm
+  ./bin/build_for_x86_64
   ```
+- __Native__ (Eg Machine matches host)
+  - When native hosts matches deploy host, can just run `cargo build --release`
 
 ## Deploying
  
@@ -50,8 +55,10 @@ LOG_LEVEL=INFO
 #You can repeat this for dev.env as well
 ```
 
-1. `./deploy.sh {dev|prod} {raspberrypi.local}`
-  - You can use github to build the binary by setting `BUILD_GITHUB=1`. This assumes you've already cut the release
+1. `ARCH={armv7-unknown-linux-gnueabihf|x86_64-unknown-linux-gnu} ./deploy.sh {dev|prod} {server.local|raspberrypi.local}`
+  - You can use github to download a release made in CI with `BUILD_GITHUB=1`
+  - Otherwise this will detect the correct way to build from your host system
+
 
 ### (First time Deploy Setup on Remote Host)
 
