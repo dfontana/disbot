@@ -19,9 +19,9 @@ static REDDIT_LINK: Lazy<Regex> = Lazy::new(|| {
         www.reddit.com            # is reddit.com
         /r/[^\s]+/                # skip over the subreddit
         comments/                 # post-id comes after this    
-        (?P<postid>[a-z1-9]+)     # capture postid
+        (?P<postid>[a-z0-9]+)     # capture postid
         (?:/comment/)*            # maybe will be a comment
-        (?P<commentid>[a-z1-9]+)? # capture comment id if it's there
+        (?P<commentid>[a-z0-9]+)? # capture comment id if it's there
       )
     ",
   )

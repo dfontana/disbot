@@ -47,6 +47,7 @@ async fn main() {
     GatewayIntents::GUILDS
       | GatewayIntents::GUILD_EMOJIS_AND_STICKERS
       | GatewayIntents::GUILD_MESSAGES
+      | GatewayIntents::MESSAGE_CONTENT
       | GatewayIntents::GUILD_MESSAGE_REACTIONS
       | GatewayIntents::GUILD_VOICE_STATES,
   )
