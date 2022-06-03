@@ -122,7 +122,7 @@ Validate: `curl http://localhost:2375/v1.40/containers/json`. This will need to 
 
 ## Invite Shruggin' Shiba to Your Server
 
-[Invite Link](https://discord.com/api/oauth2/authorize?client_id=764937518570536990&permissions=342080&scope=bot)
+[Invite Link](https://discord.com/api/oauth2/authorize?client_id=764937518570536990&permissions=545430961264&scope=bot%20applications.commands)
 
 ## This Project Uses
 
