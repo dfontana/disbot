@@ -1,16 +1,14 @@
-use std::collections::HashMap;
-
 use super::MessageListener;
 use once_cell::sync::Lazy;
 use regex::Regex;
 use reqwest::Client;
-use select::predicate::{Class, Name, Predicate};
-use select::{document::Document, predicate::Attr};
+use serde::Deserialize;
 use serenity::utils::MessageBuilder;
 use serenity::{async_trait, model::channel::Message, prelude::Context};
+use std::collections::HashMap;
 use tracing::{error, info, instrument, warn};
 
-static HTTP: Lazy<Client> = Lazy::new(|| Client::new());
+static HTTP: Lazy<Client> = Lazy::new(Client::new);
 static REDDIT_LINK: Lazy<Regex> = Lazy::new(|| {
   Regex::new(
     r"(?x)(?i)
@@ -28,71 +26,146 @@ static REDDIT_LINK: Lazy<Regex> = Lazy::new(|| {
   .unwrap()
 });
 
+#[derive(Deserialize)]
+struct RedditApi {
+  data: RedditData,
+}
+
+#[derive(Deserialize)]
+struct RedditData {
+  children: Vec<RedditKind>,
+}
+
+#[derive(Deserialize, Clone)]
+#[serde(tag = "kind", content = "data", rename_all = "lowercase")]
+enum RedditKind {
+  T1(RedditComment),
+  T3(RedditPost),
+}
+
+#[derive(Deserialize, Clone)]
+struct RedditComment {
+  link_id: String,
+  author: String,
+  body: String,
+}
+
+#[derive(Deserialize, Clone)]
+struct RedditPost {
+  title: String,
+  author: String,
+
+  // self-posts will have self-text, images have url,
+  // videos have media, others have body
+  body: Option<String>,
+  selftext: Option<String>,
+  url: Option<String>,
+  secure_media: Option<RedditMedia>,
+}
+
+#[derive(Deserialize, Clone)]
+struct RedditMedia {
+  reddit_video: RedditVideo,
+}
+
+#[derive(Deserialize, Clone)]
+struct RedditVideo {
+  fallback_url: String,
+}
+
+struct Content {
+  ctype: String,
+  title: String,
+  author: String,
+  body: Option<String>,
+  linked_embed: Option<String>,
+}
+
 #[derive(Default)]
 pub struct RedditPreviewHandler {}
 
 impl RedditPreviewHandler {
-  fn get_post_title(&self, doc: &Document, postid: &str) -> Result<String, String> {
-    // #t3_{post-id} h1 => .text()
-    let post_box = format!("t3_{}", postid);
-    doc
-      .find(Attr("id", post_box.as_str()).descendant(Name("h1")))
+  async fn get_api_details(&self, entity: &str) -> Result<Content, Box<dyn std::error::Error>> {
+    let mut req: RedditApi = HTTP
+      .get(format!(
+        "https://www.reddit.com/api/info.json?id={}",
+        entity
+      ))
+      .send()
+      .await?
+      .json::<RedditApi>()
+      .await?;
+
+    let kind = req
+      .data
+      .children
+      .drain(0..1)
       .next()
-      .map(|node| node.text())
-      .ok_or("No Post title found".into())
-  }
+      .ok_or::<String>("No data from the Reddit API".into())?;
 
-  fn get_img(&self, doc: &Document, postid: &str) -> Option<String> {
-    // #t3_{post-id} ImageBox-image if exists grab parent href for image
-    let post_box = format!("t3_{}", postid);
-    Some(
-      doc
-        .find(Attr("id", post_box.as_str()).descendant(Class("ImageBox-image")))
-        .next()?
-        .parent()?
-        .attr("href")?
-        .to_owned(),
-    )
-  }
+    match kind {
+      RedditKind::T1(comm) => {
+        let mut parent_req = HTTP
+          .get(format!(
+            "https://www.reddit.com/api/info.json?id={}",
+            comm.link_id
+          ))
+          .send()
+          .await?
+          .json::<RedditApi>()
+          .await?;
+        let parent_kind = parent_req.data.children.drain(0..1).next();
 
-  fn get_usr(&self, doc: &Document, commentid: &str, prefix: &str) -> Result<String, String> {
-    // UserInfoTooltip--t{1|3}_{comment-id}
-    // TODO this doesn't work and it smells like lazy loading of the user name to the DOM.
-    //      so we'll have to revisit this one at a later date
-    let comm_box = format!("UserInfoTooltip--{}_{}", prefix, commentid);
-    doc
-      .find(Attr("id", comm_box.as_str()).descendant(Name("a")))
-      .next()
-      .map(|node| node.text())
-      .ok_or("User could not be found".into())
-  }
-
-  fn get_comment(&self, doc: &Document, commentid: &str) -> Option<String> {
-    // .Comment .t1_{comment-id} > .RichTextJSON-root
-    // Loop over all children & map to their .text(), concatenate with newlines(? or maybe only ps, else it's spaces)
-    let comm_box = format!("t1_{}", commentid);
-    let mut comm = doc
-      .find(
-        Class(comm_box.as_str())
-          .and(Class("Comment"))
-          .descendant(Class("RichTextJSON-root")),
-      )
-      .next()?
-      .children()
-      .map(|node| node.text())
-      .collect::<Vec<String>>()
-      .join("\n");
-    comm.truncate(200);
-    Some(comm)
-  }
-
-  async fn get_document(&self, url: &str) -> Result<Document, reqwest::Error> {
-    let body = HTTP.get(url).send().await?.text().await?;
-    return Ok(Document::from(body.as_str()));
+        Ok(Content {
+          ctype: "Comment".into(),
+          title: parent_kind
+            .and_then(|k| match k {
+              RedditKind::T3(post) => Some(post.title),
+              _ => None,
+            })
+            .unwrap_or_else(|| "(No Title)".into()),
+          author: comm.author,
+          body: Some(comm.body),
+          linked_embed: None,
+        })
+      }
+      RedditKind::T3(post) => {
+        let ctype = {
+          if post.body.as_ref().filter(|s| !s.is_empty()).is_some() {
+            "Post"
+          } else if post.selftext.as_ref().filter(|s| !s.is_empty()).is_some() {
+            "SelfPost"
+          } else if post.secure_media.is_some() {
+            "Video"
+          } else if post.url.as_ref().filter(|s| !s.is_empty()).is_some() {
+            "Image"
+          } else {
+            ""
+          }
+        };
+        let embed = {
+          if ctype == "Image" || ctype == "Video" {
+            post
+              .url
+              .or(post.secure_media.map(|sm| sm.reddit_video.fallback_url))
+              .filter(|s| !s.is_empty())
+          } else {
+            None
+          }
+        };
+        Ok(Content {
+          ctype: ctype.into(),
+          title: post.title,
+          author: post.author,
+          body: post.body.or(post.selftext).filter(|s| !s.is_empty()),
+          linked_embed: embed,
+        })
+      }
+    }
   }
 }
 
-fn cap_as_map(inp: &String) -> Option<HashMap<&str, &str>> {
+fn cap_as_map(inp: &str) -> Option<HashMap<&str, &str>> {
   let caps = REDDIT_LINK.captures(inp)?;
   let cap_dict: HashMap<&str, &str> = REDDIT_LINK
     .capture_names()
@@ -118,51 +191,40 @@ impl MessageListener for RedditPreviewHandler {
         return;
       }
     };
-    let url = cap_dict.get("url").unwrap();
+
     let postid = cap_dict.get("postid").unwrap();
-
-    let preview = {
-      let doc = match self.get_document(url).await {
-        Ok(v) => v,
-        Err(err) => {
-          warn!("Failed to find parse reddit post: {}", err);
-          return;
-        }
-      };
-
-      let maybe_title = self.get_post_title(&doc, postid);
-      let maybe_image = self.get_img(&doc, postid);
-      let maybe_user = match cap_dict.get("commentid") {
-        Some(commid) => self.get_usr(&doc, commid, "t1"),
-        None => self.get_usr(&doc, postid, "t3"),
-      };
-      let mut maybe_comment = None;
-      let mut post_type = "Image";
-      if let Some(commentid) = cap_dict.get("commentid") {
-        maybe_comment = self.get_comment(&doc, commentid);
-        post_type = "Comment";
-      }
-
-      if maybe_image.is_none() && maybe_comment.is_none() {
-        info!("Skipping non-comment/image Reddit post");
+    let maybe_commid = cap_dict.get("commentid");
+    let entity = match maybe_commid {
+      Some(commid) => format!("t1_{}", commid),
+      None => format!("t3_{}", postid),
+    };
+    let content = match self.get_api_details(&entity).await {
+      Ok(v) => v,
+      Err(err) => {
+        warn!("Failed to find fetch reddit data: {}", err);
         return;
       }
-
-      let mut bld = MessageBuilder::new();
-      bld
-        .push_line(format!(
-          "Why I gotta do everything here... {} Summary",
-          post_type
-        ))
-        .push_bold_line(maybe_title.unwrap_or("".into()));
-      if let Some(img) = maybe_image {
-        bld.push_line(img);
-      }
-      if let Some(cmt) = maybe_comment {
-        bld.push_quote_line(cmt);
-      }
-      bld.to_string()
     };
+
+    if content.ctype.is_empty() || content.ctype == "Video" {
+      info!("Skipping non-previewable post");
+      return;
+    }
+
+    let mut bld = MessageBuilder::new();
+    bld
+      .push_line(format!(
+        "Why I gotta do everything here... {} Summary",
+        content.ctype
+      ))
+      .push_bold_line_safe(content.title)
+      .push_italic_line_safe(format!("Shared by {}", content.author));
+    if let Some(embed) = content.linked_embed {
+      bld.push_line_safe(embed);
+    } else if let Some(body) = content.body {
+      bld.quote_rest().push_line_safe(body);
+    }
+    let preview = bld.to_string();
 
     if let Err(err) = msg.channel_id.say(&ctx.http, preview).await {
       error!("Failed to send preview {:?}", err);
