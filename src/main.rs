@@ -5,7 +5,6 @@ extern crate hex;
 extern crate rand;
 extern crate regex;
 extern crate reqwest;
-extern crate select;
 
 mod cmd;
 mod config;
