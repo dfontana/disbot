@@ -8,19 +8,20 @@ use serenity::{
   async_trait,
   builder::CreateApplicationCommands,
   client::Context,
-  model::interactions::{
-    application_command::{
-      ApplicationCommandInteraction, ApplicationCommandInteractionDataOption,
-      ApplicationCommandInteractionDataOptionValue, ApplicationCommandOptionType,
-      ApplicationCommandType,
+  model::prelude::{
+    command::{CommandOptionType, CommandType},
+    interaction::{
+      application_command::{
+        ApplicationCommandInteraction, CommandDataOption, CommandDataOptionValue,
+      },
+      InteractionResponseType,
     },
-    InteractionResponseType,
   },
   utils::MessageBuilder,
 };
 use tracing::{instrument, log::error};
 
-const NAME: &'static str = "roll";
+const NAME: &str = "roll";
 
 #[derive(new)]
 pub struct DiceRoll {
@@ -35,10 +36,10 @@ impl AppInteractor for DiceRoll {
       command
         .name(NAME)
         .description("Roll a die, optionally between the given bounds")
-        .kind(ApplicationCommandType::ChatInput)
+        .kind(CommandType::ChatInput)
         .create_option(|option| {
           option
-            .kind(ApplicationCommandOptionType::Integer)
+            .kind(CommandOptionType::Integer)
             .name("lower")
             .description("Above or equal to")
             .min_int_value(0)
@@ -47,7 +48,7 @@ impl AppInteractor for DiceRoll {
         })
         .create_option(|option| {
           option
-            .kind(ApplicationCommandOptionType::Integer)
+            .kind(CommandOptionType::Integer)
             .name("upper")
             .description("Below or equal to")
             .min_int_value(0)
@@ -139,7 +140,7 @@ impl DiceRoll {
   }
 }
 
-fn validate(args: &Vec<ApplicationCommandInteractionDataOption>) -> Result<(u32, u32), String> {
+fn validate(args: &Vec<CommandDataOption>) -> Result<(u32, u32), String> {
   match args.len() {
     0 => Ok((1, 100)),
     1 => Ok((extract_int(args, 0)?, 100)),
@@ -156,16 +157,12 @@ fn validate(args: &Vec<ApplicationCommandInteractionDataOption>) -> Result<(u32,
   }
 }
 
-fn extract_int(
-  args: &Vec<ApplicationCommandInteractionDataOption>,
-  idx: usize,
-) -> Result<u32, String> {
+fn extract_int(args: &[CommandDataOption], idx: usize) -> Result<u32, String> {
   args
     .get(idx)
-    .map(|d| match d.resolved {
-      Some(ApplicationCommandInteractionDataOptionValue::Integer(i)) => Some(i as u32),
+    .and_then(|d| match d.resolved {
+      Some(CommandDataOptionValue::Integer(i)) => Some(i as u32),
       _ => None,
     })
-    .flatten()
-    .ok_or("Could not parse".to_string())
+    .ok_or_else(|| "Could not parse".to_string())
 }

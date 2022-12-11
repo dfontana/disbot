@@ -7,8 +7,8 @@ use derive_new::new;
 use serenity::{
   async_trait,
   client::Context,
-  model::interactions::application_command::{
-    ApplicationCommandInteraction, ApplicationCommandInteractionDataOption,
+  model::prelude::interaction::application_command::{
+    ApplicationCommandInteraction, CommandDataOption,
   },
   utils::MessageBuilder,
 };
@@ -24,7 +24,7 @@ impl SubCommandHandler for Skip {
     &self,
     ctx: &Context,
     itx: &ApplicationCommandInteraction,
-    _subopt: &ApplicationCommandInteractionDataOption,
+    _subopt: &CommandDataOption,
   ) -> Result<(), Box<dyn Error>> {
     let guild_id = match itx.guild_id {
       Some(g) => g,

@@ -4,8 +4,8 @@ use super::SubCommandHandler;
 use serenity::{
   async_trait,
   client::Context,
-  model::interactions::application_command::{
-    ApplicationCommandInteraction, ApplicationCommandInteractionDataOption,
+  model::prelude::interaction::application_command::{
+    ApplicationCommandInteraction, CommandDataOption,
   },
   utils::MessageBuilder,
 };
@@ -19,7 +19,7 @@ impl SubCommandHandler for List {
     &self,
     ctx: &Context,
     itx: &ApplicationCommandInteraction,
-    _: &ApplicationCommandInteractionDataOption,
+    _: &CommandDataOption,
   ) -> Result<(), Box<dyn Error>> {
     let guild_id = match itx.guild_id {
       Some(g) => g,

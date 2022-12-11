@@ -9,10 +9,8 @@ use serenity::{
     channel::Message,
     gateway::Ready,
     id::GuildId,
-    interactions::{
-      application_command::{
-        ApplicationCommandInteraction, ApplicationCommandInteractionDataOption,
-      },
+    prelude::interaction::{
+      application_command::{ApplicationCommandInteraction, CommandDataOption},
       message_component::MessageComponentInteraction,
       Interaction,
     },
@@ -48,7 +46,7 @@ trait SubCommandHandler: Send + Sync {
     &self,
     ctx: &Context,
     itx: &ApplicationCommandInteraction,
-    subopt: &ApplicationCommandInteractionDataOption,
+    subopt: &CommandDataOption,
   ) -> Result<(), Box<dyn Error>>;
 }
 
@@ -68,7 +66,7 @@ impl Handler {
       app_interactors: vec![
         Box::new(poll::Poll::new(emoji.clone())),
         Box::new(dice_roll::DiceRoll::new(emoji.clone())),
-        Box::new(voice::Voice::new(emoji.clone())),
+        Box::new(voice::Voice::new(emoji)),
         // server::Server::new(config),
       ],
       ready: ready::ReadyHandler::default(),

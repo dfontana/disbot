@@ -6,9 +6,8 @@ use derive_new::new;
 use serenity::{
   async_trait,
   client::Context,
-  model::interactions::application_command::{
-    ApplicationCommandInteraction, ApplicationCommandInteractionDataOption,
-    ApplicationCommandInteractionDataOptionValue,
+  model::prelude::interaction::application_command::{
+    ApplicationCommandInteraction, CommandDataOption, CommandDataOptionValue,
   },
   utils::MessageBuilder,
 };
@@ -24,7 +23,7 @@ impl SubCommandHandler for Reorder {
     &self,
     ctx: &Context,
     itx: &ApplicationCommandInteraction,
-    subopt: &ApplicationCommandInteractionDataOption,
+    subopt: &CommandDataOption,
   ) -> Result<(), Box<dyn Error>> {
     // 2 args: from, to. Min value 1. Integers.
     let args: HashMap<String, _> = subopt
@@ -114,19 +113,18 @@ impl SubCommandHandler for Reorder {
 }
 
 fn get_arg(
-  args: &HashMap<String, Option<ApplicationCommandInteractionDataOptionValue>>,
+  args: &HashMap<String, Option<CommandDataOptionValue>>,
   key: &str,
 ) -> Result<usize, String> {
   args
     .get(key)
-    .map(|v| v.to_owned())
-    .flatten()
+    .and_then(|v| v.to_owned())
     .and_then(|d| match d {
-      ApplicationCommandInteractionDataOptionValue::Integer(v) => Some(v),
+      CommandDataOptionValue::Integer(v) => Some(v),
       _ => None,
     })
     .map(|i| i as usize)
-    .ok_or("Missing bound".into())
+    .ok_or_else(|| "Missing bound".into())
 }
 
 fn validate_position<T>(maybe_pos: Result<usize, T>, queue_size: usize) -> Result<usize, String> {

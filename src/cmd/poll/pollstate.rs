@@ -1,6 +1,6 @@
 use humantime::parse_duration;
-use serenity::model::interactions::application_command::{
-  ApplicationCommandInteractionDataOption, ApplicationCommandInteractionDataOptionValue,
+use serenity::model::prelude::interaction::application_command::{
+  CommandDataOption, CommandDataOptionValue,
 };
 use std::{
   collections::{HashMap, HashSet},
@@ -27,9 +27,7 @@ impl Expiring for PollState {
 }
 
 impl PollState {
-  pub fn from_args(
-    args: &Vec<ApplicationCommandInteractionDataOption>,
-  ) -> Result<PollState, String> {
+  pub fn from_args(args: &[CommandDataOption]) -> Result<PollState, String> {
     let map: HashMap<String, _> = args
       .iter()
       .map(|d| (d.name.to_owned(), d.resolved.to_owned()))
@@ -37,10 +35,9 @@ impl PollState {
 
     let duration: Duration = map
       .get("duration")
-      .map(|v| v.to_owned())
-      .flatten()
+      .and_then(|v| v.to_owned())
       .and_then(|d| match d {
-        ApplicationCommandInteractionDataOptionValue::String(v) => Some(v),
+        CommandDataOptionValue::String(v) => Some(v),
         _ => None,
       })
       .ok_or("No duration given")
@@ -48,10 +45,9 @@ impl PollState {
 
     let topic: String = map
       .get("topic")
-      .map(|v| v.to_owned())
-      .flatten()
+      .and_then(|v| v.to_owned())
       .and_then(|d| match d {
-        ApplicationCommandInteractionDataOptionValue::String(v) => Some(v),
+        CommandDataOptionValue::String(v) => Some(v),
         _ => None,
       })
       .ok_or("No topic given")?;
@@ -59,10 +55,9 @@ impl PollState {
     let items: Vec<String> = { 0..9 }
       .into_iter()
       .map(|i| format!("option_{}", i))
-      .map(|key| map.get(&key))
-      .flatten()
+      .filter_map(|key| map.get(&key))
       .filter_map(|d| match d {
-        Some(ApplicationCommandInteractionDataOptionValue::String(v)) => Some(v.to_owned()),
+        Some(CommandDataOptionValue::String(v)) => Some(v.to_owned()),
         _ => None,
       })
       .collect();
@@ -88,25 +83,21 @@ impl PollState {
   }
 
   #[instrument(name = "PollState", level = "INFO", skip(self))]
-  pub fn update_vote(&mut self, vote: &String, voter: &String) {
-    if !self.votes.contains_key(vote) {
-      info!("Vote not present in poll, ignoring");
-      return;
-    }
+  pub fn update_vote(&mut self, votes: &[String], voter: &String) {
     info!("Casting vote");
-    self
-      .votes
-      .entry(vote.into())
-      .and_modify(|e| match e.2.contains(voter) {
-        false => {
-          e.1 += 1;
-          e.2.insert(voter.into());
+    for (option, (_, count, voters)) in self.votes.iter_mut() {
+      match (voters.contains(voter), votes.contains(option)) {
+        (false, true) => {
+          *count += 1;
+          voters.insert(voter.into());
         }
-        true => {
-          e.1 -= 1;
-          e.2.remove(voter);
+        (true, false) => {
+          *count -= 1;
+          voters.remove(voter);
         }
-      });
+        _ => (), // Already voted/not voted
+      }
+    }
     self.set_highest_vote();
   }
 

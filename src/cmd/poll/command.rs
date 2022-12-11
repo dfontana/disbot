@@ -17,12 +17,12 @@ use serenity::{
   model::{
     channel::ReactionType,
     guild::Emoji,
-    interactions::{
-      application_command::{
-        ApplicationCommandInteraction, ApplicationCommandOptionType, ApplicationCommandType,
+    prelude::{
+      command::{CommandOptionType, CommandType},
+      interaction::{
+        application_command::ApplicationCommandInteraction,
+        message_component::MessageComponentInteraction, InteractionResponseType,
       },
-      message_component::MessageComponentInteraction,
-      InteractionResponseType,
     },
   },
   utils::MessageBuilder,
@@ -30,8 +30,8 @@ use serenity::{
 use tracing::{error, instrument, warn};
 use uuid::Uuid;
 
-const NAME: &'static str = "poll";
-static POLL_STATES: Lazy<Cache<Uuid, PollState>> = Lazy::new(|| Cache::new());
+const NAME: &str = "poll";
+static POLL_STATES: Lazy<Cache<Uuid, PollState>> = Lazy::new(Cache::new);
 
 #[derive(new)]
 pub struct Poll {
@@ -46,10 +46,10 @@ impl AppInteractor for Poll {
       command
         .name(NAME)
         .description("Create a Poll with up to 9 Options")
-        .kind(ApplicationCommandType::ChatInput)
+        .kind(CommandType::ChatInput)
         .create_option(|option| {
           option
-            .kind(ApplicationCommandOptionType::String)
+            .kind(CommandOptionType::String)
             .name("duration")
             .description(
               "How long until poll closes. Valid time units: 'day', 'hour', 'minute'. ex: 30minute",
@@ -58,7 +58,7 @@ impl AppInteractor for Poll {
         })
         .create_option(|option| {
           option
-            .kind(ApplicationCommandOptionType::String)
+            .kind(CommandOptionType::String)
             .name("topic")
             .description("Question or topic of the poll")
             .required(true)
@@ -67,7 +67,7 @@ impl AppInteractor for Poll {
       for i in 0..2 {
         command.create_option(|option| {
           option
-            .kind(ApplicationCommandOptionType::String)
+            .kind(CommandOptionType::String)
             .name(format!("option_{}", i))
             .description(format!("Option to add to poll #{}", i))
             .required(true)
@@ -77,7 +77,7 @@ impl AppInteractor for Poll {
       for i in 2..9 {
         command.create_option(|option| {
           option
-            .kind(ApplicationCommandOptionType::String)
+            .kind(CommandOptionType::String)
             .name(format!("option_{}", i))
             .description(format!("Option to add to poll #{}", i))
             .required(false)
@@ -221,9 +221,7 @@ impl Poll {
       itx.user.name.to_lowercase()
     };
 
-    for value in itx.data.values.iter() {
-      POLL_STATES.invoke_mut(&poll_id, |p| p.update_vote(value, &user))?;
-    }
+    POLL_STATES.invoke_mut(&poll_id, |p| p.update_vote(&itx.data.values, &user))?;
 
     let guild_id = match itx.guild_id {
       Some(g) => g,
