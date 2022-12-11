@@ -15,7 +15,7 @@ host=${2:-raspberrypi.local}
 on_github=${BUILD_GITHUB:-0}
 arch=${ARCH:-$ARM_ARCH}
 
-echo "Building binary..."
+echo "Building binary for $arch..."
 if [[ on_github == 1 && $ARCH == $ARM_ARCH ]]; then
   echo "Using Github Release"
   echo "Downloading release..."
@@ -42,7 +42,12 @@ elif [[ $ARCH == $ARM_ARCH ]]; then
   cross build --release --target $ARCH
 else 
   echo "Compiling Natively..."
-  cargo build --release
+  RUSTFLAGS=-Awarnings cargo build --quiet --release
+fi
+
+if [[ ! -f "target/$ARCH/release/disbot" || ! -f "$env.env" ]]; then
+  echo "Missing necessary files, not touching server";
+  exit 1
 fi
 
 echo "Binary built."

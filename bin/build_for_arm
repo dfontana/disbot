@@ -8,4 +8,4 @@ export CXX_armv7_unknown_linux_gnu=$TARGET-g++
 export AR_armv7_unknown_linux_gnu=$TARGET-ar
 export CARGO_TARGET_ARMV7_UNKNOWN_LINUX_GNUEABIHF_LINKER=$TARGET-gcc
 export CMAKE_TOOLCHAIN_FILE_armv7_unknown_linux_gnueabihf=$(pwd)/bin/armv7.cmake
-cargo build --release --target $TARGET
+RUSTFLAGS=-Awarnings cargo build --quiet --release --target $TARGET
