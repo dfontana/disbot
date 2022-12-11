@@ -5,9 +5,8 @@ use derive_new::new;
 use serenity::{
   async_trait,
   client::Context,
-  model::interactions::application_command::{
-    ApplicationCommandInteraction, ApplicationCommandInteractionDataOption,
-    ApplicationCommandInteractionDataOptionValue,
+  model::prelude::interaction::application_command::{
+    ApplicationCommandInteraction, CommandDataOption, CommandDataOptionValue,
   },
   utils::MessageBuilder,
 };
@@ -33,7 +32,7 @@ impl SubCommandHandler for Play {
     &self,
     ctx: &Context,
     itx: &ApplicationCommandInteraction,
-    subopt: &ApplicationCommandInteractionDataOption,
+    subopt: &CommandDataOption,
   ) -> Result<(), Box<dyn Error>> {
     // 1 arg: link. String.
     let chan = ChannelDisconnect::get_chan();
@@ -54,10 +53,9 @@ impl SubCommandHandler for Play {
 
     let maybe_args = args
       .get("link_or_search")
-      .map(|v| v.to_owned())
-      .flatten()
+      .and_then(|v| v.to_owned())
       .and_then(|d| match d {
-        ApplicationCommandInteractionDataOptionValue::String(v) => Some(v),
+        CommandDataOptionValue::String(v) => Some(v),
         _ => None,
       })
       .ok_or("Must provide a url|search string");

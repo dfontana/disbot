@@ -39,7 +39,7 @@ impl ChannelDisconnect {
 
   pub async fn maybe_register_handler(&self, handler_lock: &Arc<Mutex<Call>>) {
     if !HANDLER_ADDED.read().map(|g| *g).await {
-      let _fut = HANDLER_ADDED.write().map(|mut g| *g = true).await;
+      HANDLER_ADDED.write().map(|mut g| *g = true).await;
       let mut handler = handler_lock.lock().await;
       handler.add_global_event(
         Event::Periodic(Duration::from_secs(TIMEOUT_SECS), None),
@@ -58,7 +58,7 @@ impl ChannelDisconnect {
   }
 
   pub async fn stop(&self) {
-    let _dis = self.disconnect(true).await;
+    self.disconnect(true).await;
   }
 
   async fn is_queuing(&self) -> bool {

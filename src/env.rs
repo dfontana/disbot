@@ -1,6 +1,6 @@
 use std::str::FromStr;
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Environment {
   Prod,
   Dev,

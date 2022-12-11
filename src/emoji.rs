@@ -62,5 +62,5 @@ async fn get_emoji(
     .create_emoji(http, &name, &EMOJI_IMAGE)
     .await
     .map_err(|err| format!("{:?}", err))?;
-  Ok(emote.clone())
+  Ok(emote)
 }

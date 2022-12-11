@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use reqwest::{Client, Error};
 use serde::Deserialize;
 
-#[derive(Clone, Deserialize, Debug, PartialEq)]
+#[derive(Clone, Deserialize, Debug, Eq, PartialEq)]
 #[serde(rename_all = "lowercase")]
 pub enum ContainerState {
   Created,
@@ -15,7 +15,7 @@ pub enum ContainerState {
   Dead,
 }
 
-#[derive(Builder, Default, Deserialize, Debug, PartialEq)]
+#[derive(Builder, Default, Deserialize, Debug, Eq, PartialEq)]
 pub struct Container {
   #[serde(rename = "Id")]
   pub id: String,
@@ -26,7 +26,7 @@ pub struct Container {
   pub state: ContainerState,
 }
 
-#[derive(Builder, Deserialize, Debug, PartialEq)]
+#[derive(Builder, Deserialize, Debug, Eq, PartialEq)]
 pub struct ContainerInspect {
   #[serde(rename = "Id")]
   pub id: String,
@@ -36,13 +36,13 @@ pub struct ContainerInspect {
   pub state: ContainerInspectState,
 }
 
-#[derive(Clone, Deserialize, Debug, PartialEq)]
+#[derive(Clone, Deserialize, Debug, Eq, PartialEq)]
 pub struct ContainerInspectState {
   #[serde(rename = "Status")]
   pub status: ContainerState,
 }
 
-#[derive(Clone, Deserialize, Debug, PartialEq)]
+#[derive(Clone, Deserialize, Debug, Eq, PartialEq)]
 pub struct ContainerInspectConfig {
   #[serde(rename = "Labels")]
   pub labels: HashMap<String, String>,

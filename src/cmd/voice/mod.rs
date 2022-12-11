@@ -18,18 +18,16 @@ use serenity::{
   async_trait,
   builder::CreateApplicationCommands,
   client::Context,
-  model::interactions::{
-    application_command::{
-      ApplicationCommandInteraction, ApplicationCommandOptionType, ApplicationCommandType,
-    },
-    InteractionResponseType,
+  model::prelude::{
+    command::{CommandOptionType, CommandType},
+    interaction::{application_command::ApplicationCommandInteraction, InteractionResponseType},
   },
 };
 use skip::*;
 use stop::*;
 use tracing::{instrument, log::error};
 
-const NAME: &'static str = "play";
+const NAME: &str = "play";
 
 pub struct Voice {
   play: Play,
@@ -59,15 +57,15 @@ impl AppInteractor for Voice {
       command
         .name(NAME)
         .description("Sheebs Givith Loud Noises")
-        .kind(ApplicationCommandType::ChatInput)
+        .kind(CommandType::ChatInput)
         .create_option(|option| {
           option
-            .kind(ApplicationCommandOptionType::SubCommand)
+            .kind(CommandOptionType::SubCommand)
             .name("yt")
             .description("Play sound from YT")
             .create_sub_option(|subopt| {
               subopt
-                .kind(ApplicationCommandOptionType::String)
+                .kind(CommandOptionType::String)
                 .name("link_or_search")
                 .description("Link or search on YT")
                 .required(true)
@@ -75,30 +73,30 @@ impl AppInteractor for Voice {
         })
         .create_option(|option| {
           option
-            .kind(ApplicationCommandOptionType::SubCommand)
+            .kind(CommandOptionType::SubCommand)
             .name("stop")
             .description("Kindly ask Shibba to stop screaming")
         })
         .create_option(|option| {
           option
-            .kind(ApplicationCommandOptionType::SubCommand)
+            .kind(CommandOptionType::SubCommand)
             .name("skip")
             .description("Demand Shibba scream the next tune")
         })
         .create_option(|option| {
           option
-            .kind(ApplicationCommandOptionType::SubCommand)
+            .kind(CommandOptionType::SubCommand)
             .name("list")
             .description("Shibba will reveal his inner secrets")
         })
         .create_option(|option| {
           option
-            .kind(ApplicationCommandOptionType::SubCommand)
+            .kind(CommandOptionType::SubCommand)
             .name("reorder")
             .description("Move the given item to the given position in queue")
             .create_sub_option(|subopt| {
               subopt
-                .kind(ApplicationCommandOptionType::Integer)
+                .kind(CommandOptionType::Integer)
                 .name("from")
                 .description("Item to move")
                 .required(true)
@@ -106,7 +104,7 @@ impl AppInteractor for Voice {
             })
             .create_sub_option(|subopt| {
               subopt
-                .kind(ApplicationCommandOptionType::Integer)
+                .kind(CommandOptionType::Integer)
                 .name("to")
                 .description("Where to move to")
                 .required(true)
@@ -157,8 +155,7 @@ impl Voice {
     let subopt = itx
       .data
       .options
-      .iter()
-      .next()
+      .first()
       .expect("Discord did not pass sub-opt");
 
     match subopt.name.as_str() {
