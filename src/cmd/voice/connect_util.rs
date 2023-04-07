@@ -11,8 +11,6 @@ use std::{sync::Arc, time::Duration};
 use tokio::sync::mpsc::{self, Receiver, Sender};
 use tracing::{info, instrument};
 
-const TIMEOUT_SECS: u64 = 600;
-
 // https://ryhl.io/blog/actors-with-tokio/
 pub enum DisconnectMessage {
   Enqueue,
@@ -57,43 +55,50 @@ impl DisconnectActor {
     }
   }
 
-  async fn disconnect(&self, force: bool) {
+  async fn disconnect(&mut self, force: bool) {
     let det_lock = self.disconnect_details.lock().await;
     let Some(details) = det_lock.as_ref() else {
       // Nothing to disconnect from silly
+      info!("No disconnect details present, nothing to disconnect");
       return;
     };
     let mut handler = details.voice.lock().await;
 
-    let should_leave = if force {
-      info!("Stopping queue");
-      handler.queue().stop();
-      true
-    } else {
-      info!("Checking queue prescense");
-      handler.queue().is_empty() && self.in_progress_count == 0
+    let Some(channel) = handler.current_channel() else {
+      info!("Not in a channel, nothing to disconnect");
+      return;
     };
 
-    if !should_leave {
+    if force {
+      info!("Force stopping");
+      handler.queue().stop();
+    } else if !handler.queue().is_empty() || self.in_progress_count != 0 {
+      info!(
+        "Queue not empty or queuing ({}), will not disconnect",
+        self.in_progress_count
+      );
       return;
     }
 
-    if let Some(channel) = handler.current_channel() {
-      info!("Disconnecting client from voice");
-      let s_channel = ChannelId::from(channel.0);
-      let _dc = handler.leave().await;
-      let _rep = s_channel
-        .say(
-          &details.http,
-          MessageBuilder::new()
-            .mention(&details.emoji)
-            .push(" Cya later NERD ")
-            .mention(&details.emoji)
-            .build(),
-        )
-        .await;
-      info!("Disconnected");
-    }
+    info!("Disconnecting client from voice");
+    let s_channel = ChannelId::from(channel.0);
+    let _dc = handler.leave().await;
+    let _rep = s_channel
+      .say(
+        &details.http,
+        MessageBuilder::new()
+          .mention(&details.emoji)
+          .push(" Cya later NERD ")
+          .mention(&details.emoji)
+          .build(),
+      )
+      .await;
+    info!("Disconnected");
+
+    // Don't reset the details since the call is still valid, and may reconnect
+    // we'll let it tell us when to. On the contrary, though, we should reset queuing
+    // progress
+    self.in_progress_count = 0;
   }
 }
 
@@ -142,10 +147,10 @@ pub struct DisconnectEventHandler {
 }
 
 impl DisconnectEventHandler {
-  pub async fn register(handle: DisconnectHandle, call: &Arc<Mutex<Call>>) {
+  pub async fn register(timeout: u64, handle: DisconnectHandle, call: &Arc<Mutex<Call>>) {
     let mut call_lock = call.lock().await;
     call_lock.add_global_event(
-      Event::Periodic(Duration::from_secs(TIMEOUT_SECS), None),
+      Event::Periodic(Duration::from_secs(timeout), None),
       Self { handle },
     );
   }

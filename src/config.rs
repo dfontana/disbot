@@ -15,6 +15,7 @@ pub struct Config {
   pub env: Environment,
   pub log_level: String,
   pub server: ServerConfig,
+  pub timeout: u64, // Seconds
 }
 
 #[derive(Debug, Clone)]
@@ -46,6 +47,7 @@ impl Default for Config {
       env: Environment::Dev,
       log_level: "INFO".to_string(),
       server: ServerConfig::default(),
+      timeout: 10,
     }
   }
 }
@@ -64,6 +66,9 @@ impl Config {
         .collect(),
       env,
       log_level: env::var("LOG_LEVEL")?,
+      timeout: env::var("TIMEOUT")?
+        .parse::<u64>()
+        .map_err(|_| VarError::NotPresent)?,
       server: ServerConfig {
         mac: env::var("SERVER_MAC")?,
         ip: env::var("SERVER_IP")?,

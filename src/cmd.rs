@@ -60,13 +60,13 @@ impl Handler {
   pub fn new(config: Config, emoji: EmojiLookup) -> Self {
     Handler {
       listeners: vec![
-        Box::new(shrug::ShrugHandler::new(config, emoji.clone())),
+        Box::new(shrug::ShrugHandler::new(config.clone(), emoji.clone())),
         Box::new(reddit_prev::RedditPreviewHandler::default()),
       ],
       app_interactors: vec![
         Box::new(poll::Poll::new(emoji.clone())),
         Box::new(dice_roll::DiceRoll::new(emoji.clone())),
-        Box::new(voice::Voice::new(emoji)),
+        Box::new(voice::Voice::new(config.clone(), emoji.clone())),
         // server::Server::new(config),
       ],
       ready: ready::ReadyHandler::default(),

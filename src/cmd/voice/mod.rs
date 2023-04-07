@@ -1,6 +1,6 @@
 use std::error::Error;
 
-use crate::emoji::EmojiLookup;
+use crate::{config::Config, emoji::EmojiLookup};
 
 use self::connect_util::DisconnectHandle;
 
@@ -40,10 +40,10 @@ pub struct Voice {
 }
 
 impl Voice {
-  pub fn new(emoji: EmojiLookup) -> Self {
+  pub fn new(config: Config, emoji: EmojiLookup) -> Self {
     let disconnect = DisconnectHandle::new();
     Voice {
-      play: Play::new(emoji.clone(), disconnect.clone()),
+      play: Play::new(config, emoji.clone(), disconnect.clone()),
       stop: Stop::new(disconnect.clone()),
       skip: Skip::new(emoji.clone()),
       list: List::default(),

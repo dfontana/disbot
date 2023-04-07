@@ -2,6 +2,7 @@ use std::{collections::HashMap, error::Error};
 
 use crate::{
   cmd::voice::connect_util::{DisconnectDetails, DisconnectEventHandler},
+  config::Config,
   emoji::EmojiLookup,
 };
 use derive_new::new;
@@ -24,6 +25,7 @@ use songbird::{
 
 #[derive(new)]
 pub struct Play {
+  config: Config,
   emoji: EmojiLookup,
   disconnect: DisconnectHandle,
 }
@@ -115,7 +117,12 @@ async fn wrapped_handle(
       let (handler_lock, _success) = manager.join(guild_id, connect_to).await;
 
       // Register an event handler to listen for the duration of the call
-      let _ = DisconnectEventHandler::register(play.disconnect.clone(), &handler_lock).await;
+      let _ = DisconnectEventHandler::register(
+        play.config.timeout,
+        play.disconnect.clone(),
+        &handler_lock,
+      )
+      .await;
 
       // Inform disconnect of where to disconnect from
       let _ = play
@@ -129,7 +136,16 @@ async fn wrapped_handle(
 
       handler_lock
     }
-    Some(l) => l,
+    Some(l) => {
+      {
+        // Rejoin the channel if we're not in it already, but we previously were
+        let mut lock = l.lock().await;
+        if lock.current_channel().is_none() {
+          let _ = lock.join(connect_to).await;
+        }
+      }
+      l
+    }
   };
 
   // Queue up the source
