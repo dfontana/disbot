@@ -1,7 +1,6 @@
 use std::error::Error;
 
 use super::SubCommandHandler;
-use rand::seq::SliceRandom;
 use serenity::{
   async_trait,
   client::Context,
@@ -45,10 +44,6 @@ impl SubCommandHandler for List {
       Some(v) => v,
     };
     let handler = handler_lock.lock().await;
-
-    handler.queue().modify_queue(|f| {
-      f.make_contiguous().shuffle(&mut rand::thread_rng());
-    });
 
     let mut bld = MessageBuilder::new();
     bld.push_bold_line("Current Queue:");
