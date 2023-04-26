@@ -8,14 +8,13 @@ use serenity::{
   model::prelude::interaction::application_command::{
     ApplicationCommandInteraction, CommandDataOption,
   },
-  utils::MessageBuilder,
 };
 
 #[derive(Default)]
-pub struct List {}
+pub struct Shuffle {}
 
 #[async_trait]
-impl SubCommandHandler for List {
+impl SubCommandHandler for Shuffle {
   async fn handle(
     &self,
     ctx: &Context,
@@ -50,26 +49,8 @@ impl SubCommandHandler for List {
       f.make_contiguous().shuffle(&mut rand::thread_rng());
     });
 
-    let mut bld = MessageBuilder::new();
-    bld.push_bold_line("Current Queue:");
-    let mut body = String::new();
-    for (idx, trk) in handler.queue().current_queue().iter().enumerate() {
-      body.push_str(&format!(
-        "{}. '{}'\n",
-        idx + 1,
-        trk
-          .metadata()
-          .track
-          .as_ref()
-          .or_else(|| trk.metadata().title.as_ref())
-          .unwrap_or(&"<UNKNOWN>".to_string())
-      ));
-    }
-
     itx
-      .edit_original_interaction_response(&ctx.http, |f| {
-        f.content(bld.push_codeblock(body, None).build())
-      })
+      .edit_original_interaction_response(&ctx.http, |f| f.content("Queue shuffled!"))
       .await?;
     Ok(())
   }

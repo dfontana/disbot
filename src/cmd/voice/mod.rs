@@ -10,6 +10,7 @@ mod connect_util;
 mod list;
 mod play;
 mod reorder;
+mod shuffle;
 mod skip;
 mod stop;
 
@@ -25,6 +26,7 @@ use serenity::{
     interaction::{application_command::ApplicationCommandInteraction, InteractionResponseType},
   },
 };
+use shuffle::*;
 use skip::*;
 use stop::*;
 use tracing::{instrument, log::error};
@@ -35,6 +37,7 @@ pub struct Voice {
   play: Play,
   stop: Stop,
   skip: Skip,
+  shuffle: Shuffle,
   list: List,
   reorder: Reorder,
 }
@@ -46,6 +49,7 @@ impl Voice {
       play: Play::new(config, emoji.clone(), disconnect.clone()),
       stop: Stop::new(disconnect.clone()),
       skip: Skip::new(emoji.clone()),
+      shuffle: Shuffle::default(),
       list: List::default(),
       reorder: Reorder::new(emoji),
     }
@@ -91,6 +95,12 @@ impl AppInteractor for Voice {
             .kind(CommandOptionType::SubCommand)
             .name("list")
             .description("Shibba will reveal his inner secrets")
+        })
+        .create_option(|option| {
+          option
+            .kind(CommandOptionType::SubCommand)
+            .name("shuffle")
+            .description("Shibba will throw the queue on the ground")
         })
         .create_option(|option| {
           option
@@ -167,6 +177,7 @@ impl Voice {
       "skip" => self.skip.handle(ctx, itx, subopt).await?,
       "reorder" => self.reorder.handle(ctx, itx, subopt).await?,
       "list" => self.list.handle(ctx, itx, subopt).await?,
+      "shuffle" => self.shuffle.handle(ctx, itx, subopt).await?,
       _ => unreachable!(),
     };
 
