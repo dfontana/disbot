@@ -30,8 +30,7 @@ impl SubCommandHandler for Shuffle {
 
     let manager = songbird::get(ctx)
       .await
-      .expect("Songbird Voice client placed in at initialisation.")
-      .clone();
+      .expect("Songbird Voice client placed in at initialisation.");
     let handler_lock = match manager.get(guild_id) {
       None => {
         itx
@@ -46,7 +45,11 @@ impl SubCommandHandler for Shuffle {
     let handler = handler_lock.lock().await;
 
     handler.queue().modify_queue(|f| {
+      let front = f.pop_front();
       f.make_contiguous().shuffle(&mut rand::thread_rng());
+      if let Some(v) = front {
+        f.push_front(v);
+      }
     });
 
     itx
