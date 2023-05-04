@@ -73,7 +73,7 @@ pub async fn send_poll_message(
 ) -> serenity::Result<()> {
   itx
     .create_interaction_response(&ps.ctx.http, |builder| {
-      let poll_msg = build_poll_message(&ps);
+      let poll_msg = build_poll_message(ps);
       let mut component = CreateComponents::default();
       let mut action_row = CreateActionRow::default();
 

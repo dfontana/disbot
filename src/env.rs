@@ -1,7 +1,8 @@
 use std::str::FromStr;
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub enum Environment {
+  #[default]
   Prod,
   Dev,
 }
@@ -23,11 +24,5 @@ impl FromStr for Environment {
       "dev" => Ok(Environment::Dev),
       _ => Err("Unknown Environment Given".to_string()),
     }
-  }
-}
-
-impl Default for Environment {
-  fn default() -> Self {
-    Environment::Prod
   }
 }

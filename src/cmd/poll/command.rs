@@ -132,8 +132,8 @@ impl Poll {
       }
     };
     let emoji = self.emoji.get(&ctx.http, &ctx.cache, guild_id).await?;
-    let ps = PollState::from_args(&ctx, emoji, &itx)?;
-    let _ = self
+    let ps = PollState::from_args(ctx, emoji, itx)?;
+    self
       .actor
       .send(PollMessage::CreatePoll((ps, itx.clone())))
       .await;
@@ -153,7 +153,7 @@ impl Poll {
       itx.user.name.to_lowercase()
     };
 
-    let _ = self
+    self
       .actor
       .send(PollMessage::UpdateVote((
         poll_id,

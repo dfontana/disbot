@@ -47,7 +47,7 @@ impl Voice {
     let disconnect = DisconnectHandle::new();
     Voice {
       play: Play::new(config, emoji.clone(), disconnect.clone()),
-      stop: Stop::new(disconnect.clone()),
+      stop: Stop::new(disconnect),
       skip: Skip::new(emoji.clone()),
       shuffle: Shuffle::default(),
       list: List::default(),

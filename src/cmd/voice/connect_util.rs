@@ -49,9 +49,7 @@ impl DisconnectActor {
         let mut det_lock = self.disconnect_details.lock().await;
         *det_lock = Some(det);
       }
-      DisconnectMessage::Disconnect(forced) => {
-        let _ = self.disconnect(forced).await;
-      }
+      DisconnectMessage::Disconnect(forced) => self.disconnect(forced).await,
     }
   }
 
@@ -104,7 +102,7 @@ impl DisconnectActor {
 
 async fn run_disconnector(mut actor: DisconnectActor) {
   while let Some(msg) = actor.receiver.recv().await {
-    let _ = actor.handle_msg(msg).await;
+    actor.handle_msg(msg).await
   }
 }
 

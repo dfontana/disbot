@@ -73,7 +73,6 @@ impl PollState {
       .ok_or("No topic given")?;
 
     let items: Vec<String> = { 0..9 }
-      .into_iter()
       .map(|i| format!("option_{}", i))
       .filter_map(|key| map.get(&key))
       .filter_map(|d| match d {
