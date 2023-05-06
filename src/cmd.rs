@@ -20,6 +20,7 @@ use serenity::{
 
 use self::poll::PollHandle;
 
+mod check_in;
 mod dice_roll;
 mod poll;
 mod ready;
@@ -60,7 +61,10 @@ pub struct Handler {
 
 impl Handler {
   pub fn new(config: Config, emoji: EmojiLookup) -> Self {
+    // Boot the poller actor
     let poll_handle = PollHandle::new();
+    // Boot the check_in routine
+    check_in::CheckIn::new(config.clone(), emoji.clone(), poll_handle.clone()).boot();
     Handler {
       listeners: vec![
         Box::new(shrug::ShrugHandler::new(config.clone(), emoji.clone())),
