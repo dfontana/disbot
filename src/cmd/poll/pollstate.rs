@@ -1,15 +1,28 @@
 use humantime::parse_duration;
-use serenity::model::prelude::interaction::application_command::{
-  CommandDataOption, CommandDataOptionValue,
+use serenity::{
+  http::Http,
+  model::prelude::{
+    interaction::application_command::{ApplicationCommandInteraction, CommandDataOptionValue},
+    ChannelId, Emoji,
+  },
+  prelude::Context,
 };
 use std::{
   collections::{HashMap, HashSet},
+  sync::Arc,
   time::Duration,
 };
-use tracing::{info, instrument};
+use tracing::{info, instrument, warn};
 use uuid::Uuid;
 
 use super::cache::Expiring;
+
+#[derive(Clone)]
+pub struct CallContext {
+  pub channel: ChannelId,
+  pub http: Arc<Http>,
+  pub emoji: Emoji,
+}
 
 pub struct PollState {
   pub id: Uuid,
@@ -18,6 +31,7 @@ pub struct PollState {
   pub longest_option: usize,
   pub most_votes: usize,
   pub votes: HashMap<String, (String, usize, HashSet<String>)>,
+  pub ctx: CallContext,
 }
 
 impl Expiring for PollState {
@@ -27,7 +41,13 @@ impl Expiring for PollState {
 }
 
 impl PollState {
-  pub fn from_args(args: &[CommandDataOption]) -> Result<PollState, String> {
+  pub fn from_args(
+    ctx: &Context,
+    emoji: Emoji,
+    itx: &ApplicationCommandInteraction,
+  ) -> Result<PollState, String> {
+    let args = &itx.data.options;
+
     let map: HashMap<String, _> = args
       .iter()
       .map(|d| (d.name.to_owned(), d.resolved.to_owned()))
@@ -53,7 +73,6 @@ impl PollState {
       .ok_or("No topic given")?;
 
     let items: Vec<String> = { 0..9 }
-      .into_iter()
       .map(|i| format!("option_{}", i))
       .filter_map(|key| map.get(&key))
       .filter_map(|d| match d {
@@ -79,6 +98,11 @@ impl PollState {
       longest_option: opt_width,
       most_votes: 0,
       votes,
+      ctx: CallContext {
+        channel: itx.channel_id,
+        http: ctx.http.clone(),
+        emoji,
+      },
     })
   }
 

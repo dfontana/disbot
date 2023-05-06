@@ -117,15 +117,11 @@ async fn wrapped_handle(
       let (handler_lock, _success) = manager.join(guild_id, connect_to).await;
 
       // Register an event handler to listen for the duration of the call
-      let _ = DisconnectEventHandler::register(
-        play.config.timeout,
-        play.disconnect.clone(),
-        &handler_lock,
-      )
-      .await;
+      DisconnectEventHandler::register(play.config.timeout, play.disconnect.clone(), &handler_lock)
+        .await;
 
       // Inform disconnect of where to disconnect from
-      let _ = play
+      play
         .disconnect
         .connected_to(DisconnectDetails::new(
           handler_lock.clone(),
