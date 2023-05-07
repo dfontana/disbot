@@ -124,9 +124,12 @@ impl CheckIn {
 
     self
       .actor
-      .send(CheckInMessage::SetPoll((
+      .send(CheckInMessage::SetPoll(CheckInCtx::new(
         time,
-        CheckInCtx::new(duration, itx.channel_id, ctx.http.clone(), emoji.clone()),
+        duration,
+        itx.channel_id,
+        ctx.http.clone(),
+        emoji.clone(),
       )))
       .await;
     itx
