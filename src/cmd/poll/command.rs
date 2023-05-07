@@ -136,7 +136,13 @@ impl Poll {
     let ps = PollState::from_args(ctx, emoji, itx)?;
     self
       .actor
-      .send(PollMessage::CreatePoll((ps, itx.clone())))
+      .send(PollMessage::CreatePoll((ps, itx.channel_id)))
+      .await;
+    let _ = itx
+      .create_interaction_response(&ctx.http, |f| {
+        f.kind(InteractionResponseType::ChannelMessageWithSource)
+          .interaction_response_data(|k| k.content("yep."))
+      })
       .await;
     Ok(())
   }

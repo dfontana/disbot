@@ -17,7 +17,6 @@ use serenity::{
   },
   prelude::*,
 };
-use tokio::runtime::Runtime;
 
 use self::{
   check_in::{CheckInActor, CheckInMessage},
@@ -65,21 +64,10 @@ pub struct Handler {
 
 impl Handler {
   pub fn new(config: Config, emoji: EmojiLookup) -> Self {
-    // Boot the poller actor
     let poll_handle = ActorHandle::<PollMessage>::spawn(|r, h| PollActor::new(r, h));
-    // Boot the check_in routine
-    Runtime::new().unwrap().block_on(
-      ActorHandle::<CheckInMessage>::spawn(|r, h| {
-        Box::new(CheckInActor::new(
-          h,
-          r,
-          config.clone(),
-          emoji.clone(),
-          poll_handle.clone(),
-        ))
-      })
-      .send(CheckInMessage::Sleep),
-    );
+    let chk_handle = ActorHandle::<CheckInMessage>::spawn(|r, h| {
+      Box::new(CheckInActor::new(h, r, poll_handle.clone()))
+    });
     Handler {
       listeners: vec![
         Box::new(shrug::ShrugHandler::new(config.clone(), emoji.clone())),
@@ -87,6 +75,7 @@ impl Handler {
       ],
       app_interactors: vec![
         Box::new(poll::Poll::new(emoji.clone(), poll_handle)),
+        Box::new(check_in::CheckIn::new(emoji.clone(), chk_handle)),
         Box::new(dice_roll::DiceRoll::new(emoji.clone())),
         Box::new(voice::Voice::new(config, emoji)),
         // server::Server::new(config),

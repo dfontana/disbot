@@ -1,9 +1,6 @@
 use serenity::{
   builder::{CreateActionRow, CreateComponents},
-  model::prelude::{
-    interaction::{application_command::ApplicationCommandInteraction, InteractionResponseType},
-    ReactionType,
-  },
+  model::prelude::{ChannelId, ReactionType},
   utils::MessageBuilder,
 };
 
@@ -67,12 +64,9 @@ pub fn build_poll_message(ps: &PollState) -> String {
     .build()
 }
 
-pub async fn send_poll_message(
-  ps: &PollState,
-  itx: &ApplicationCommandInteraction,
-) -> serenity::Result<()> {
+pub async fn send_poll_message(ps: &PollState, itx: &ChannelId) -> serenity::Result<()> {
   itx
-    .create_interaction_response(&ps.ctx.http, |builder| {
+    .send_message(&ps.ctx.http, |builder| {
       let poll_msg = build_poll_message(ps);
       let mut component = CreateComponents::default();
       let mut action_row = CreateActionRow::default();
@@ -102,11 +96,10 @@ pub async fn send_poll_message(
 
       component.add_action_row(action_row);
 
-      builder
-        .kind(InteractionResponseType::ChannelMessageWithSource)
-        .interaction_response_data(|f| f.content(poll_msg).set_components(component))
+      builder.content(poll_msg).set_components(component)
     })
     .await
+    .map(|_| ())
 }
 
 pub fn build_exp_message(ps: &PollState) -> String {

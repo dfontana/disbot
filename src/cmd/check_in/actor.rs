@@ -1,47 +1,83 @@
 use crate::{
   actor::{Actor, ActorHandle},
-  config::Config,
-  emoji::EmojiLookup,
+  cmd::poll::PollMessage,
 };
 use async_trait::async_trait;
 use chrono::{DateTime, NaiveDateTime, NaiveTime, TimeZone, Utc};
 use chrono_tz::America;
 use derive_new::new;
-use std::time::Duration;
+use serenity::{
+  http::Http,
+  model::prelude::{ChannelId, Emoji},
+};
+use std::{sync::Arc, time::Duration};
 use tokio::sync::mpsc::Receiver;
-
-use super::poll::PollMessage;
 
 #[derive(Clone)]
 pub enum CheckInMessage {
-  CheckIn,
-  Sleep,
+  CheckIn(CheckInCtx),
+  Sleep((Duration, CheckInCtx)),
+  SetPoll((NaiveTime, CheckInCtx)),
 }
 
-#[derive(new)]
+#[derive(new, Clone)]
+pub struct CheckInCtx {
+  pub poll_dur: Duration,
+  pub channel: ChannelId,
+  pub http: Arc<Http>,
+  pub emoji: Emoji,
+}
+
 pub struct CheckInActor {
   self_ref: ActorHandle<CheckInMessage>,
   receiver: Receiver<CheckInMessage>,
-  config: Config,
-  emoji: EmojiLookup,
   poll_handle: ActorHandle<PollMessage>,
+  configured: bool,
+}
+
+impl CheckInActor {
+  pub fn new(
+    self_ref: ActorHandle<CheckInMessage>,
+    receiver: Receiver<CheckInMessage>,
+    poll_handle: ActorHandle<PollMessage>,
+  ) -> Self {
+    CheckInActor {
+      self_ref,
+      receiver,
+      poll_handle,
+      configured: false,
+    }
+  }
 }
 
 #[async_trait]
 impl Actor<CheckInMessage> for CheckInActor {
   async fn handle_msg(&mut self, msg: CheckInMessage) {
     match msg {
-      CheckInMessage::Sleep => {
-        let sleep_until = time_until(Utc::now(), self.config.check_in.time);
+      CheckInMessage::SetPoll((time, ctx)) => {
+        if self.configured {
+          return;
+        }
+        let sleep_until = time_until(Utc::now(), time);
+        self
+          .self_ref
+          .send(CheckInMessage::Sleep((sleep_until, ctx)))
+          .await;
+        self.configured = true;
+      }
+      CheckInMessage::Sleep((sleep_until, ctx)) => {
         let hdl = self.self_ref.clone();
         tokio::spawn(async move {
           tokio::time::sleep(sleep_until).await;
-          hdl.send(CheckInMessage::CheckIn).await
+          hdl.send(CheckInMessage::CheckIn(ctx)).await
         });
       }
-      CheckInMessage::CheckIn => {
-        self.config.check_in.duration;
-        todo!()
+      CheckInMessage::CheckIn(ctx) => {
+        let chan = ctx.channel;
+        self
+          .poll_handle
+          .send(PollMessage::CreatePoll((ctx.into(), chan)))
+          .await;
       }
     }
   }
@@ -77,7 +113,7 @@ mod test {
 
   use chrono::{DateTime, NaiveTime, Utc};
 
-  use crate::cmd::check_in::time_until;
+  use crate::cmd::check_in::actor::time_until;
 
   #[test]
   fn time_in_past() {

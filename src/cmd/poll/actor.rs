@@ -1,9 +1,6 @@
 use async_trait::async_trait;
 use serenity::{
-  model::prelude::interaction::{
-    application_command::ApplicationCommandInteraction,
-    message_component::MessageComponentInteraction,
-  },
+  model::prelude::{interaction::message_component::MessageComponentInteraction, ChannelId},
   prelude::Context,
 };
 use tokio::sync::mpsc::Receiver;
@@ -17,7 +14,7 @@ use super::{cache::Cache, messages, pollstate::PollState};
 #[derive(Clone)]
 pub enum PollMessage {
   UpdateVote((Uuid, String, Context, MessageComponentInteraction)),
-  CreatePoll((PollState, ApplicationCommandInteraction)),
+  CreatePoll((PollState, ChannelId)),
   ExpirePoll(Uuid),
 }
 
