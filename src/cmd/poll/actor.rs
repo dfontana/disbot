@@ -1,59 +1,43 @@
+use async_trait::async_trait;
 use serenity::{
-  model::prelude::interaction::{
-    application_command::ApplicationCommandInteraction,
-    message_component::MessageComponentInteraction,
-  },
+  model::prelude::{interaction::message_component::MessageComponentInteraction, ChannelId},
   prelude::Context,
 };
-use tokio::sync::mpsc::{self, Receiver, Sender};
+use tokio::sync::mpsc::Receiver;
 use tracing::{error, warn};
 use uuid::Uuid;
 
+use crate::actor::{Actor, ActorHandle};
+
 use super::{cache::Cache, messages, pollstate::PollState};
+
+#[derive(Clone)]
 pub enum PollMessage {
   UpdateVote((Uuid, String, Context, MessageComponentInteraction)),
-  CreatePoll((PollState, ApplicationCommandInteraction)),
+  CreatePoll((PollState, ChannelId)),
   ExpirePoll(Uuid),
 }
 
-#[derive(Clone)]
-pub struct PollHandle {
-  sender: Sender<PollMessage>,
-}
-
-async fn run_poller(mut actor: PollActor) {
-  while let Some(msg) = actor.receiver.recv().await {
-    actor.handle_msg(msg).await
-  }
-}
-
-impl PollHandle {
-  pub fn new() -> Self {
-    let (sender, receiver) = mpsc::channel(8);
-    let handle = Self { sender };
-    let actor = PollActor::new(handle.clone(), receiver);
-    tokio::spawn(run_poller(actor));
-    handle
-  }
-
-  pub async fn send(&self, msg: PollMessage) {
-    let _ = self.sender.send(msg).await;
-  }
-}
-
 pub struct PollActor {
-  self_ref: PollHandle,
+  self_ref: ActorHandle<PollMessage>,
   receiver: Receiver<PollMessage>,
   states: Cache<Uuid, PollState>,
 }
 
 impl PollActor {
-  pub fn new(self_ref: PollHandle, receiver: Receiver<PollMessage>) -> Self {
-    Self {
+  pub fn new(receiver: Receiver<PollMessage>, self_ref: ActorHandle<PollMessage>) -> Box<Self> {
+    Box::new(Self {
       self_ref,
       receiver,
       states: Cache::new(),
-    }
+    })
+  }
+}
+
+#[async_trait]
+impl Actor<PollMessage> for PollActor {
+  fn receiver(&mut self) -> &mut Receiver<PollMessage> {
+    &mut self.receiver
   }
 
   async fn handle_msg(&mut self, msg: PollMessage) {

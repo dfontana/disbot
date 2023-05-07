@@ -1,6 +1,7 @@
 use std::{collections::HashMap, error::Error};
 
 use crate::{
+  actor::ActorHandle,
   cmd::voice::connect_util::{DisconnectDetails, DisconnectEventHandler},
   config::Config,
   emoji::EmojiLookup,
@@ -17,7 +18,7 @@ use serenity::{
 
 use tracing::{error, info};
 
-use super::{connect_util::DisconnectHandle, SubCommandHandler};
+use super::{connect_util::DisconnectMessage, SubCommandHandler};
 use songbird::{
   driver::Bitrate,
   input::{restartable::Restartable, Input},
@@ -27,7 +28,7 @@ use songbird::{
 pub struct Play {
   config: Config,
   emoji: EmojiLookup,
-  disconnect: DisconnectHandle,
+  disconnect: ActorHandle<DisconnectMessage>,
 }
 
 #[async_trait]
@@ -39,9 +40,9 @@ impl SubCommandHandler for Play {
     subopt: &CommandDataOption,
   ) -> Result<(), Box<dyn Error>> {
     // 1 arg: link. String.
-    let _ = self.disconnect.enqueue().await;
+    let _ = self.disconnect.send(DisconnectMessage::Enqueue).await;
     let res = wrapped_handle(self, ctx, itx, subopt).await;
-    let _ = self.disconnect.enqueue_done().await;
+    let _ = self.disconnect.send(DisconnectMessage::Dequeue).await;
     match res {
       Ok(_) => Ok(()),
       Err(e) => Err(e),
@@ -123,11 +124,11 @@ async fn wrapped_handle(
       // Inform disconnect of where to disconnect from
       play
         .disconnect
-        .connected_to(DisconnectDetails::new(
+        .send(DisconnectMessage::Details(DisconnectDetails::new(
           handler_lock.clone(),
           ctx.http.clone(),
           play.emoji.get(&ctx.http, &ctx.cache, guild_id).await?,
-        ))
+        )))
         .await;
 
       handler_lock

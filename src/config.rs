@@ -18,23 +18,12 @@ pub struct Config {
   pub timeout: u64, // Seconds
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct ServerConfig {
   pub mac: String,
   pub ip: String,
   pub user: String,
   pub port: usize,
-}
-
-impl Default for ServerConfig {
-  fn default() -> Self {
-    ServerConfig {
-      mac: "".to_owned(),
-      ip: "".to_owned(),
-      user: "".to_owned(),
-      port: 0,
-    }
-  }
 }
 
 impl Default for Config {

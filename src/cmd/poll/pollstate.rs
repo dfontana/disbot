@@ -15,6 +15,8 @@ use std::{
 use tracing::{info, instrument, warn};
 use uuid::Uuid;
 
+use crate::cmd::check_in::CheckInCtx;
+
 use super::cache::Expiring;
 
 #[derive(Clone)]
@@ -24,6 +26,7 @@ pub struct CallContext {
   pub emoji: Emoji,
 }
 
+#[derive(Clone)]
 pub struct PollState {
   pub id: Uuid,
   pub duration: Duration,
@@ -37,6 +40,27 @@ pub struct PollState {
 impl Expiring for PollState {
   fn duration(&self) -> Duration {
     self.duration
+  }
+}
+
+impl From<CheckInCtx> for PollState {
+  fn from(c: CheckInCtx) -> Self {
+    PollState {
+      id: Uuid::new_v4(),
+      duration: c.poll_dur,
+      topic: "Will you be on tonight? This is a legally binding.".into(),
+      longest_option: 3,
+      most_votes: 0,
+      votes: HashMap::from([
+        ("1".into(), ("Yes".into(), 0, HashSet::new())),
+        ("2".into(), ("No".into(), 0, HashSet::new())),
+      ]),
+      ctx: CallContext {
+        channel: c.channel,
+        http: c.http,
+        emoji: c.emoji,
+      },
+    }
   }
 }
 

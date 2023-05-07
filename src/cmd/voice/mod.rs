@@ -1,8 +1,8 @@
 use std::error::Error;
 
-use crate::{config::Config, emoji::EmojiLookup};
+use crate::{actor::ActorHandle, config::Config, emoji::EmojiLookup};
 
-use self::connect_util::DisconnectHandle;
+use self::connect_util::{DisconnectActor, DisconnectMessage};
 
 use super::{AppInteractor, SubCommandHandler};
 
@@ -44,7 +44,8 @@ pub struct Voice {
 
 impl Voice {
   pub fn new(config: Config, emoji: EmojiLookup) -> Self {
-    let disconnect = DisconnectHandle::new();
+    let disconnect =
+      ActorHandle::<DisconnectMessage>::spawn(|r, _| Box::new(DisconnectActor::new(r)));
     Voice {
       play: Play::new(config, emoji.clone(), disconnect.clone()),
       stop: Stop::new(disconnect),
