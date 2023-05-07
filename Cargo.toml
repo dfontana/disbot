@@ -26,6 +26,7 @@ songbird = {features = ["builtin-queue", "yt-dlp"], version="0.3.2"}
 tokio = { version = "1.0", features = ["full"] }
 tracing = "0.1.36"
 tracing-subscriber = "0.3.15"
+async-trait = "0.1.68"
 
 [dependencies.uuid]
 version = "1.1.2"

@@ -24,6 +24,7 @@ pub struct CallContext {
   pub emoji: Emoji,
 }
 
+#[derive(Clone)]
 pub struct PollState {
   pub id: Uuid,
   pub duration: Duration,

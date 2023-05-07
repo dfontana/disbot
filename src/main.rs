@@ -6,6 +6,7 @@ extern crate rand;
 extern crate regex;
 extern crate reqwest;
 
+mod actor;
 mod cmd;
 mod config;
 mod docker;

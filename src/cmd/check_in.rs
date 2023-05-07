@@ -1,26 +1,53 @@
-use crate::{config::Config, emoji::EmojiLookup};
+use crate::{
+  actor::{Actor, ActorHandle},
+  config::Config,
+  emoji::EmojiLookup,
+};
+use async_trait::async_trait;
 use chrono::{DateTime, NaiveDateTime, NaiveTime, TimeZone, Utc};
-use chrono_tz::{America, Tz};
+use chrono_tz::America;
 use derive_new::new;
 use std::time::Duration;
+use tokio::sync::mpsc::Receiver;
 
-use super::poll::PollHandle;
+use super::poll::PollMessage;
 
-#[derive(new)]
-pub struct CheckIn {
-  config: Config,
-  emoji: EmojiLookup,
-  poll_handle: PollHandle,
+#[derive(Clone)]
+pub enum CheckInMessage {
+  CheckIn,
+  Sleep,
 }
 
-impl CheckIn {
-  pub fn boot(self) {
-    // TODO:
-    // Spawn a sleep task (like poll expire does) to trigger the next poll.
-    // This task should spawn the next task to sleep again, infinitum.
-    // You need to avoid pushing the call stack on this, bear in mind
-    let _sleep_until = time_until(Utc::now(), self.config.check_in.time);
-    self.config.check_in.duration;
+#[derive(new)]
+pub struct CheckInActor {
+  self_ref: ActorHandle<CheckInMessage>,
+  receiver: Receiver<CheckInMessage>,
+  config: Config,
+  emoji: EmojiLookup,
+  poll_handle: ActorHandle<PollMessage>,
+}
+
+#[async_trait]
+impl Actor<CheckInMessage> for CheckInActor {
+  async fn handle_msg(&mut self, msg: CheckInMessage) {
+    match msg {
+      CheckInMessage::Sleep => {
+        let sleep_until = time_until(Utc::now(), self.config.check_in.time);
+        let hdl = self.self_ref.clone();
+        tokio::spawn(async move {
+          tokio::time::sleep(sleep_until).await;
+          hdl.send(CheckInMessage::CheckIn).await
+        });
+      }
+      CheckInMessage::CheckIn => {
+        self.config.check_in.duration;
+        todo!()
+      }
+    }
+  }
+
+  fn receiver(&mut self) -> &mut Receiver<CheckInMessage> {
+    &mut self.receiver
   }
 }
 

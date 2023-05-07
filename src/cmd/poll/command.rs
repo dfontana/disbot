@@ -1,6 +1,7 @@
 use std::error::Error;
 
 use crate::{
+  actor::ActorHandle,
   cmd::{poll::pollstate::PollState, AppInteractor},
   emoji::EmojiLookup,
 };
@@ -21,14 +22,14 @@ use serenity::{
 use tracing::{error, instrument, warn};
 use uuid::Uuid;
 
-use super::actor::{PollHandle, PollMessage};
+use super::actor::PollMessage;
 
 const NAME: &str = "poll";
 
 #[derive(new)]
 pub struct Poll {
   emoji: EmojiLookup,
-  actor: PollHandle,
+  actor: ActorHandle<PollMessage>,
 }
 
 #[async_trait]

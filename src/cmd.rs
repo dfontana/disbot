@@ -1,6 +1,6 @@
 use std::error::Error;
 
-use crate::{config::Config, emoji::EmojiLookup};
+use crate::{actor::ActorHandle, config::Config, emoji::EmojiLookup};
 use serenity::{
   async_trait,
   builder::CreateApplicationCommands,
@@ -17,8 +17,12 @@ use serenity::{
   },
   prelude::*,
 };
+use tokio::runtime::Runtime;
 
-use self::poll::PollHandle;
+use self::{
+  check_in::{CheckInActor, CheckInMessage},
+  poll::{PollActor, PollMessage},
+};
 
 mod check_in;
 mod dice_roll;
@@ -62,9 +66,20 @@ pub struct Handler {
 impl Handler {
   pub fn new(config: Config, emoji: EmojiLookup) -> Self {
     // Boot the poller actor
-    let poll_handle = PollHandle::new();
+    let poll_handle = ActorHandle::<PollMessage>::spawn(|r, h| PollActor::new(r, h));
     // Boot the check_in routine
-    check_in::CheckIn::new(config.clone(), emoji.clone(), poll_handle.clone()).boot();
+    Runtime::new().unwrap().block_on(
+      ActorHandle::<CheckInMessage>::spawn(|r, h| {
+        Box::new(CheckInActor::new(
+          h,
+          r,
+          config.clone(),
+          emoji.clone(),
+          poll_handle.clone(),
+        ))
+      })
+      .send(CheckInMessage::Sleep),
+    );
     Handler {
       listeners: vec![
         Box::new(shrug::ShrugHandler::new(config.clone(), emoji.clone())),

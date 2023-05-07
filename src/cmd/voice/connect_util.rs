@@ -8,10 +8,12 @@ use serenity::{
 };
 use songbird::{Call, Event, EventContext, EventHandler};
 use std::{sync::Arc, time::Duration};
-use tokio::sync::mpsc::{self, Receiver, Sender};
+use tokio::sync::mpsc::Receiver;
 use tracing::{info, instrument};
 
-// https://ryhl.io/blog/actors-with-tokio/
+use crate::actor::{Actor, ActorHandle};
+
+#[derive(Clone)]
 pub enum DisconnectMessage {
   Enqueue,
   Dequeue,
@@ -19,7 +21,7 @@ pub enum DisconnectMessage {
   Disconnect(bool), // Forced = true
 }
 
-#[derive(new)]
+#[derive(new, Clone)]
 pub struct DisconnectDetails {
   voice: Arc<Mutex<Call>>,
   http: Arc<Http>,
@@ -32,13 +34,10 @@ pub struct DisconnectActor {
   disconnect_details: Mutex<Option<DisconnectDetails>>,
 }
 
-impl DisconnectActor {
-  pub fn new(receiver: Receiver<DisconnectMessage>) -> Self {
-    Self {
-      receiver,
-      in_progress_count: 0,
-      disconnect_details: Mutex::new(None),
-    }
+#[async_trait]
+impl Actor<DisconnectMessage> for DisconnectActor {
+  fn receiver(&mut self) -> &mut Receiver<DisconnectMessage> {
+    &mut self.receiver
   }
 
   async fn handle_msg(&mut self, msg: DisconnectMessage) {
@@ -50,6 +49,16 @@ impl DisconnectActor {
         *det_lock = Some(det);
       }
       DisconnectMessage::Disconnect(forced) => self.disconnect(forced).await,
+    }
+  }
+}
+
+impl DisconnectActor {
+  pub fn new(receiver: Receiver<DisconnectMessage>) -> Self {
+    Self {
+      receiver,
+      in_progress_count: 0,
+      disconnect_details: Mutex::new(None),
     }
   }
 
@@ -100,52 +109,16 @@ impl DisconnectActor {
   }
 }
 
-async fn run_disconnector(mut actor: DisconnectActor) {
-  while let Some(msg) = actor.receiver.recv().await {
-    actor.handle_msg(msg).await
-  }
-}
-
-#[derive(Clone)]
-pub struct DisconnectHandle {
-  sender: Sender<DisconnectMessage>,
-}
-
-impl DisconnectHandle {
-  pub fn new() -> Self {
-    let (sender, receiver) = mpsc::channel(8);
-    let actor = DisconnectActor::new(receiver);
-    tokio::spawn(run_disconnector(actor));
-    Self { sender }
-  }
-
-  pub async fn enqueue(&self) {
-    let _ = self.sender.send(DisconnectMessage::Enqueue).await;
-  }
-
-  pub async fn enqueue_done(&self) {
-    let _ = self.sender.send(DisconnectMessage::Dequeue).await;
-  }
-
-  pub async fn connected_to(&self, details: DisconnectDetails) {
-    let _ = self.sender.send(DisconnectMessage::Details(details)).await;
-  }
-
-  pub async fn attempt_disconnect(&self) {
-    let _ = self.sender.send(DisconnectMessage::Disconnect(false)).await;
-  }
-
-  pub async fn stop(&self) {
-    let _ = self.sender.send(DisconnectMessage::Disconnect(true)).await;
-  }
-}
-
 pub struct DisconnectEventHandler {
-  handle: DisconnectHandle,
+  handle: ActorHandle<DisconnectMessage>,
 }
 
 impl DisconnectEventHandler {
-  pub async fn register(timeout: u64, handle: DisconnectHandle, call: &Arc<Mutex<Call>>) {
+  pub async fn register(
+    timeout: u64,
+    handle: ActorHandle<DisconnectMessage>,
+    call: &Arc<Mutex<Call>>,
+  ) {
     let mut call_lock = call.lock().await;
     call_lock.add_global_event(
       Event::Periodic(Duration::from_secs(timeout), None),
@@ -159,7 +132,7 @@ impl EventHandler for DisconnectEventHandler {
   #[instrument(name = "VoiceTimeoutListener", level = "INFO", skip(self, _ctx))]
   async fn act(&self, _ctx: &EventContext<'_>) -> Option<Event> {
     info!("Checking for inactivity...");
-    let _ = self.handle.attempt_disconnect().await;
+    let _ = self.handle.send(DisconnectMessage::Disconnect(false)).await;
     None
   }
 }
