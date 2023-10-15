@@ -12,16 +12,19 @@ mod config;
 mod docker;
 mod emoji;
 mod env;
+mod template;
 
-use std::str::FromStr;
-
-use serenity::{client::Client, prelude::GatewayIntents};
-use songbird::SerenityInit;
-use tracing::{error, Level};
-
+use axum::Router;
 use cmd::Handler;
 use config::Config;
 use env::Environment;
+use serenity::{client::Client, prelude::GatewayIntents};
+use songbird::SerenityInit;
+use std::str::FromStr;
+use std::thread;
+use tokio::runtime::Handle;
+use tower_http::trace::TraceLayer;
+use tracing::{error, info, Level};
 
 #[tokio::main]
 async fn main() {
@@ -42,6 +45,9 @@ async fn main() {
   let emoji = emoji::EmojiLookup::new(&config);
   docker::configure(&config.server).expect("Failed to setup docker for game server");
 
+  let handle = Handle::current();
+  let server_thread = thread::spawn(move || handle.spawn(spawn_thread()));
+
   let mut client = Client::builder(
     &config.api_key,
     GatewayIntents::GUILDS
@@ -60,4 +66,19 @@ async fn main() {
   if let Err(why) = client.start().await {
     error!("Failed to start Discord Client {:?}", why);
   }
+
+  server_thread.join().expect("Server Thread Panicked");
+}
+
+async fn spawn_thread() {
+  let app = Router::new()
+    .nest("/ui", template::admin_routes())
+    .layer(TraceLayer::new_for_http());
+
+  info!("Starting server");
+  axum::Server::bind(&"0.0.0.0:3000".parse().unwrap())
+    .serve(app.into_make_service())
+    .await
+    .unwrap();
+  info!("Server started");
 }
