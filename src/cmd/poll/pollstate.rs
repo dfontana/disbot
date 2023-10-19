@@ -1,4 +1,5 @@
 use humantime::parse_duration;
+use serde::{Serialize, Serializer};
 use serenity::{
   http::Http,
   model::prelude::{
@@ -24,15 +25,28 @@ pub struct CallContext {
   pub emoji: Emoji,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Serialize)]
 pub struct PollState {
   pub id: Uuid,
+  #[serde(serialize_with = "duration_serialize")]
   pub duration: Duration,
   pub topic: String,
+  #[serde(skip_serializing)]
   pub longest_option: usize,
+  #[serde(skip_serializing)]
   pub most_votes: usize,
+  #[serde(skip_serializing)]
   pub votes: HashMap<String, (String, usize, HashSet<String>)>,
+  #[serde(skip_serializing)]
   pub ctx: CallContext,
+}
+
+fn duration_serialize<S>(x: &Duration, s: S) -> Result<S::Ok, S::Error>
+where
+  S: Serializer,
+{
+  let v = format!("{:?}", x);
+  s.serialize_str(v.as_str())
 }
 
 impl From<CheckInCtx> for PollState {

@@ -12,7 +12,10 @@ use tokio::sync::oneshot;
 use tracing::error;
 use uuid::Uuid;
 
-use crate::{actor::ActorHandle, cmd::PollMessage};
+use crate::{
+  actor::ActorHandle,
+  cmd::{PollMessage, PollState},
+};
 
 #[derive(Clone)]
 struct AppState {
@@ -69,7 +72,7 @@ async fn index(State(tera): State<Arc<Tera>>) -> Result<Html<String>, HtmlErr> {
 #[derive(Serialize)]
 struct Polls<'a> {
   title: &'a str,
-  polls: Vec<PollInfo>,
+  polls: Vec<PollState>,
   poll_state_fields: Vec<&'a str>,
 }
 
@@ -93,15 +96,8 @@ async fn polls(
 
   let polls = Polls {
     title: "Poll Controls",
-    polls: admin_info
-      .iter()
-      .map(|e| PollInfo {
-        id: e.id.to_string(),
-        duration: format!("{:?}", e.duration),
-        topic: e.topic.to_owned(),
-      })
-      .collect(),
-    poll_state_fields: vec!["id", "duration", "topic"],
+    polls: admin_info,
+    poll_state_fields: vec!["id", "duration", "topic", "most_votes"],
   };
   try_render(tera, "polls.html", polls)
 }

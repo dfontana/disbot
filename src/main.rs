@@ -45,7 +45,6 @@ async fn main() {
     .init();
   let emoji = emoji::EmojiLookup::new(&config);
   docker::configure(&config.server).expect("Failed to setup docker for game server");
-
   let poll_handle = ActorHandle::<PollMessage>::spawn(|r, h| PollActor::new(r, h));
   let server_copy = poll_handle.clone();
 

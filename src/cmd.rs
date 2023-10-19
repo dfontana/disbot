@@ -20,7 +20,7 @@ use serenity::{
 
 use self::check_in::{CheckInActor, CheckInMessage};
 
-pub use poll::{PollActor, PollMessage};
+pub use poll::{PollActor, PollMessage, PollState};
 mod check_in;
 mod dice_roll;
 mod poll;

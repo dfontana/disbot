@@ -58,6 +58,11 @@ impl Actor<CheckInMessage> for CheckInActor {
   async fn handle_msg(&mut self, msg: CheckInMessage) {
     match msg {
       CheckInMessage::SetPoll(ctx) => {
+        // TODO: Rather than be oneshot, you can create an abortable task by
+        //       wrapping the tokio::spawn call in https://docs.rs/futures/0.3.28/futures/future/fn.abortable.html.
+        // https://stackoverflow.com/questions/64084955/how-to-remotely-shut-down-running-tasks-with-tokio
+        //       This will let users set new checkins or cancel them from the admin
+        //       ui.
         if self.configured {
           return;
         }
