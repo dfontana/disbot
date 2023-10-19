@@ -14,8 +14,9 @@ mod emoji;
 mod env;
 mod template;
 
+use actor::ActorHandle;
 use axum::Router;
-use cmd::Handler;
+use cmd::{Handler, PollActor, PollMessage};
 use config::Config;
 use env::Environment;
 use serenity::{client::Client, prelude::GatewayIntents};
@@ -45,8 +46,11 @@ async fn main() {
   let emoji = emoji::EmojiLookup::new(&config);
   docker::configure(&config.server).expect("Failed to setup docker for game server");
 
+  let poll_handle = ActorHandle::<PollMessage>::spawn(|r, h| PollActor::new(r, h));
+  let server_copy = poll_handle.clone();
+
   let handle = Handle::current();
-  let server_thread = thread::spawn(move || handle.spawn(spawn_thread()));
+  let server_thread = thread::spawn(move || handle.spawn(spawn_thread(server_copy)));
 
   let mut client = Client::builder(
     &config.api_key,
@@ -58,7 +62,7 @@ async fn main() {
       | GatewayIntents::GUILD_VOICE_STATES,
   )
   .register_songbird()
-  .event_handler(Handler::new(config.clone(), emoji))
+  .event_handler(Handler::new(config.clone(), emoji, poll_handle))
   .application_id(config.app_id)
   .await
   .expect("Err creating client");
@@ -70,9 +74,9 @@ async fn main() {
   server_thread.join().expect("Server Thread Panicked");
 }
 
-async fn spawn_thread() {
+async fn spawn_thread(poll_handle: ActorHandle<PollMessage>) {
   let app = Router::new()
-    .nest("/ui", template::admin_routes())
+    .nest("/ui", template::admin_routes(poll_handle))
     .layer(TraceLayer::new_for_http());
 
   info!("Starting server");

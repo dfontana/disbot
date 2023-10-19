@@ -8,12 +8,21 @@ pub trait Actor<T: Send + Sync> {
   fn receiver(&mut self) -> &mut Receiver<T>;
 }
 
-#[derive(Clone)]
-pub struct ActorHandle<T: Clone> {
+pub struct ActorHandle<T> {
   sender: Sender<T>,
 }
 
-impl<T: Clone + Send + Sync + 'static> ActorHandle<T> {
+// Cannot derive clone, because https://github.com/rust-lang/rust/issues/26925
+// Manual impl avoids need to bound T: Clone, which makes no sense
+impl<T> Clone for ActorHandle<T> {
+  fn clone(&self) -> Self {
+    ActorHandle {
+      sender: self.sender.clone(),
+    }
+  }
+}
+
+impl<T: Send + Sync + 'static> ActorHandle<T> {
   pub fn spawn(
     mk_actor: impl Fn(Receiver<T>, ActorHandle<T>) -> Box<dyn Actor<T> + Send + Sync>,
   ) -> Self {

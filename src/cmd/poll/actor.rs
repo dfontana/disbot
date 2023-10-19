@@ -3,7 +3,7 @@ use serenity::{
   model::prelude::{interaction::message_component::MessageComponentInteraction, ChannelId},
   prelude::Context,
 };
-use tokio::sync::mpsc::Receiver;
+use tokio::sync::{mpsc::Receiver, oneshot};
 use tracing::{error, warn};
 use uuid::Uuid;
 
@@ -11,11 +11,11 @@ use crate::actor::{Actor, ActorHandle};
 
 use super::{cache::Cache, messages, pollstate::PollState};
 
-#[derive(Clone)]
 pub enum PollMessage {
   UpdateVote((Uuid, String, Context, MessageComponentInteraction)),
   CreatePoll((PollState, ChannelId)),
   ExpirePoll(Uuid),
+  GetAdminState(oneshot::Sender<Vec<PollState>>),
 }
 
 pub struct PollActor {
@@ -77,6 +77,18 @@ impl Actor<PollMessage> for PollActor {
 
         if let Err(e) = self.states.remove(&id) {
           warn!("Failed to reap poll on exp: {}", e);
+        }
+      }
+      PollMessage::GetAdminState(send) => {
+        let msg = match self.states.values() {
+          Ok(v) => v,
+          Err(e) => {
+            error!(e);
+            return;
+          }
+        };
+        if let Err(_) = send.send(msg) {
+          error!("Failed to send admin state, recv dropped");
         }
       }
       PollMessage::UpdateVote((id, voter, ctx, mtx)) => {

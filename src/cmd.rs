@@ -18,11 +18,9 @@ use serenity::{
   prelude::*,
 };
 
-use self::{
-  check_in::{CheckInActor, CheckInMessage},
-  poll::{PollActor, PollMessage},
-};
+use self::check_in::{CheckInActor, CheckInMessage};
 
+pub use poll::{PollActor, PollMessage};
 mod check_in;
 mod dice_roll;
 mod poll;
@@ -63,8 +61,7 @@ pub struct Handler {
 }
 
 impl Handler {
-  pub fn new(config: Config, emoji: EmojiLookup) -> Self {
-    let poll_handle = ActorHandle::<PollMessage>::spawn(|r, h| PollActor::new(r, h));
+  pub fn new(config: Config, emoji: EmojiLookup, poll_handle: ActorHandle<PollMessage>) -> Self {
     let chk_handle = ActorHandle::<CheckInMessage>::spawn(|r, h| {
       Box::new(CheckInActor::new(h, r, poll_handle.clone()))
     });

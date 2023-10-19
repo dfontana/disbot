@@ -9,19 +9,25 @@
 	<table>
 	  <thead>
 	    <tr>
-	      <th>The table header</th>
-	      <th>The table header</th>
+				{% for field in poll_state_fields %}
+	      <th>{{ field }}</th>
+				{% endfor %}
+	      <th>cancel</th>
 	    </tr>
 	  </thead>
 	  <tbody>
 		  {% for poll in polls %}
 	    <tr>
-	      <td>{{ poll.id }}</td>
-	      <td>{{ poll.duration }}</td>
-	      <td>{{ poll.topic }}</td>
-				<td><a href="/ui/polls/cancel?id={{poll.id}}">Cancel Poll</a></td>
+				{% for field in poll_state_fields %}
+	      <td>{{ poll[field] }}</td>
+				{% endfor %}
+				<td>{{ self::delete(label="Cancel", id=poll.id) }}</td>
 			</tr>
 		  {% endfor %}
 	  </tbody>
 	</table>
 {% endblock content %}
+
+{% macro delete(label, id) %}
+	<form action="/ui/polls/{{id}}" method="post"><button type="submit">{{label}}</button></form>
+{% endmacro delete %}

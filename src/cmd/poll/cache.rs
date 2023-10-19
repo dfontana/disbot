@@ -31,7 +31,7 @@ impl<V> Timestamped<V> {
   }
 }
 
-impl<K: Eq + Hash + Clone, V: Expiring> Cache<K, V> {
+impl<K: Eq + Hash + Clone, V: Expiring + Clone> Cache<K, V> {
   pub fn new() -> Cache<K, V> {
     Cache {
       cache: RwLock::new(HashMap::new()),
@@ -104,6 +104,13 @@ impl<K: Eq + Hash + Clone, V: Expiring> Cache<K, V> {
           Ok(())
         }
       },
+    }
+  }
+
+  pub fn values(&self) -> Result<Vec<V>, String> {
+    match self.cache.read() {
+      Err(e) => Err(format!("Failed to aquire lock - {}", e)),
+      Ok(lock) => Ok(lock.values().map(|v| v.val.clone()).collect::<Vec<V>>()),
     }
   }
 }
