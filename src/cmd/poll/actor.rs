@@ -1,15 +1,17 @@
+use std::collections::HashMap;
+
 use async_trait::async_trait;
 use serenity::{
   model::prelude::{interaction::message_component::MessageComponentInteraction, ChannelId},
   prelude::Context,
 };
 use tokio::sync::{mpsc::Receiver, oneshot};
-use tracing::{error, warn};
+use tracing::error;
 use uuid::Uuid;
 
 use crate::actor::{Actor, ActorHandle};
 
-use super::{cache::Cache, messages, pollstate::PollState};
+use super::{messages, pollstate::PollState};
 
 pub enum PollMessage {
   UpdateVote((Uuid, String, Context, MessageComponentInteraction)),
@@ -21,7 +23,7 @@ pub enum PollMessage {
 pub struct PollActor {
   self_ref: ActorHandle<PollMessage>,
   receiver: Receiver<PollMessage>,
-  states: Cache<Uuid, PollState>,
+  states: HashMap<Uuid, PollState>,
 }
 
 impl PollActor {
@@ -29,7 +31,7 @@ impl PollActor {
     Box::new(Self {
       self_ref,
       receiver,
-      states: Cache::new(),
+      states: HashMap::new(),
     })
   }
 }
@@ -49,7 +51,10 @@ impl Actor<PollMessage> for PollActor {
         if let Err(e) = messages::send_poll_message(&ps, &itx)
           .await
           .map_err(|e| format!("{}", e))
-          .and_then(|_| self.states.insert(ps.id, ps))
+          .and_then(|_| {
+            self.states.insert(ps.id, ps);
+            Ok(())
+          })
         {
           error!("Failed to launch poll {}", e);
           return;
@@ -62,56 +67,34 @@ impl Actor<PollMessage> for PollActor {
         });
       }
       PollMessage::ExpirePoll(id) => {
-        let (resp, ctx) = match self
-          .states
-          .invoke(&id, |p| (messages::build_exp_message(p), p.ctx.clone()))
-        {
-          Err(e) => {
-            error!("Failed to inform channel poll has finished: {}", e);
+        let (resp, ctx) = match self.states.get(&id) {
+          Some(p) => (messages::build_exp_message(p), p.ctx.clone()),
+          None => {
+            error!("Poll no longer exists for expiring: {}", id);
             return;
           }
-          Ok(v) => v,
         };
-
+        self.states.remove(&id);
         let _ = ctx.channel.say(&ctx.http, resp).await;
-
-        if let Err(e) = self.states.remove(&id) {
-          warn!("Failed to reap poll on exp: {}", e);
-        }
       }
       PollMessage::GetAdminState(send) => {
-        let msg = match self.states.values() {
-          Ok(v) => v,
-          Err(e) => {
-            error!(e);
-            return;
-          }
-        };
+        let msg = self.states.values().map(|v| v.clone()).collect();
         if let Err(_) = send.send(msg) {
           error!("Failed to send admin state, recv dropped");
         }
       }
       PollMessage::UpdateVote((id, voter, ctx, mtx)) => {
-        let new_body = match self
+        if !self.states.contains_key(&id) {
+          error!("Failed to cast vote for poll {}: Poll expired", id);
+          return;
+        }
+        let p = self
           .states
-          .contains_key(&id)
-          .and_then(|ext| match ext {
-            true => Ok(()),
-            false => Err(format!("Poll expired, dead interaction: {}", id)),
-          })
-          .and_then(|_| {
-            self
-              .states
-              .invoke_mut(&id, |p| p.update_vote(&mtx.data.values, &voter))
-          })
-          .and_then(|_| self.states.invoke(&id, messages::build_poll_message))
-        {
-          Ok(v) => v,
-          Err(e) => {
-            error!("Failed to cast vote for poll {}: {}", id, e);
-            return;
-          }
-        };
+          .entry(id.clone())
+          .and_modify(|p| p.update_vote(&mtx.data.values, &voter))
+          .or_insert_with(|| panic!("Entry went missing during update"));
+
+        let new_body = messages::build_poll_message(p);
 
         if let Err(e) = mtx
           .message

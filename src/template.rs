@@ -84,8 +84,6 @@ async fn polls(
   State(tera): State<Arc<Tera>>,
   State(poll_handle): State<ActorHandle<PollMessage>>,
 ) -> Result<Html<String>, HtmlErr> {
-  // Need to have PollState sent in AdminPollInfo object
-  // Need to convert PollStates to PollInfo correct
   let (send, recv) = oneshot::channel();
   poll_handle.send(PollMessage::GetAdminState(send)).await;
   let admin_info = match recv.await {

@@ -17,8 +17,6 @@ use uuid::Uuid;
 
 use crate::cmd::check_in::CheckInCtx;
 
-use super::cache::Expiring;
-
 #[derive(Clone)]
 pub struct CallContext {
   pub channel: ChannelId,
@@ -35,12 +33,6 @@ pub struct PollState {
   pub most_votes: usize,
   pub votes: HashMap<String, (String, usize, HashSet<String>)>,
   pub ctx: CallContext,
-}
-
-impl Expiring for PollState {
-  fn duration(&self) -> Duration {
-    self.duration
-  }
 }
 
 impl From<CheckInCtx> for PollState {
