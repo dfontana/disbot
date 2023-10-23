@@ -1,10 +1,5 @@
 #[macro_use]
 extern crate derive_builder;
-extern crate dotenv;
-extern crate hex;
-extern crate rand;
-extern crate regex;
-extern crate reqwest;
 
 mod actor;
 mod cmd;

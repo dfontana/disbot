@@ -1,33 +1,35 @@
 {% extends "base.html" %}
 {% block head %}
-  {{ super() }}
+  {% call super() %}
   <style type="text/css">
     .important { color: #336699; }
   </style>
-{% endblock head %}
+{% endblock %}
 {% block content %}
 	<table>
 	  <thead>
 	    <tr>
-				{% for field in poll_state_fields %}
-	      <th>{{ field }}</th>
-				{% endfor %}
+	      <th>id</th>
+	      <th>duration</th>
+	      <th>topic</th>
+	      <th>most_votes</th>
 	      <th>cancel</th>
 	    </tr>
 	  </thead>
 	  <tbody>
 		  {% for poll in polls %}
 	    <tr>
-				{% for field in poll_state_fields %}
-	      <td>{{ poll[field] }}</td>
-				{% endfor %}
-				<td>{{ self::delete(label="Cancel", id=poll.id) }}</td>
+				<td>{{poll.id}}</td>
+				<td>{{"{:?}"|format(poll.duration)}}</td>
+				<td>{{poll.topic}}</td>
+				<td>{{poll.most_votes}}</td>
+				<td>{% call delete("Cancel", poll.id) %}</td>
 			</tr>
 		  {% endfor %}
 	  </tbody>
 	</table>
-{% endblock content %}
+{% endblock %}
 
 {% macro delete(label, id) %}
 	<form action="/ui/polls/{{id}}" method="post"><button type="submit">{{label}}</button></form>
-{% endmacro delete %}
+{% endmacro %}

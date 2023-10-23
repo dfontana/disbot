@@ -1,12 +1,12 @@
 {% extends "base.html" %}
 {% block head %}
-  {{ super() }}
+  {% call super() %}
   <style type="text/css">
     .important { color: #336699; }
   </style>
-{% endblock head %}
+{% endblock %}
 {% block content %}
   {% for pg in pages %}
     <a href="/ui/{{pg}}">{{pg}}</a>
   {% endfor %}
-{% endblock content %}
+{% endblock %}

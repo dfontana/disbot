@@ -10,6 +10,7 @@ use serenity::{
 };
 use std::{
   collections::{HashMap, HashSet},
+  fmt::Display,
   sync::Arc,
   time::Duration,
 };
@@ -25,19 +26,14 @@ pub struct CallContext {
   pub emoji: Emoji,
 }
 
-#[derive(Clone, Serialize)]
+#[derive(Clone)]
 pub struct PollState {
   pub id: Uuid,
-  #[serde(serialize_with = "duration_serialize")]
   pub duration: Duration,
   pub topic: String,
-  #[serde(skip_serializing)]
   pub longest_option: usize,
-  #[serde(skip_serializing)]
   pub most_votes: usize,
-  #[serde(skip_serializing)]
   pub votes: HashMap<String, (String, usize, HashSet<String>)>,
-  #[serde(skip_serializing)]
   pub ctx: CallContext,
 }
 
