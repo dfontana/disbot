@@ -14,40 +14,25 @@ use uuid::Uuid;
 
 use crate::{
   actor::ActorHandle,
-  cmd::{PollMessage, PollState},
+  cmd::{PollMessage, PollState, CheckInCtx}, ActorHandles,
 };
 
 #[derive(Clone)]
 struct AppState {
-  poll_handle: ActorHandle<PollMessage>,
+  actors: ActorHandles,
 }
 
 impl FromRef<AppState> for ActorHandle<PollMessage> {
   fn from_ref(app_state: &AppState) -> ActorHandle<PollMessage> {
-    app_state.poll_handle.clone()
+    app_state.actors.poll.clone()
   }
 }
 
-pub fn admin_routes(poll_handle: ActorHandle<PollMessage>) -> Router {
+pub fn admin_routes(actors: ActorHandles) -> Router {
   Router::new()
-    .route("/", get(index))
-    .route("/polls", get(polls))
+    .route("/", get(polls))
     .route("/polls/:id", post(delete_poll))
-    .with_state(AppState { poll_handle })
-}
-
-#[derive(Template)]
-#[template(path = "index.html")]
-struct Index<'a> {
-  title: &'a str,
-  pages: Vec<&'a str>,
-}
-
-async fn index() -> impl IntoResponse {
-  Index {
-    title: "Disbot Admin UI",
-    pages: vec!["polls"],
-  }
+    .with_state(AppState { actors })
 }
 
 #[derive(Template)]
@@ -55,6 +40,7 @@ async fn index() -> impl IntoResponse {
 struct Polls<'a> {
   title: &'a str,
   polls: Vec<PollState>,
+  check_in: Option<CheckInCtx>,
 }
 
 #[derive(Serialize)]
@@ -75,8 +61,9 @@ async fn polls(
   };
 
   Ok(Polls {
-    title: "Poll Controls",
+    title: "Disbot Admin UI",
     polls: admin_info,
+    check_in: None,
   })
 }
 
@@ -85,7 +72,7 @@ async fn delete_poll(
   Path(poll_id): Path<Uuid>,
 ) -> impl IntoResponse {
   poll_handle.send(PollMessage::ExpirePoll(poll_id)).await;
-  Redirect::to("/ui/polls")
+  Redirect::to("/ui")
 }
 
 enum HtmlErr {

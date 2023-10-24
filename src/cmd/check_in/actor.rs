@@ -11,14 +11,17 @@ use serenity::{
   model::prelude::{ChannelId, Emoji},
 };
 use std::{sync::Arc, time::Duration};
-use tokio::sync::mpsc::Receiver;
-use tracing::{info, instrument};
+use tokio::{
+  sync::{mpsc::Receiver, oneshot},
+  task::JoinHandle,
+};
+use tracing::{error, info, instrument};
 
-#[derive(Clone)]
 pub enum CheckInMessage {
   CheckIn(CheckInCtx),
   Sleep((Duration, CheckInCtx)),
   SetPoll(CheckInCtx),
+  GetAdminState(oneshot::Sender<Option<CheckInCtx>>),
 }
 
 #[derive(new, Clone)]
@@ -34,7 +37,7 @@ pub struct CheckInActor {
   self_ref: ActorHandle<CheckInMessage>,
   receiver: Receiver<CheckInMessage>,
   poll_handle: ActorHandle<PollMessage>,
-  configured: bool,
+  task: Option<(JoinHandle<()>, CheckInCtx)>,
 }
 
 impl CheckInActor {
@@ -47,7 +50,7 @@ impl CheckInActor {
       self_ref,
       receiver,
       poll_handle,
-      configured: false,
+      task: None,
     }
   }
 }
@@ -58,20 +61,16 @@ impl Actor<CheckInMessage> for CheckInActor {
   async fn handle_msg(&mut self, msg: CheckInMessage) {
     match msg {
       CheckInMessage::SetPoll(ctx) => {
-        // TODO: Rather than be oneshot, you can create an abortable task by
-        //       wrapping the tokio::spawn call in https://docs.rs/futures/0.3.28/futures/future/fn.abortable.html.
-        // https://stackoverflow.com/questions/64084955/how-to-remotely-shut-down-running-tasks-with-tokio
-        //       This will let users set new checkins or cancel them from the admin
-        //       ui.
-        if self.configured {
-          return;
+        if let Some((t, _)) = self.task.as_ref() {
+          info!("Cancelling existing task");
+          t.abort();
+          self.task = None;
         }
         let sleep_until = time_until(Utc::now(), ctx.poll_time);
         self
           .self_ref
           .send(CheckInMessage::Sleep((sleep_until, ctx)))
           .await;
-        self.configured = true;
       }
       CheckInMessage::Sleep((sleep_until, ctx)) => {
         let hdl = self.self_ref.clone();
@@ -79,10 +78,14 @@ impl Actor<CheckInMessage> for CheckInActor {
           "Sleep scheduled until {}",
           Utc::now() + chrono::Duration::from_std(sleep_until).unwrap()
         );
-        tokio::spawn(async move {
-          tokio::time::sleep(sleep_until).await;
-          hdl.send(CheckInMessage::CheckIn(ctx)).await
-        });
+        let ctx_cpy = ctx.clone();
+        self.task = Some((
+          tokio::spawn(async move {
+            tokio::time::sleep(sleep_until).await;
+            hdl.send(CheckInMessage::CheckIn(ctx)).await
+          }),
+          ctx_cpy,
+        ));
       }
       CheckInMessage::CheckIn(ctx) => {
         let chan = ctx.channel;
@@ -96,6 +99,11 @@ impl Actor<CheckInMessage> for CheckInActor {
           .self_ref
           .send(CheckInMessage::Sleep((sleep_until, nw_ctx)))
           .await;
+      }
+      CheckInMessage::GetAdminState(send) => {
+        if let Err(_) = send.send(self.task.as_ref().map(|x| x.1.clone())) {
+          error!("Failed to send admin state, recv dropped");
+        }
       }
     }
   }

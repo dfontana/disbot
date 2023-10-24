@@ -1,35 +1,45 @@
-{% extends "base.html" %}
-{% block head %}
-  {% call super() %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>{{ title }}</title>
   <style type="text/css">
     .important { color: #336699; }
   </style>
-{% endblock %}
-{% block content %}
-	<table>
-	  <thead>
-	    <tr>
-	      <th>id</th>
-	      <th>duration</th>
-	      <th>topic</th>
-	      <th>most_votes</th>
-	      <th>cancel</th>
-	    </tr>
-	  </thead>
-	  <tbody>
-		  {% for poll in polls %}
-	    <tr>
-				<td>{{poll.id}}</td>
-				<td>{{"{:?}"|format(poll.duration)}}</td>
-				<td>{{poll.topic}}</td>
-				<td>{{poll.most_votes}}</td>
-				<td>{% call delete("Cancel", poll.id) %}</td>
-			</tr>
-		  {% endfor %}
-	  </tbody>
-	</table>
-{% endblock %}
+</head>
+<body>
+    <h1>Polls</h1>
+		<table>
+		  <thead>
+		    <tr>
+		      <th>id</th>
+		      <th>duration</th>
+		      <th>topic</th>
+		      <th>most_votes</th>
+		      <th>cancel</th>
+		    </tr>
+		  </thead>
+		  <tbody>
+			  {% for poll in polls %}
+		    <tr>
+					<td>{{poll.id}}</td>
+					<td>{{"{:?}"|format(poll.duration)}}</td>
+					<td>{{poll.topic}}</td>
+					<td>{{poll.most_votes}}</td>
+					<td>{% call delete_poll("Cancel", poll.id) %}</td>
+				</tr>
+			  {% endfor %}
+		  </tbody>
+		</table>
+		<h1>Check In</h1>
+		{% match check_in %}
+			{% when Some with ctx %}
+			  There be checkin
+			{% when None %}
+				No check-ins
+		{% end %}
+	</body>
+</html>
 
-{% macro delete(label, id) %}
+{% macro delete_poll(label, id) %}
 	<form action="/ui/polls/{{id}}" method="post"><button type="submit">{{label}}</button></form>
 {% endmacro %}

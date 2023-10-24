@@ -1,6 +1,6 @@
 use std::error::Error;
 
-use crate::{actor::ActorHandle, config::Config, emoji::EmojiLookup};
+use crate::{config::Config, emoji::EmojiLookup, ActorHandles};
 use serenity::{
   async_trait,
   builder::CreateApplicationCommands,
@@ -18,9 +18,9 @@ use serenity::{
   prelude::*,
 };
 
-use self::check_in::{CheckInActor, CheckInMessage};
-
+pub use check_in::{CheckInActor, CheckInMessage, CheckInCtx};
 pub use poll::{PollActor, PollMessage, PollState};
+
 mod check_in;
 mod dice_roll;
 mod poll;
@@ -61,18 +61,15 @@ pub struct Handler {
 }
 
 impl Handler {
-  pub fn new(config: Config, emoji: EmojiLookup, poll_handle: ActorHandle<PollMessage>) -> Self {
-    let chk_handle = ActorHandle::<CheckInMessage>::spawn(|r, h| {
-      Box::new(CheckInActor::new(h, r, poll_handle.clone()))
-    });
+  pub fn new(config: Config, emoji: EmojiLookup, actors: ActorHandles) -> Self {
     Handler {
       listeners: vec![
         Box::new(shrug::ShrugHandler::new(config.clone(), emoji.clone())),
         Box::<reddit_prev::RedditPreviewHandler>::default(),
       ],
       app_interactors: vec![
-        Box::new(poll::Poll::new(emoji.clone(), poll_handle)),
-        Box::new(check_in::CheckIn::new(emoji.clone(), chk_handle)),
+        Box::new(poll::Poll::new(emoji.clone(), actors.poll.clone())),
+        Box::new(check_in::CheckIn::new(emoji.clone(), actors.chk.clone())),
         Box::new(dice_roll::DiceRoll::new(emoji.clone())),
         Box::new(voice::Voice::new(config, emoji)),
         // server::Server::new(config),
