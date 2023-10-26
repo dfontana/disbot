@@ -5,16 +5,17 @@ use axum::{
   extract::{FromRef, Path, State},
   response::{Html, IntoResponse, Redirect, Response},
   routing::{get, post},
-  Router,
+  Form, Router,
 };
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use tokio::sync::oneshot;
 use tracing::error;
 use uuid::Uuid;
 
 use crate::{
   actor::ActorHandle,
-  cmd::{PollMessage, PollState, CheckInCtx}, ActorHandles,
+  cmd::{CheckInCtx, CheckInMessage, PollMessage, PollState},
+  ActorHandles,
 };
 
 #[derive(Clone)]
@@ -28,10 +29,17 @@ impl FromRef<AppState> for ActorHandle<PollMessage> {
   }
 }
 
+impl FromRef<AppState> for ActorHandle<CheckInMessage> {
+  fn from_ref(app_state: &AppState) -> ActorHandle<CheckInMessage> {
+    app_state.actors.chk.clone()
+  }
+}
+
 pub fn admin_routes(actors: ActorHandles) -> Router {
   Router::new()
     .route("/", get(polls))
     .route("/polls/:id", post(delete_poll))
+    .route("/check-in/update", get(update_check_in))
     .with_state(AppState { actors })
 }
 
@@ -52,6 +60,7 @@ struct PollInfo {
 
 async fn polls(
   State(poll_handle): State<ActorHandle<PollMessage>>,
+  State(chk_handle): State<ActorHandle<CheckInMessage>>,
 ) -> Result<Polls<'static>, HtmlErr> {
   let (send, recv) = oneshot::channel();
   poll_handle.send(PollMessage::GetAdminState(send)).await;
@@ -60,10 +69,18 @@ async fn polls(
     Ok(v) => v,
   };
 
+  let (send_chk, recv_chk) = oneshot::channel();
+  chk_handle
+    .send(CheckInMessage::GetAdminState(send_chk))
+    .await;
+  let chk_admin_info = match recv_chk.await {
+    Err(_) => return Err(HtmlErr::Rendering("no data".into())),
+    Ok(v) => v,
+  };
   Ok(Polls {
     title: "Disbot Admin UI",
     polls: admin_info,
-    check_in: None,
+    check_in: chk_admin_info,
   })
 }
 
@@ -73,6 +90,17 @@ async fn delete_poll(
 ) -> impl IntoResponse {
   poll_handle.send(PollMessage::ExpirePoll(poll_id)).await;
   Redirect::to("/ui")
+}
+
+#[derive(Deserialize)]
+struct UpdateCheckIn {
+  datetime: String,
+  duration: String,
+}
+
+async fn update_check_in(Form(updates): Form<UpdateCheckIn>) {
+  // TODO: Impl this
+  // TODO: You'll need a new message type and parsing like the handler does
 }
 
 enum HtmlErr {

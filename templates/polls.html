@@ -25,21 +25,28 @@
 					<td>{{"{:?}"|format(poll.duration)}}</td>
 					<td>{{poll.topic}}</td>
 					<td>{{poll.most_votes}}</td>
-					<td>{% call delete_poll("Cancel", poll.id) %}</td>
+					<td>{% call delete_poll(poll.id) %}</td>
 				</tr>
 			  {% endfor %}
 		  </tbody>
 		</table>
 		<h1>Check In</h1>
 		{% match check_in %}
-			{% when Some with ctx %}
-			  There be checkin
+			{% when Some with (ctx) %}
+				<ul>
+					<li><b>Poll Time</b>: {{"{:?}"|format(ctx.poll_time)}}</li>
+					<li><b>Poll Duration</b>: {{"{:?}"|format(ctx.poll_dur)}}</li>
+				</ul>
 			{% when None %}
 				No check-ins
-		{% end %}
+		{% endmatch %}
+		<form action="/ui/check-in/update" method="get">
+			<input 
+			<button type="submit">Update</button>
+		</form>
 	</body>
 </html>
 
 {% macro delete_poll(label, id) %}
-	<form action="/ui/polls/{{id}}" method="post"><button type="submit">{{label}}</button></form>
+	<form action="/ui/polls/{{id}}" method="post"><button type="submit">Cancel</button></form>
 {% endmacro %}
