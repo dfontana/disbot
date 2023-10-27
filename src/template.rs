@@ -37,9 +37,10 @@ impl FromRef<AppState> for ActorHandle<CheckInMessage> {
 
 pub fn admin_routes(actors: ActorHandles) -> Router {
   Router::new()
-    .route("/", get(polls))
+    .route("/", get(index))
     .route("/polls/:id", post(delete_poll))
     .route("/check-in/update", get(update_check_in))
+    .route("/check-in/cancel", post(delete_check_in))
     .with_state(AppState { actors })
 }
 
@@ -58,7 +59,7 @@ struct PollInfo {
   topic: String,
 }
 
-async fn polls(
+async fn index(
   State(poll_handle): State<ActorHandle<PollMessage>>,
   State(chk_handle): State<ActorHandle<CheckInMessage>>,
 ) -> Result<Polls<'static>, HtmlErr> {
@@ -98,13 +99,40 @@ struct UpdateCheckIn {
   duration: String,
 }
 
-async fn update_check_in(Form(updates): Form<UpdateCheckIn>) {
-  // TODO: Impl this
-  // TODO: You'll need a new message type and parsing like the handler does
+async fn update_check_in(
+  State(chk_handle): State<ActorHandle<CheckInMessage>>,
+  Form(updates): Form<UpdateCheckIn>,
+) -> impl IntoResponse {
+  let (send, recv) = oneshot::channel();
+  chk_handle
+    .send(CheckInMessage::UpdatePoll((
+      updates.datetime,
+      updates.duration,
+      send,
+    )))
+    .await;
+  match recv.await {
+    Ok(Some(err)) => return Err(HtmlErr::Internal(err)),
+    Ok(None) => Ok(Redirect::to("/ui")),
+    Err(err) => return Err(HtmlErr::Internal(err.to_string())),
+  }
+}
+
+async fn delete_check_in(
+  State(chk_handle): State<ActorHandle<CheckInMessage>>,
+) -> impl IntoResponse {
+  let (send, recv) = oneshot::channel();
+  chk_handle.send(CheckInMessage::Cancel(send)).await;
+  match recv.await {
+    Ok(Some(err)) => return Err(HtmlErr::Internal(err)),
+    Ok(None) => Ok(Redirect::to("/ui")),
+    Err(err) => return Err(HtmlErr::Internal(err.to_string())),
+  }
 }
 
 enum HtmlErr {
   Rendering(Box<dyn Error>),
+  Internal(String),
 }
 
 impl IntoResponse for HtmlErr {
@@ -113,6 +141,10 @@ impl IntoResponse for HtmlErr {
       HtmlErr::Rendering(err) => {
         error!("{}", err);
         Html("failed").into_response()
+      }
+      HtmlErr::Internal(err) => {
+        error!("{}", err);
+        Html(err).into_response()
       }
     }
   }

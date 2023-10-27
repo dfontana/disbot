@@ -1,8 +1,6 @@
-use std::{collections::HashMap, error::Error, time::Duration};
+use std::{collections::HashMap, error::Error};
 
-use chrono::NaiveTime;
 use derive_new::new;
-use humantime::parse_duration;
 use serenity::{
   async_trait,
   builder::CreateApplicationCommands,
@@ -102,36 +100,37 @@ impl CheckIn {
       .map(|d| (d.name.to_owned(), d.resolved.to_owned()))
       .collect();
 
-    let duration: Duration = map
+    let duration: String = map
       .get("duration")
       .and_then(|v| v.to_owned())
       .and_then(|d| match d {
         CommandDataOptionValue::String(v) => Some(v),
         _ => None,
       })
-      .ok_or("No duration given")
-      .and_then(|s| parse_duration(&s).map_err(|_| "Invalid duration given"))?;
+      .ok_or("No duration given")?;
 
-    let time: NaiveTime = map
+    let time: String = map
       .get("time")
       .and_then(|v| v.to_owned())
       .and_then(|d| match d {
         CommandDataOptionValue::String(v) => Some(v),
         _ => None,
       })
-      .ok_or("No time given")
-      .and_then(|s| s.parse::<NaiveTime>().map_err(|_| "Invalid time given"))?;
+      .ok_or("No time given")?;
+
+    let chctx = CheckInCtx::parse(
+      time,
+      duration,
+      itx.channel_id,
+      ctx.http.clone(),
+      emoji.clone(),
+    )?;
 
     self
       .actor
-      .send(CheckInMessage::SetPoll(CheckInCtx::new(
-        time,
-        duration,
-        itx.channel_id,
-        ctx.http.clone(),
-        emoji.clone(),
-      )))
+      .send(CheckInMessage::SetPoll(chctx.clone()))
       .await;
+
     itx
       .create_interaction_response(&ctx.http, |f| {
         f.kind(InteractionResponseType::ChannelMessageWithSource)
@@ -140,9 +139,9 @@ impl CheckIn {
               MessageBuilder::new()
                 .mention(&emoji)
                 .push_bold("Check in set to ")
-                .push_italic(time)
+                .push_italic(chctx.poll_time)
                 .push_bold(" lasting ")
-                .push_italic(duration.as_secs())
+                .push_italic(chctx.poll_dur.as_secs())
                 .push_bold(" seconds.")
                 .mention(&emoji)
                 .build(),

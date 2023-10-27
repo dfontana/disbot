@@ -33,20 +33,26 @@
 		<h1>Check In</h1>
 		{% match check_in %}
 			{% when Some with (ctx) %}
-				<ul>
-					<li><b>Poll Time</b>: {{"{:?}"|format(ctx.poll_time)}}</li>
-					<li><b>Poll Duration</b>: {{"{:?}"|format(ctx.poll_dur)}}</li>
-				</ul>
+				<form action="/ui/check-in/update" method="get">
+					<ul>
+						<li>
+							<b>Poll Time</b>: {{"{:?}"|format(ctx.poll_time)}}
+							<input type="text" name="datetime" placeholder="23:00:00"/>
+						</li>
+						<li>
+							<b>Poll Duration</b>: {{"{:?}"|format(ctx.poll_dur)}}
+							<input type="text" name="duration" placeholder="10m"/>
+						</li>
+					</ul>
+					<button type="submit">Update</button>
+				</form>
+				<form action="/ui/check-in/cancel" method="post"><button type="submit">Cancel</button></form>
 			{% when None %}
 				No check-ins
 		{% endmatch %}
-		<form action="/ui/check-in/update" method="get">
-			<input 
-			<button type="submit">Update</button>
-		</form>
 	</body>
 </html>
 
-{% macro delete_poll(label, id) %}
+{% macro delete_poll(id) %}
 	<form action="/ui/polls/{{id}}" method="post"><button type="submit">Cancel</button></form>
 {% endmacro %}

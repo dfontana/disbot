@@ -6,6 +6,7 @@ use async_trait::async_trait;
 use chrono::{DateTime, NaiveDateTime, NaiveTime, TimeZone, Utc};
 use chrono_tz::America;
 use derive_new::new;
+use humantime::parse_duration;
 use serenity::{
   http::Http,
   model::prelude::{ChannelId, Emoji},
@@ -21,7 +22,9 @@ pub enum CheckInMessage {
   CheckIn(CheckInCtx),
   Sleep((Duration, CheckInCtx)),
   SetPoll(CheckInCtx),
+  UpdatePoll((String, String, oneshot::Sender<Option<String>>)),
   GetAdminState(oneshot::Sender<Option<CheckInCtx>>),
+  Cancel(oneshot::Sender<Option<String>>),
 }
 
 #[derive(new, Clone)]
@@ -31,6 +34,37 @@ pub struct CheckInCtx {
   pub channel: ChannelId,
   pub http: Arc<Http>,
   pub emoji: Emoji,
+}
+
+impl CheckInCtx {
+  pub fn update(&self, time_s: String, dur_s: String) -> Result<Self, String> {
+    CheckInCtx::parse(
+      time_s,
+      dur_s,
+      self.channel.clone(),
+      self.http.clone(),
+      self.emoji.clone(),
+    )
+  }
+
+  pub fn parse(
+    time_s: String,
+    dur_s: String,
+    channel: ChannelId,
+    http: Arc<Http>,
+    emoji: Emoji,
+  ) -> Result<Self, String> {
+    Ok(CheckInCtx {
+      poll_time: time_s
+        .parse::<NaiveTime>()
+        .map_err(|err| format!("Invalid time given {:?}. Cause: {}", time_s, err))?,
+      poll_dur: parse_duration(&dur_s)
+        .map_err(|err| format!("Invalid duration given {:?}. Cause: {}", dur_s, err))?,
+      channel,
+      http,
+      emoji,
+    })
+  }
 }
 
 pub struct CheckInActor {
@@ -60,6 +94,32 @@ impl Actor<CheckInMessage> for CheckInActor {
   #[instrument(name = "CheckIn", level = "INFO", skip(self, msg))]
   async fn handle_msg(&mut self, msg: CheckInMessage) {
     match msg {
+      CheckInMessage::UpdatePoll((time_s, dur_s, send)) => {
+        let maybe_new_ctx = self
+          .task
+          .as_ref()
+          .ok_or("No registered check-in".into())
+          .and_then(|(_, ctx)| ctx.update(time_s, dur_s));
+        match maybe_new_ctx {
+          Ok(ctx) => {
+            self.self_ref.send(CheckInMessage::SetPoll(ctx)).await;
+            let _ = send.send(None);
+          }
+          Err(err) => {
+            let _ = send.send(Some(err));
+          }
+        }
+      }
+      CheckInMessage::Cancel(send) => {
+        if let Some((t, _)) = self.task.as_ref() {
+          info!("Cancelling existing task");
+          t.abort();
+          self.task = None;
+          let _ = send.send(None);
+        } else {
+          let _ = send.send(Some("No registered check-in".into()));
+        }
+      }
       CheckInMessage::SetPoll(ctx) => {
         if let Some((t, _)) = self.task.as_ref() {
           info!("Cancelling existing task");

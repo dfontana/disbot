@@ -18,7 +18,7 @@ use serenity::{
   prelude::*,
 };
 
-pub use check_in::{CheckInActor, CheckInMessage, CheckInCtx};
+pub use check_in::{CheckInActor, CheckInCtx, CheckInMessage};
 pub use poll::{PollActor, PollMessage, PollState};
 
 mod check_in;

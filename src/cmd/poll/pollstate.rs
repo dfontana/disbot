@@ -1,5 +1,5 @@
 use humantime::parse_duration;
-use serde::{Serialize, Serializer};
+use serde::Serializer;
 use serenity::{
   http::Http,
   model::prelude::{
@@ -10,7 +10,6 @@ use serenity::{
 };
 use std::{
   collections::{HashMap, HashSet},
-  fmt::Display,
   sync::Arc,
   time::Duration,
 };

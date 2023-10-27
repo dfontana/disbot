@@ -92,7 +92,9 @@ impl ActorHandles {
   pub fn init() -> Self {
     let polls = ActorHandle::<PollMessage>::spawn(|r, h| PollActor::new(r, h));
     ActorHandles {
-      chk: ActorHandle::<CheckInMessage>::spawn(|r, h| Box::new(CheckInActor::new(h, r, polls.clone()))),
+      chk: ActorHandle::<CheckInMessage>::spawn(|r, h| {
+        Box::new(CheckInActor::new(h, r, polls.clone()))
+      }),
       poll: polls,
     }
   }
