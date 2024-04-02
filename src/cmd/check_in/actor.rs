@@ -8,7 +8,7 @@ use chrono_tz::America;
 use derive_new::new;
 use serenity::{
   http::Http,
-  model::prelude::{ChannelId, Emoji},
+  model::prelude::{ChannelId, Emoji, Role},
 };
 use std::{sync::Arc, time::Duration};
 use tokio::sync::mpsc::Receiver;
@@ -25,6 +25,7 @@ pub enum CheckInMessage {
 pub struct CheckInCtx {
   pub poll_time: NaiveTime,
   pub poll_dur: Duration,
+  pub at_group: Option<Role>,
   pub channel: ChannelId,
   pub http: Arc<Http>,
   pub emoji: Emoji,
@@ -103,7 +104,7 @@ impl Actor<CheckInMessage> for CheckInActor {
 fn time_until(now_ref: DateTime<Utc>, time: NaiveTime) -> Duration {
   let now_local = now_ref.with_timezone(&America::New_York);
   let target_local = America::New_York
-    .from_local_datetime(&NaiveDateTime::new(now_ref.naive_local().date(), time))
+    .from_local_datetime(&NaiveDateTime::new(now_local.date_naive(), time))
     .unwrap();
 
   let diff = now_local.signed_duration_since(target_local);
@@ -111,7 +112,7 @@ fn time_until(now_ref: DateTime<Utc>, time: NaiveTime) -> Duration {
     std::cmp::Ordering::Less => (target_local - now_local).to_std().unwrap(),
     std::cmp::Ordering::Equal => std::time::Duration::default(),
     std::cmp::Ordering::Greater => {
-      // Time has passed, schedule for tomrorow
+      // Time has passed, schedule for tomorrow
       (target_local + chrono::Duration::days(1) - now_local)
         .to_std()
         .unwrap()
