@@ -12,6 +12,7 @@ use serenity::{
       application_command::{ApplicationCommandInteraction, CommandDataOptionValue},
       InteractionResponseType,
     },
+    Role,
   },
   prelude::Context,
   utils::MessageBuilder,
@@ -54,6 +55,13 @@ impl AppInteractor for CheckIn {
             .name("time")
             .description("What time to run the poll, eg 19:30:00")
             .required(true)
+        })
+        .create_option(|option| {
+          option
+            .kind(CommandOptionType::Role)
+            .name("role")
+            .description("What role to tag, if any")
+            .required(false)
         })
     });
   }
@@ -122,11 +130,20 @@ impl CheckIn {
       .ok_or("No time given")
       .and_then(|s| s.parse::<NaiveTime>().map_err(|_| "Invalid time given"))?;
 
+    let at_group: Option<Role> = map
+      .get("role")
+      .and_then(|v| v.to_owned())
+      .and_then(|d| match d {
+        CommandDataOptionValue::Role(v) => Some(v),
+        _ => None,
+      });
+
     self
       .actor
       .send(CheckInMessage::SetPoll(CheckInCtx::new(
         time,
         duration,
+        at_group,
         itx.channel_id,
         ctx.http.clone(),
         emoji.clone(),

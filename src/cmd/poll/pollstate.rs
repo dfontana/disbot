@@ -48,7 +48,10 @@ impl From<CheckInCtx> for PollState {
     PollState {
       id: Uuid::new_v4(),
       duration: c.poll_dur,
-      topic: "Will you be on tonight? This is a legally binding.".into(),
+      topic: format!(
+        "{}Will you be on tonight? This is a legally binding.",
+        c.at_group.map(|c| format!("{} ", c)).unwrap_or("".into())
+      ),
       longest_option: 3,
       most_votes: 0,
       votes: HashMap::from([
