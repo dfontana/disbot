@@ -40,7 +40,6 @@ async fn main() {
     .with_target(false)
     .init();
   let emoji = emoji::EmojiLookup::new(&config);
-  docker::configure(&config.server).expect("Failed to setup docker for game server");
 
   let mut client = Client::builder(
     &config.api_key,

@@ -3,12 +3,10 @@
 mod list;
 mod start;
 mod stop;
-mod wol;
 
 use list::*;
 use start::*;
 use stop::*;
-pub use wol::configure;
 
 // #[group]
 // #[description = "Game Server Management tools, for turning on, off, and switching servers"]

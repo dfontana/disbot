@@ -1,4 +1,4 @@
-use crate::{cmd::server::wol::Wol, docker::Docker};
+use crate::docker::Docker;
 use serenity::{
   client::Context,
   // framework::standard::{macros::command, Args, CommandResult},
