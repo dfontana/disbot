@@ -56,7 +56,7 @@ async fn main() {
     reqwest::Client::new(),
     Docker::new().unwrap(),
   ))
-  .application_id(config.app_id)
+  .application_id(config.app_id.into())
   .await
   .expect("Err creating client");
 
