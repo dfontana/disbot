@@ -22,7 +22,7 @@ use stop::*;
 
 use tracing::{error, instrument};
 
-use crate::emoji::EmojiLookup;
+use crate::{docker::Docker, emoji::EmojiLookup};
 
 use super::{AppInteractor, SubCommandHandler};
 
@@ -36,9 +36,9 @@ pub struct GameServers {
 }
 
 impl GameServers {
-  pub fn new(http: Client, emoji: EmojiLookup) -> Self {
+  pub fn new(emoji: EmojiLookup, http: Client, docker: Docker) -> Self {
     GameServers {
-      list: List::new(),
+      list: List::new(docker),
       start: Start::new(),
       stop: Stop::new(),
       ip: Ip::new(http, emoji),
@@ -69,8 +69,8 @@ impl AppInteractor for GameServers {
             .create_sub_option(|subopt| {
               subopt
                 .kind(CommandOptionType::String)
-                .name("server-id")
-                .description("ID of server from list command")
+                .name("server-name")
+                .description("name of server from list command")
                 .required(true)
             })
         })
@@ -82,8 +82,8 @@ impl AppInteractor for GameServers {
             .create_sub_option(|subopt| {
               subopt
                 .kind(CommandOptionType::String)
-                .name("server-id")
-                .description("ID of server from list command")
+                .name("server-name")
+                .description("Name of server from list command")
                 .required(true)
             })
         })
@@ -144,7 +144,7 @@ impl GameServers {
       // TODO
       // "start" => self.start.handle(ctx, itx, subopt).await?,
       // "stop" => self.stop.handle(ctx, itx, subopt).await?,
-      // "list" => self.list.handle(ctx, itx, subopt).await?,
+      "list" => self.list.handle(ctx, itx, subopt).await?,
       "ip" => self.ip.handle(ctx, itx, subopt).await?,
       _ => unreachable!(),
     };

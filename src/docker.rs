@@ -10,7 +10,7 @@ pub struct Docker {
 }
 
 impl Docker {
-  pub fn client() -> Result<Docker, anyhow::Error> {
+  pub fn new() -> Result<Docker, anyhow::Error> {
     Ok(Docker {
       client: bollard::Docker::connect_with_socket_defaults()?,
     })

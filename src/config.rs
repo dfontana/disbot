@@ -14,15 +14,7 @@ pub struct Config {
   pub emote_users: Vec<String>,
   pub env: Environment,
   pub log_level: String,
-  pub server: ServerConfig,
   pub timeout: u64, // Seconds
-}
-
-#[derive(Debug, Clone, Default)]
-pub struct ServerConfig {
-  pub ip: String,
-  pub user: String,
-  pub port: usize,
 }
 
 impl Default for Config {
@@ -34,7 +26,6 @@ impl Default for Config {
       emote_users: Vec::new(),
       env: Environment::Dev,
       log_level: "INFO".to_string(),
-      server: ServerConfig::default(),
       timeout: 10,
     }
   }
@@ -57,16 +48,6 @@ impl Config {
       timeout: env::var("TIMEOUT")?
         .parse::<u64>()
         .map_err(|_| VarError::NotPresent)?,
-      server: ServerConfig {
-        ip: env::var("SERVER_IP")?,
-        user: env::var("SERVER_USER")?,
-        port: env::var("SERVER_DOCKER_PORT")
-          .map(|v| {
-            v.parse::<usize>()
-              .expect("SERVER_DOCKER_PORT not a valid number")
-          })
-          .unwrap_or(2375),
-      },
     };
     if let Ok(mut inst) = INSTANCE.try_write() {
       *inst = c.clone();

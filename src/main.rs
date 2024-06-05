@@ -13,6 +13,7 @@ mod env;
 
 use std::str::FromStr;
 
+use docker::Docker;
 use serenity::{client::Client, prelude::GatewayIntents};
 use songbird::SerenityInit;
 use tracing::{error, Level};
@@ -49,7 +50,12 @@ async fn main() {
       | GatewayIntents::GUILD_VOICE_STATES,
   )
   .register_songbird()
-  .event_handler(Handler::new(config.clone(), emoji))
+  .event_handler(Handler::new(
+    config.clone(),
+    emoji,
+    reqwest::Client::new(),
+    Docker::new().unwrap(),
+  ))
   .application_id(config.app_id)
   .await
   .expect("Err creating client");
