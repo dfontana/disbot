@@ -20,7 +20,6 @@ pub struct Config {
 
 #[derive(Debug, Clone, Default)]
 pub struct ServerConfig {
-  pub mac: String,
   pub ip: String,
   pub user: String,
   pub port: usize,
@@ -59,7 +58,6 @@ impl Config {
         .parse::<u64>()
         .map_err(|_| VarError::NotPresent)?,
       server: ServerConfig {
-        mac: env::var("SERVER_MAC")?,
         ip: env::var("SERVER_IP")?,
         user: env::var("SERVER_USER")?,
         port: env::var("SERVER_DOCKER_PORT")

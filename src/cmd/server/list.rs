@@ -1,10 +1,21 @@
-use crate::docker::Docker;
-use serenity::{
-  client::Context,
-  // framework::standard::{macros::command, Args, CommandResult},
-  model::channel::Message,
-};
-use tracing::{error, info, instrument};
+use crate::cmd::SubCommandHandler;
+use derive_new::new;
+use serenity::{async_trait, client::Context};
+
+#[derive(new)]
+pub struct List {}
+
+#[async_trait]
+impl SubCommandHandler for List {
+  async fn handle(
+    &self,
+    ctx: &Context,
+    itx: &serenity::model::prelude::interaction::application_command::ApplicationCommandInteraction,
+    _subopt: &serenity::model::prelude::interaction::application_command::CommandDataOption,
+  ) -> Result<(), Box<dyn std::error::Error>> {
+    todo!()
+  }
+}
 
 // #[command]
 // #[description = "List the servers that can be turned on"]

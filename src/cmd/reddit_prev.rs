@@ -1,4 +1,5 @@
 use super::MessageListener;
+use derive_new::new;
 use once_cell::sync::Lazy;
 use regex::Regex;
 use reqwest::Client;
@@ -8,7 +9,6 @@ use serenity::{async_trait, model::channel::Message, prelude::Context};
 use std::collections::HashMap;
 use tracing::{error, info, instrument, warn};
 
-static HTTP: Lazy<Client> = Lazy::new(Client::new);
 static REDDIT_LINK: Lazy<Regex> = Lazy::new(|| {
   Regex::new(
     r"(?x)(?i)
@@ -81,12 +81,15 @@ struct Content {
   linked_embed: Option<String>,
 }
 
-#[derive(Default)]
-pub struct RedditPreviewHandler {}
+#[derive(new)]
+pub struct RedditPreviewHandler {
+  http: Client,
+}
 
 impl RedditPreviewHandler {
   async fn get_api_details(&self, entity: &str) -> Result<Content, Box<dyn std::error::Error>> {
-    let mut req: RedditApi = HTTP
+    let mut req: RedditApi = self
+      .http
       .get(format!(
         "https://www.reddit.com/api/info.json?id={}",
         entity
@@ -105,7 +108,8 @@ impl RedditPreviewHandler {
 
     match kind {
       RedditKind::T1(comm) => {
-        let mut parent_req = HTTP
+        let mut parent_req = self
+          .http
           .get(format!(
             "https://www.reddit.com/api/info.json?id={}",
             comm.link_id

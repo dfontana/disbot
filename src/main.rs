@@ -1,5 +1,3 @@
-#[macro_use]
-extern crate derive_builder;
 extern crate dotenv;
 extern crate hex;
 extern crate rand;
