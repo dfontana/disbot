@@ -1,56 +1,78 @@
-use crate::{cmd::server::wol::Wol, docker::Docker};
+use crate::{cmd::SubCommandHandler, docker::Docker};
+use bollard::service::ContainerSummary;
+use derive_new::new;
+use itertools::Itertools;
 use serenity::{
+  async_trait,
   client::Context,
-  // framework::standard::{macros::command, Args, CommandResult},
-  model::channel::Message,
+  model::prelude::interaction::application_command::{
+    ApplicationCommandInteraction, CommandDataOption,
+  },
+  utils::MessageBuilder,
 };
-use tracing::{error, info, instrument};
 
-// #[command]
-// #[description = "List the servers that can be turned on"]
-// #[usage = "list"]
-// #[example = "list"]
-// async fn list(ctx: &Context, msg: &Message, _: Args) -> CommandResult {
-//   exec_list(ctx, msg).await
-// }
+#[derive(new)]
+pub struct List {
+  docker: Docker,
+}
 
-// #[instrument(name = "ServerList", level = "INFO", skip(ctx, msg))]
-// async fn exec_list(ctx: &Context, msg: &Message) -> CommandResult {
-//   if let Err(err) = Wol::inst()?.ensure_awake() {
-//     info!("error {:?}", err);
-//     msg.reply_ping(&ctx.http, err).await?;
-//     return Ok(());
-//   };
+#[async_trait]
+impl SubCommandHandler for List {
+  async fn handle(
+    &self,
+    ctx: &Context,
+    itx: &ApplicationCommandInteraction,
+    _subopt: &CommandDataOption,
+  ) -> Result<(), Box<dyn std::error::Error>> {
+    let msg = match build_list_msg(&self.docker).await {
+      Ok(mut m) => m.build(),
+      Err(e) => format!("Failed to list docker containers: {}", e),
+    };
+    itx
+      .edit_original_interaction_response(&ctx.http, |f| f.content(msg))
+      .await?;
+    Ok(())
+  }
+}
 
-//   let docker = Docker::client()?.containers();
+async fn build_list_msg(docker: &Docker) -> Result<MessageBuilder, anyhow::Error> {
+  let mut bdy = MessageBuilder::new();
+  let summaries = docker.list().await?;
+  let stat_len = 10;
+  let max_len = summaries
+    .iter()
+    .map(extract_name)
+    .map(|s| s.len())
+    .max()
+    .unwrap_or(1);
 
-//   let containers = match docker.list().await {
-//     Ok(c) => c,
-//     Err(err) => {
-//       error!("Failed to get containers - {:?}", err);
-//       return Ok(());
-//     }
-//   };
+  let mut table = String::new();
+  table.push_str(&format!("{:<max_len$} | {:<stat_len$}\n", "Name", "Status"));
+  table.push_str(&format!("{:-<max_len$}---{:-<stat_len$}\n", "", ""));
+  let msg = summaries
+    .iter()
+    .sorted_by_key(|summary| extract_name(&summary))
+    .fold(table, |mut acc, summary| {
+      acc.push_str(&format!(
+        "{:<max_len$} | {:<stat_len$}\n",
+        extract_name(&summary),
+        summary
+          .state
+          .as_ref()
+          .map(|s| s.as_str())
+          .unwrap_or_else(|| "(No State)".into()),
+      ));
+      acc
+    });
+  bdy.push_codeblock(msg, None);
+  Ok(bdy)
+}
 
-//   for c in &containers {
-//     info!("Data on hand - {:?}", c);
-//     match docker.inspect(&c.id).await {
-//       Ok(v) => {
-//         info!("Inspected data - {:?}", v);
-//       }
-//       Err(err) => {
-//         error!("Failed to inspect container - {:?}", err);
-//         return Ok(());
-//       }
-//     }
-//   }
-
-//   // let id = &containers.get(0).unwrap().id;
-//   // match docker.start(&id).await {
-//   //   Err(err) => {
-//   //     return Ok(());
-//   //   },
-//   //   _ => (),
-//   // }
-//   Ok(())
-// }
+fn extract_name<'a>(summary: &'a ContainerSummary) -> &'a str {
+  summary
+    .names
+    .as_ref()
+    .and_then(|v| v.get(0))
+    .and_then(|s| s.strip_prefix("/"))
+    .unwrap_or_else(|| "(No Name)")
+}

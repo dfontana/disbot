@@ -1,80 +1,69 @@
-use std::{thread, time::Duration};
-
-use crate::cmd::server::wol::Wol;
+use crate::{cmd::SubCommandHandler, docker::Docker};
+use bollard::service::ContainerStateStatusEnum::{CREATED, EXITED};
+use derive_new::new;
 use serenity::{
+  async_trait,
   client::Context,
-  // framework::standard::{macros::command, Args, CommandResult},
-  model::channel::Message,
+  model::prelude::interaction::application_command::{
+    ApplicationCommandInteraction, CommandDataOption, CommandDataOptionValue,
+  },
 };
-use tracing::{error, info, instrument};
+use std::collections::HashMap;
 
-// #[command]
-// #[description = "Start the game server"]
-// #[usage = "start"]
-// #[example = "start"]
-// async fn start(ctx: &Context, msg: &Message, _: Args) -> CommandResult {
-//   exec_start(ctx, msg).await
-// }
+#[derive(new)]
+pub struct Start {
+  docker: Docker,
+}
 
-// #[instrument(name = "ServerStart", level = "INFO", skip(ctx, msg))]
-// async fn exec_start(ctx: &Context, msg: &Message) -> CommandResult {
-//   let wol = Wol::inst()?;
+#[async_trait]
+impl SubCommandHandler for Start {
+  async fn handle(
+    &self,
+    ctx: &Context,
+    itx: &ApplicationCommandInteraction,
+    subopt: &CommandDataOption,
+  ) -> Result<(), Box<dyn std::error::Error>> {
+    // TODO: Let's move to autocomplete on these
+    let args: HashMap<String, _> = subopt
+      .options
+      .iter()
+      .map(|d| (d.name.to_owned(), d.resolved.to_owned()))
+      .collect();
 
-//   let is_awake = match wol.is_awake() {
-//     Ok(v) => v,
-//     Err(e) => {
-//       error!("Failed to check Game Server is awake - {}", e);
-//       msg
-//         .reply_ping(&ctx.http, "Couldn't start the server :(")
-//         .await?;
-//       return Ok(());
-//     }
-//   };
+    let name = args
+      .get("server-name")
+      .and_then(|v| v.to_owned())
+      .and_then(|d| match d {
+        CommandDataOptionValue::String(v) => Some(v),
+        _ => None,
+      })
+      .ok_or("Must provide a server name")?;
 
-//   if is_awake {
-//     msg.reply_ping(&ctx.http, "Server is already awake").await?;
-//     return Ok(());
-//   }
+    match self.docker.status(&name).await {
+      Ok(CREATED | EXITED) => {}
+      Ok(s) => {
+        itx
+          .edit_original_interaction_response(&ctx.http, |f| {
+            f.content(format!("Server in state that can't be started: {}", s))
+          })
+          .await?;
+        return Ok(());
+      }
+      Err(e) => {
+        itx
+          .edit_original_interaction_response(&ctx.http, |f| f.content(format!("{}", e)))
+          .await?;
+        return Ok(());
+      }
+    }
 
-//   match wol.awake() {
-//     Ok(_) => {
-//       msg
-//         .reply_ping(
-//           &ctx.http,
-//           "Server is waking... (I'll let you known when its up)",
-//         )
-//         .await?;
-//     }
-//     Err(e) => {
-//       error!("Failed to start Game Server - {:?}", e);
-//       msg
-//         .reply_ping(&ctx.http, "Couldn't start the server :(")
-//         .await?;
-//       return Ok(());
-//     }
-//   }
-
-//   let mut keep_trying = 12;
-//   while keep_trying > 0 {
-//     thread::sleep(Duration::from_secs(10));
-//     match wol.is_awake() {
-//       Ok(v) => {
-//         keep_trying -= 1;
-//         if v {
-//           keep_trying = 0;
-//           msg.reply_ping(&ctx.http, "Server is awake!").await?;
-//         }
-//       }
-//       Err(e) => {
-//         keep_trying = 0;
-//         error!("Failed to check if Game Server is live - {:?}", e);
-//         msg
-//           .reply_ping(&ctx.http, "Failed to check Game Server is awake")
-//           .await?;
-//       }
-//     }
-//   }
-
-//   info!("Server has Woken");
-//   Ok(())
-// }
+    let msg = match self.docker.start(&name).await {
+      Ok(_) => "Server starting".into(),
+      Err(e) => format!("{}", e),
+    };
+    itx
+      .edit_original_interaction_response(&ctx.http, |f| f.content(msg))
+      .await?;
+    Ok(())
+  }
+}

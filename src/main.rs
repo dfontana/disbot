@@ -1,5 +1,3 @@
-#[macro_use]
-extern crate derive_builder;
 extern crate dotenv;
 extern crate hex;
 extern crate rand;
@@ -15,6 +13,7 @@ mod env;
 
 use std::str::FromStr;
 
+use docker::Docker;
 use serenity::{client::Client, prelude::GatewayIntents};
 use songbird::SerenityInit;
 use tracing::{error, Level};
@@ -40,7 +39,6 @@ async fn main() {
     .with_target(false)
     .init();
   let emoji = emoji::EmojiLookup::new(&config);
-  docker::configure(&config.server).expect("Failed to setup docker for game server");
 
   let mut client = Client::builder(
     &config.api_key,
@@ -52,7 +50,12 @@ async fn main() {
       | GatewayIntents::GUILD_VOICE_STATES,
   )
   .register_songbird()
-  .event_handler(Handler::new(config.clone(), emoji))
+  .event_handler(Handler::new(
+    config.clone(),
+    emoji,
+    reqwest::Client::new(),
+    Docker::new().unwrap(),
+  ))
   .application_id(config.app_id)
   .await
   .expect("Err creating client");

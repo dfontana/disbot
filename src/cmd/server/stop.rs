@@ -1,60 +1,51 @@
-use crate::cmd::server::wol::Wol;
+use derive_new::new;
 use serenity::{
-  client::Context,
-  // framework::standard::{macros::command, Args, CommandResult},
-  model::channel::Message,
+  async_trait,
+  model::prelude::interaction::application_command::{
+    ApplicationCommandInteraction, CommandDataOption, CommandDataOptionValue,
+  },
+  prelude::Context,
 };
-use tracing::{error, info, instrument};
+use std::collections::HashMap;
 
-// #[command]
-// #[description = "Stop the game server"]
-// #[usage = "stop"]
-// #[example = "stop"]
-// async fn stop(ctx: &Context, msg: &Message, _: Args) -> CommandResult {
-//   exec_stop(ctx, msg).await
-// }
+use crate::{cmd::SubCommandHandler, docker::Docker};
 
-// #[instrument(name = "ServerStop", level = "INFO", skip(ctx, msg))]
-// async fn exec_stop(ctx: &Context, msg: &Message) -> CommandResult {
-//   let wol = Wol::inst()?;
+#[derive(new)]
+pub struct Stop {
+  docker: Docker,
+}
 
-//   let is_awake = match wol.is_awake() {
-//     Ok(v) => v,
-//     Err(e) => {
-//       error!("Failed to check Game Server is awake - {:?}", e);
-//       msg
-//         .reply_ping(&ctx.http, "Couldn't stop the server :(")
-//         .await?;
-//       return Ok(());
-//     }
-//   };
+#[async_trait]
+impl SubCommandHandler for Stop {
+  async fn handle(
+    &self,
+    ctx: &Context,
+    itx: &ApplicationCommandInteraction,
+    subopt: &CommandDataOption,
+  ) -> Result<(), Box<dyn std::error::Error>> {
+    // TODO: Let's move to autocomplete on these
+    let args: HashMap<String, _> = subopt
+      .options
+      .iter()
+      .map(|d| (d.name.to_owned(), d.resolved.to_owned()))
+      .collect();
 
-//   if !is_awake {
-//     msg.reply_ping(&ctx.http, "Server is not awake").await?;
-//     return Ok(());
-//   }
+    let name = args
+      .get("server-name")
+      .and_then(|v| v.to_owned())
+      .and_then(|d| match d {
+        CommandDataOptionValue::String(v) => Some(v),
+        _ => None,
+      })
+      .ok_or("Must provide a server name")?;
 
-//   match wol.shutdown() {
-//     Ok(0) => {
-//       msg.reply_ping(&ctx.http, "Server is stopping").await?;
-//     }
-//     Ok(left) => {
-//       let msg_res = format!(
-//         "Stop ran recently, please wait {}m{}s",
-//         left / 60,
-//         left % 60
-//       );
-//       msg.reply_ping(&ctx.http, msg_res).await?;
-//     }
-//     Err(e) => {
-//       error!("Failed to stop Game Server - {:?}", e);
-//       msg
-//         .reply_ping(&ctx.http, "Couldn't stop the server :(")
-//         .await?;
-//       return Ok(());
-//     }
-//   }
-
-//   info!("Server has stopped");
-//   Ok(())
-// }
+    let msg = match self.docker.stop(&name).await {
+      Ok(_) => "Server stopped".into(),
+      Err(e) => format!("{}", e),
+    };
+    itx
+      .edit_original_interaction_response(&ctx.http, |f| f.content(msg))
+      .await?;
+    Ok(())
+  }
+}
