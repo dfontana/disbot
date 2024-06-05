@@ -2,7 +2,14 @@ use crate::{cmd::SubCommandHandler, docker::Docker};
 use bollard::service::ContainerSummary;
 use derive_new::new;
 use itertools::Itertools;
-use serenity::{async_trait, client::Context, utils::MessageBuilder};
+use serenity::{
+  async_trait,
+  client::Context,
+  model::prelude::interaction::application_command::{
+    ApplicationCommandInteraction, CommandDataOption,
+  },
+  utils::MessageBuilder,
+};
 
 #[derive(new)]
 pub struct List {
@@ -14,8 +21,8 @@ impl SubCommandHandler for List {
   async fn handle(
     &self,
     ctx: &Context,
-    itx: &serenity::model::prelude::interaction::application_command::ApplicationCommandInteraction,
-    _subopt: &serenity::model::prelude::interaction::application_command::CommandDataOption,
+    itx: &ApplicationCommandInteraction,
+    _subopt: &CommandDataOption,
   ) -> Result<(), Box<dyn std::error::Error>> {
     let msg = match build_list_msg(&self.docker).await {
       Ok(mut m) => m.build(),

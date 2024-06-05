@@ -5,6 +5,7 @@ use bollard::{
   service::ContainerSummary,
 };
 
+#[derive(Clone)]
 pub struct Docker {
   client: bollard::Docker,
 }

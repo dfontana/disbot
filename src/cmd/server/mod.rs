@@ -38,9 +38,9 @@ pub struct GameServers {
 impl GameServers {
   pub fn new(emoji: EmojiLookup, http: Client, docker: Docker) -> Self {
     GameServers {
-      list: List::new(docker),
+      list: List::new(docker.clone()),
       start: Start::new(),
-      stop: Stop::new(),
+      stop: Stop::new(docker),
       ip: Ip::new(http, emoji),
     }
   }
@@ -143,7 +143,7 @@ impl GameServers {
     match subopt.name.as_str() {
       // TODO
       // "start" => self.start.handle(ctx, itx, subopt).await?,
-      // "stop" => self.stop.handle(ctx, itx, subopt).await?,
+      "stop" => self.stop.handle(ctx, itx, subopt).await?,
       "list" => self.list.handle(ctx, itx, subopt).await?,
       "ip" => self.ip.handle(ctx, itx, subopt).await?,
       _ => unreachable!(),
