@@ -1,8 +1,5 @@
 use crate::{cmd::SubCommandHandler, docker::Docker};
-use bollard::service::{
-  ContainerState,
-  ContainerStateStatusEnum::{CREATED, EXITED},
-};
+use bollard::service::ContainerStateStatusEnum::{CREATED, EXITED};
 use derive_new::new;
 use serenity::{
   async_trait,
