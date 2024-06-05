@@ -23,6 +23,7 @@ impl SubCommandHandler for Stop {
     itx: &ApplicationCommandInteraction,
     subopt: &CommandDataOption,
   ) -> Result<(), Box<dyn std::error::Error>> {
+    // TODO: Let's move to autocomplete on these
     let args: HashMap<String, _> = subopt
       .options
       .iter()
@@ -40,7 +41,7 @@ impl SubCommandHandler for Stop {
 
     let msg = match self.docker.stop(&name).await {
       Ok(_) => "Server stopped".into(),
-      Err(e) => format!("Failed to list docker containers: {}", e),
+      Err(e) => format!("{}", e),
     };
     itx
       .edit_original_interaction_response(&ctx.http, |f| f.content(msg))

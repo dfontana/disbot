@@ -3,8 +3,6 @@ mod list;
 mod start;
 mod stop;
 
-use std::error::Error;
-
 use ip::*;
 use list::*;
 use reqwest::Client;
@@ -18,6 +16,7 @@ use serenity::{
   prelude::Context,
 };
 use start::*;
+use std::error::Error;
 use stop::*;
 
 use tracing::{error, instrument};
@@ -39,7 +38,7 @@ impl GameServers {
   pub fn new(emoji: EmojiLookup, http: Client, docker: Docker) -> Self {
     GameServers {
       list: List::new(docker.clone()),
-      start: Start::new(),
+      start: Start::new(docker.clone()),
       stop: Stop::new(docker),
       ip: Ip::new(http, emoji),
     }
@@ -141,8 +140,7 @@ impl GameServers {
       .expect("Discord did not pass sub-opt");
 
     match subopt.name.as_str() {
-      // TODO
-      // "start" => self.start.handle(ctx, itx, subopt).await?,
+      "start" => self.start.handle(ctx, itx, subopt).await?,
       "stop" => self.stop.handle(ctx, itx, subopt).await?,
       "list" => self.list.handle(ctx, itx, subopt).await?,
       "ip" => self.ip.handle(ctx, itx, subopt).await?,

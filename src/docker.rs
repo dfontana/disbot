@@ -1,9 +1,9 @@
-use std::collections::HashMap;
-
+use anyhow::anyhow;
 use bollard::{
   container::{ListContainersOptions, StopContainerOptions},
-  service::ContainerSummary,
+  service::{ContainerStateStatusEnum, ContainerSummary},
 };
+use std::collections::HashMap;
 
 #[derive(Clone)]
 pub struct Docker {
@@ -34,6 +34,20 @@ impl Docker {
       }))
       .await
       .map_err(|e| anyhow::anyhow!(e))
+  }
+
+  pub async fn status(&self, name: &str) -> Result<ContainerStateStatusEnum, anyhow::Error> {
+    self
+      .client
+      .inspect_container(name, None)
+      .await
+      .map_err(|e| anyhow::anyhow!(e))
+      .and_then(|res| {
+        res
+          .state
+          .and_then(|s| s.status)
+          .ok_or(anyhow!("Container in Unknown State"))
+      })
   }
 
   pub async fn start(&self, name: &str) -> Result<(), anyhow::Error> {
