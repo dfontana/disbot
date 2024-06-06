@@ -8,21 +8,16 @@ use crate::{
 };
 use derive_new::new;
 use serenity::{
+  all::{CommandDataOption, CommandDataOptionValue, CommandInteraction},
   async_trait,
   client::Context,
-  model::prelude::interaction::application_command::{
-    ApplicationCommandInteraction, CommandDataOption, CommandDataOptionValue,
-  },
   utils::MessageBuilder,
 };
 
 use tracing::{error, info};
 
 use super::{connect_util::DisconnectMessage, SubCommandHandler};
-use songbird::{
-  driver::Bitrate,
-  input::{restartable::Restartable, Input},
-};
+use songbird::{driver::Bitrate, input::Input};
 
 #[derive(new)]
 pub struct Play {
@@ -36,7 +31,7 @@ impl SubCommandHandler for Play {
   async fn handle(
     &self,
     ctx: &Context,
-    itx: &ApplicationCommandInteraction,
+    itx: &CommandInteraction,
     subopt: &CommandDataOption,
   ) -> Result<(), Box<dyn Error>> {
     // 1 arg: link. String.
@@ -53,7 +48,7 @@ impl SubCommandHandler for Play {
 async fn wrapped_handle(
   play: &Play,
   ctx: &Context,
-  itx: &ApplicationCommandInteraction,
+  itx: &CommandInteraction,
   subopt: &CommandDataOption,
 ) -> Result<(), Box<dyn Error + Send + Sync>> {
   let guild_id = match itx.guild_id {
@@ -66,7 +61,7 @@ async fn wrapped_handle(
   let args: HashMap<String, _> = subopt
     .options
     .iter()
-    .map(|d| (d.name.to_owned(), d.resolved.to_owned()))
+    .map(|d| (d.name.to_owned(), d.value.to_owned()))
     .collect();
 
   let maybe_args = args
@@ -115,7 +110,18 @@ async fn wrapped_handle(
   let handler_lock = match manager.get(guild_id) {
     None => {
       info!("Joining voice for first time...");
-      let (handler_lock, _success) = manager.join(guild_id, connect_to).await;
+      let handler_lock = match manager.join(guild_id, connect_to).await {
+        Ok(v) => v,
+        Err(why) => {
+          error!("Err joining voice: {:?}", why);
+          itx
+            .edit_original_interaction_response(&ctx.http, |f| {
+              f.content("Error joining voice channel")
+            })
+            .await?;
+          return Ok(());
+        }
+      };
 
       // Register an event handler to listen for the duration of the call
       DisconnectEventHandler::register(play.config.timeout, play.disconnect.clone(), &handler_lock)
@@ -165,17 +171,15 @@ async fn wrapped_handle(
 
   let emoji = play.emoji.get(&ctx.http, &ctx.cache, guild_id).await?;
 
-  let metadata = input.metadata.clone();
-  let title = metadata
-    .track
-    .or(metadata.title)
-    .unwrap_or_else(|| "<UNKNOWN>".to_string())
-    .to_string();
-  let source_url = metadata
-    .source_url
-    .unwrap_or_else(|| "Unknown Source".to_string())
-    .to_string();
-
+  let metadata = input.aux_metadata().await;
+  let title = match metadata.map(|m| m.track.or(m.title)) {
+    Ok(Some(v)) => v,
+    Err(_) | Ok(None) => "<UNKNOWN>".to_string(),
+  };
+  let source_url = match metadata.map(|m| m.source_url) {
+    Ok(Some(v)) => v,
+    Err(_) | Ok(None) => "Unknown Source".to_string(),
+  };
   let mut handler = handler_lock.lock().await;
   handler.set_bitrate(Bitrate::Max);
   handler.enqueue_source(input);

@@ -1,28 +1,21 @@
-use std::error::Error;
-
+use super::actor::PollMessage;
 use crate::{
   actor::ActorHandle,
   cmd::{poll::pollstate::PollState, AppInteractor},
   emoji::EmojiLookup,
 };
 use derive_new::new;
-
 use serenity::{
+  all::{CommandInteraction, CommandOptionType, CommandType, ComponentInteraction},
   async_trait,
-  builder::CreateApplicationCommands,
-  client::Context,
-  model::prelude::{
-    command::{CommandOptionType, CommandType},
-    interaction::{
-      application_command::ApplicationCommandInteraction,
-      message_component::MessageComponentInteraction, InteractionResponseType,
-    },
+  builder::{
+    CreateCommand, CreateCommandOption, CreateInteractionResponse, CreateInteractionResponseMessage,
   },
+  client::Context,
 };
+use std::error::Error;
 use tracing::{error, instrument, warn};
 use uuid::Uuid;
-
-use super::actor::PollMessage;
 
 const NAME: &str = "poll";
 
@@ -34,55 +27,53 @@ pub struct Poll {
 
 #[async_trait]
 impl AppInteractor for Poll {
-  #[instrument(name = "Poller", level = "INFO", skip(self, commands))]
-  fn register(&self, commands: &mut CreateApplicationCommands) {
-    commands.create_application_command(|command| {
-      command
-        .name(NAME)
-        .description("Create a Poll with up to 9 Options")
-        .kind(CommandType::ChatInput)
-        .create_option(|option| {
-          option
-            .kind(CommandOptionType::String)
-            .name("duration")
-            .description(
-              "How long until poll closes. Valid time units: 'day', 'hour', 'minute'. ex: 30minute",
-            )
-            .required(true)
-        })
-        .create_option(|option| {
-          option
-            .kind(CommandOptionType::String)
-            .name("topic")
-            .description("Question or topic of the poll")
-            .required(true)
-        });
+  #[instrument(name = "Poller", level = "INFO", skip(self))]
+  fn commands(&self) -> Vec<CreateCommand> {
+    let mut command = CreateCommand::new(NAME)
+      .description("Create a Poll with up to 9 Options")
+      .kind(CommandType::ChatInput)
+      .add_option(
+        CreateCommandOption::new(
+          CommandOptionType::String,
+          "duration",
+          "How long until poll closes. Valid time units: 'day', 'hour', 'minute'. ex: 30minute",
+        )
+        .required(true),
+      )
+      .add_option(
+        CreateCommandOption::new(
+          CommandOptionType::String,
+          "topic",
+          "Question or topic of the poll",
+        )
+        .required(true),
+      );
+    for i in 0..2 {
+      command = command.add_option(
+        CreateCommandOption::new(
+          CommandOptionType::String,
+          format!("option_{}", i),
+          format!("Option to add to poll #{}", i),
+        )
+        .required(true),
+      );
+    }
 
-      for i in 0..2 {
-        command.create_option(|option| {
-          option
-            .kind(CommandOptionType::String)
-            .name(format!("option_{}", i))
-            .description(format!("Option to add to poll #{}", i))
-            .required(true)
-        });
-      }
-
-      for i in 2..9 {
-        command.create_option(|option| {
-          option
-            .kind(CommandOptionType::String)
-            .name(format!("option_{}", i))
-            .description(format!("Option to add to poll #{}", i))
-            .required(false)
-        });
-      }
-      command
-    });
+    for i in 2..9 {
+      command = command.add_option(
+        CreateCommandOption::new(
+          CommandOptionType::String,
+          format!("option_{}", i),
+          format!("Option to add to poll #{}", i),
+        )
+        .required(true),
+      );
+    }
+    vec![command]
   }
 
   #[instrument(name = "Poller", level = "INFO", skip(self, ctx, itx))]
-  async fn app_interact(&self, ctx: &Context, itx: &ApplicationCommandInteraction) {
+  async fn app_interact(&self, ctx: &Context, itx: &CommandInteraction) {
     let mut err = false;
     if let Err(e) = self._handle_app(ctx, itx).await {
       error!("Failed to create poll {:?}", e);
@@ -90,11 +81,12 @@ impl AppInteractor for Poll {
     }
     if err {
       if let Err(e) = itx
-        .create_interaction_response(&ctx.http, |bld| {
-          bld
-            .kind(InteractionResponseType::ChannelMessageWithSource)
-            .interaction_response_data(|f| f.content("Command failed"))
-        })
+        .create_response(
+          &ctx.http,
+          CreateInteractionResponse::Message(
+            CreateInteractionResponseMessage::new().content("Command failed"),
+          ),
+        )
         .await
       {
         error!("Failed to notify app failed {:?}", e);
@@ -103,7 +95,7 @@ impl AppInteractor for Poll {
   }
 
   #[instrument(name = "Poller", level = "INFO", skip(self, ctx, itx))]
-  async fn msg_interact(&self, ctx: &Context, itx: &MessageComponentInteraction) {
+  async fn msg_interact(&self, ctx: &Context, itx: &ComponentInteraction) {
     let mut err = false;
     if let Err(e) = self._handle_msg(ctx, itx).await {
       error!("Failed to update poll {:?}", e);
@@ -121,7 +113,7 @@ impl Poll {
   async fn _handle_app(
     &self,
     ctx: &Context,
-    itx: &ApplicationCommandInteraction,
+    itx: &CommandInteraction,
   ) -> Result<(), Box<dyn Error>> {
     if !itx.data.name.as_str().eq(NAME) {
       return Ok(());
@@ -139,10 +131,10 @@ impl Poll {
       .send(PollMessage::CreatePoll((ps, itx.channel_id)))
       .await;
     let _ = itx
-      .create_interaction_response(&ctx.http, |f| {
-        f.kind(InteractionResponseType::ChannelMessageWithSource)
-          .interaction_response_data(|k| k.content("yep."))
-      })
+      .create_response(
+        &ctx.http,
+        CreateInteractionResponse::Message(CreateInteractionResponseMessage::new().content("yep.")),
+      )
       .await;
     Ok(())
   }
@@ -150,7 +142,7 @@ impl Poll {
   async fn _handle_msg(
     &self,
     ctx: &Context,
-    itx: &MessageComponentInteraction,
+    itx: &ComponentInteraction,
   ) -> Result<(), Box<dyn Error>> {
     let poll_id = Uuid::parse_str(&itx.data.custom_id)?;
 

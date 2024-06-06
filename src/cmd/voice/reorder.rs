@@ -4,11 +4,10 @@ use super::SubCommandHandler;
 use crate::emoji::EmojiLookup;
 use derive_new::new;
 use serenity::{
+  all::{CommandDataOption, CommandDataOptionValue, CommandInteraction},
   async_trait,
+  builder::EditInteractionResponse,
   client::Context,
-  model::prelude::interaction::application_command::{
-    ApplicationCommandInteraction, CommandDataOption, CommandDataOptionValue,
-  },
   utils::MessageBuilder,
 };
 
@@ -22,14 +21,15 @@ impl SubCommandHandler for Reorder {
   async fn handle(
     &self,
     ctx: &Context,
-    itx: &ApplicationCommandInteraction,
+    itx: &CommandInteraction,
     subopt: &CommandDataOption,
   ) -> Result<(), Box<dyn Error>> {
     // 2 args: from, to. Min value 1. Integers.
-    let args: HashMap<String, _> = subopt
+    let args: HashMap<String, _> = itx
+      .data
       .options
       .iter()
-      .map(|d| (d.name.to_owned(), d.resolved.to_owned()))
+      .map(|d| (d.name.to_owned(), d.value.to_owned()))
       .collect();
 
     // Get the handler
@@ -46,7 +46,10 @@ impl SubCommandHandler for Reorder {
     let handler_lock = match manager.get(guild_id) {
       None => {
         itx
-          .edit_original_interaction_response(&ctx.http, |f| f.content("Not in a voice channel"))
+          .edit_response(
+            &ctx.http,
+            EditInteractionResponse::new().content("Not in a voice channel"),
+          )
           .await?;
         return Ok(());
       }
@@ -60,7 +63,7 @@ impl SubCommandHandler for Reorder {
       Ok(v) => v,
       Err(e) => {
         itx
-          .edit_original_interaction_response(&ctx.http, |f| f.content(&e))
+          .edit_response(&ctx.http, EditInteractionResponse::new().content(&e))
           .await?;
         return Ok(());
       }
@@ -69,14 +72,17 @@ impl SubCommandHandler for Reorder {
       Ok(v) => v,
       Err(e) => {
         itx
-          .edit_original_interaction_response(&ctx.http, |f| f.content(&e))
+          .edit_response(&ctx.http, EditInteractionResponse::new().content(&e))
           .await?;
         return Ok(());
       }
     };
     if posa == posb {
       itx
-        .edit_original_interaction_response(&ctx.http, |f| f.content("A touch psychotic are we?"))
+        .edit_response(
+          &ctx.http,
+          EditInteractionResponse::new().content("A touch psychotic are we?"),
+        )
         .await?;
       return Ok(());
     }
@@ -95,8 +101,9 @@ impl SubCommandHandler for Reorder {
 
     let emoji = self.emoji.get(&ctx.http, &ctx.cache, guild_id).await?;
     itx
-      .edit_original_interaction_response(&ctx.http, |f| {
-        f.content(
+      .edit_response(
+        &ctx.http,
+        EditInteractionResponse::new().content(
           MessageBuilder::new()
             .mention(&emoji)
             .push_bold("Queued updated!")
@@ -104,23 +111,19 @@ impl SubCommandHandler for Reorder {
             .push_line("")
             .push_italic("You can list the queue your damn self")
             .build(),
-        )
-      })
+        ),
+      )
       .await?;
 
     Ok(())
   }
 }
 
-fn get_arg(
-  args: &HashMap<String, Option<CommandDataOptionValue>>,
-  key: &str,
-) -> Result<usize, String> {
+fn get_arg(args: &HashMap<String, CommandDataOptionValue>, key: &str) -> Result<usize, String> {
   args
     .get(key)
-    .and_then(|v| v.to_owned())
     .and_then(|d| match d {
-      CommandDataOptionValue::Integer(v) => Some(v),
+      CommandDataOptionValue::Integer(v) => Some(v.to_owned()),
       _ => None,
     })
     .map(|i| i as usize)

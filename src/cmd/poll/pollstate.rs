@@ -1,10 +1,8 @@
 use humantime::parse_duration;
 use serenity::{
+  all::{CommandInteraction, ResolvedValue},
   http::Http,
-  model::prelude::{
-    interaction::application_command::{ApplicationCommandInteraction, CommandDataOptionValue},
-    ChannelId, Emoji,
-  },
+  model::prelude::{ChannelId, Emoji},
   prelude::Context,
 };
 use std::{
@@ -71,20 +69,19 @@ impl PollState {
   pub fn from_args(
     ctx: &Context,
     emoji: Emoji,
-    itx: &ApplicationCommandInteraction,
+    itx: &CommandInteraction,
   ) -> Result<PollState, String> {
-    let args = &itx.data.options;
+    let args = &itx.data.options();
 
     let map: HashMap<String, _> = args
       .iter()
-      .map(|d| (d.name.to_owned(), d.resolved.to_owned()))
+      .map(|d| (d.name.to_owned(), d.value.to_owned()))
       .collect();
 
     let duration: Duration = map
       .get("duration")
-      .and_then(|v| v.to_owned())
       .and_then(|d| match d {
-        CommandDataOptionValue::String(v) => Some(v),
+        ResolvedValue::String(v) => Some(v),
         _ => None,
       })
       .ok_or("No duration given")
@@ -92,9 +89,8 @@ impl PollState {
 
     let topic: String = map
       .get("topic")
-      .and_then(|v| v.to_owned())
       .and_then(|d| match d {
-        CommandDataOptionValue::String(v) => Some(v),
+        ResolvedValue::String(v) => Some(v.to_string()),
         _ => None,
       })
       .ok_or("No topic given")?;
@@ -103,7 +99,7 @@ impl PollState {
       .map(|i| format!("option_{}", i))
       .filter_map(|key| map.get(&key))
       .filter_map(|d| match d {
-        Some(CommandDataOptionValue::String(v)) => Some(v.to_owned()),
+        ResolvedValue::String(v) => Some(v.to_string()),
         _ => None,
       })
       .collect();

@@ -3,6 +3,7 @@ use self::{
   poll::{PollActor, PollMessage},
 };
 use crate::{actor::ActorHandle, config::Config, docker::Docker, emoji::EmojiLookup};
+use itertools::Itertools;
 use reqwest::Client;
 use serenity::{
   all::{CommandDataOption, CommandInteraction, ComponentInteraction, Interaction},
@@ -91,7 +92,7 @@ impl EventHandler for Handler {
           self
             .app_interactors
             .iter()
-            .flat_map(|ai| ai.commands().iter())
+            .flat_map(|ai| ai.commands().into_iter())
             .collect_vec(),
         )
         .await
