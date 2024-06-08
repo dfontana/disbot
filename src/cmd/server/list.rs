@@ -1,13 +1,12 @@
-use crate::{cmd::SubCommandHandler, docker::Docker};
+use crate::{
+  cmd::{arg_util::Args, SubCommandHandler},
+  docker::Docker,
+};
 use bollard::service::ContainerSummary;
 use derive_new::new;
 use itertools::Itertools;
 use serenity::{
-  async_trait,
-  client::Context,
-  model::prelude::interaction::application_command::{
-    ApplicationCommandInteraction, CommandDataOption,
-  },
+  all::CommandInteraction, async_trait, builder::EditInteractionResponse, client::Context,
   utils::MessageBuilder,
 };
 
@@ -21,15 +20,15 @@ impl SubCommandHandler for List {
   async fn handle(
     &self,
     ctx: &Context,
-    itx: &ApplicationCommandInteraction,
-    _subopt: &CommandDataOption,
-  ) -> Result<(), Box<dyn std::error::Error>> {
+    itx: &CommandInteraction,
+    _args: &Args,
+  ) -> Result<(), anyhow::Error> {
     let msg = match build_list_msg(&self.docker).await {
       Ok(mut m) => m.build(),
       Err(e) => format!("Failed to list docker containers: {}", e),
     };
     itx
-      .edit_original_interaction_response(&ctx.http, |f| f.content(msg))
+      .edit_response(&ctx.http, EditInteractionResponse::new().content(msg))
       .await?;
     Ok(())
   }

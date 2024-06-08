@@ -1,14 +1,13 @@
-use crate::{cmd::SubCommandHandler, docker::Docker};
+use crate::{
+  cmd::{arg_util::Args, SubCommandHandler},
+  docker::Docker,
+};
+use anyhow::anyhow;
 use bollard::service::ContainerStateStatusEnum::{CREATED, EXITED};
 use derive_new::new;
 use serenity::{
-  async_trait,
-  client::Context,
-  model::prelude::interaction::application_command::{
-    ApplicationCommandInteraction, CommandDataOption, CommandDataOptionValue,
-  },
+  all::CommandInteraction, async_trait, builder::EditInteractionResponse, client::Context,
 };
-use std::collections::HashMap;
 
 #[derive(new)]
 pub struct Start {
@@ -20,38 +19,32 @@ impl SubCommandHandler for Start {
   async fn handle(
     &self,
     ctx: &Context,
-    itx: &ApplicationCommandInteraction,
-    subopt: &CommandDataOption,
-  ) -> Result<(), Box<dyn std::error::Error>> {
+    itx: &CommandInteraction,
+    args: &Args,
+  ) -> Result<(), anyhow::Error> {
     // TODO: Let's move to autocomplete on these
-    let args: HashMap<String, _> = subopt
-      .options
-      .iter()
-      .map(|d| (d.name.to_owned(), d.resolved.to_owned()))
-      .collect();
-
     let name = args
-      .get("server-name")
-      .and_then(|v| v.to_owned())
-      .and_then(|d| match d {
-        CommandDataOptionValue::String(v) => Some(v),
-        _ => None,
-      })
-      .ok_or("Must provide a server name")?;
+      .str("server-name")
+      .map_err(|e| anyhow!("Must provide a server name").context(e))?;
 
     match self.docker.status(&name).await {
       Ok(CREATED | EXITED) => {}
       Ok(s) => {
         itx
-          .edit_original_interaction_response(&ctx.http, |f| {
-            f.content(format!("Server in state that can't be started: {}", s))
-          })
+          .edit_response(
+            &ctx.http,
+            EditInteractionResponse::new()
+              .content(format!("Server in state that can't be started: {}", s)),
+          )
           .await?;
         return Ok(());
       }
       Err(e) => {
         itx
-          .edit_original_interaction_response(&ctx.http, |f| f.content(format!("{}", e)))
+          .edit_response(
+            &ctx.http,
+            EditInteractionResponse::new().content(format!("{}", e)),
+          )
           .await?;
         return Ok(());
       }
@@ -62,7 +55,7 @@ impl SubCommandHandler for Start {
       Err(e) => format!("{}", e),
     };
     itx
-      .edit_original_interaction_response(&ctx.http, |f| f.content(msg))
+      .edit_response(&ctx.http, EditInteractionResponse::new().content(msg))
       .await?;
     Ok(())
   }

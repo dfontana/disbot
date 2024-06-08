@@ -1,14 +1,9 @@
-use std::{collections::HashMap, error::Error};
-
 use super::SubCommandHandler;
-use crate::emoji::EmojiLookup;
+use crate::{cmd::arg_util::Args, emoji::EmojiLookup};
+use anyhow::anyhow;
 use derive_new::new;
 use serenity::{
-  async_trait,
-  client::Context,
-  model::prelude::interaction::application_command::{
-    ApplicationCommandInteraction, CommandDataOption, CommandDataOptionValue,
-  },
+  all::CommandInteraction, async_trait, builder::EditInteractionResponse, client::Context,
   utils::MessageBuilder,
 };
 
@@ -22,63 +17,28 @@ impl SubCommandHandler for Reorder {
   async fn handle(
     &self,
     ctx: &Context,
-    itx: &ApplicationCommandInteraction,
-    subopt: &CommandDataOption,
-  ) -> Result<(), Box<dyn Error>> {
-    // 2 args: from, to. Min value 1. Integers.
-    let args: HashMap<String, _> = subopt
-      .options
-      .iter()
-      .map(|d| (d.name.to_owned(), d.resolved.to_owned()))
-      .collect();
-
-    // Get the handler
-    let guild_id = match itx.guild_id {
-      Some(g) => g,
-      None => {
-        return Err("No Guild Id on Interaction".into());
-      }
-    };
+    itx: &CommandInteraction,
+    args: &Args,
+  ) -> Result<(), anyhow::Error> {
+    let guild_id = itx
+      .guild_id
+      .ok_or_else(|| anyhow!("No Guild Id on Interaction"))?;
     let manager = songbird::get(ctx)
       .await
       .expect("Songbird Voice client placed in at initialisation.")
       .clone();
-    let handler_lock = match manager.get(guild_id) {
-      None => {
-        itx
-          .edit_original_interaction_response(&ctx.http, |f| f.content("Not in a voice channel"))
-          .await?;
-        return Ok(());
-      }
-      Some(v) => v,
-    };
+    let handler_lock = manager
+      .get(guild_id)
+      .ok_or_else(|| anyhow!("Not in a voice channel"))?;
     let handler = handler_lock.lock().await;
 
-    //  Validate the position args
+    // 2 args: from, to. Min value 1. Integers.
+    // Validate the position args
     let queue_size = handler.queue().current_queue().len();
-    let posa = match validate_position(get_arg(&args, "from"), queue_size) {
-      Ok(v) => v,
-      Err(e) => {
-        itx
-          .edit_original_interaction_response(&ctx.http, |f| f.content(&e))
-          .await?;
-        return Ok(());
-      }
-    };
-    let posb = match validate_position(get_arg(&args, "to"), queue_size) {
-      Ok(v) => v,
-      Err(e) => {
-        itx
-          .edit_original_interaction_response(&ctx.http, |f| f.content(&e))
-          .await?;
-        return Ok(());
-      }
-    };
+    let posa = validate_position(args.i64("from"), queue_size)?;
+    let posb = validate_position(args.i64("to"), queue_size)?;
     if posa == posb {
-      itx
-        .edit_original_interaction_response(&ctx.http, |f| f.content("A touch psychotic are we?"))
-        .await?;
-      return Ok(());
+      return Err(anyhow!("A touch psychotic are we?"));
     }
 
     // Perform the movement
@@ -95,48 +55,38 @@ impl SubCommandHandler for Reorder {
 
     let emoji = self.emoji.get(&ctx.http, &ctx.cache, guild_id).await?;
     itx
-      .edit_original_interaction_response(&ctx.http, |f| {
-        f.content(
+      .edit_response(
+        &ctx.http,
+        EditInteractionResponse::new().content(
           MessageBuilder::new()
-            .mention(&emoji)
+            .emoji(&emoji)
             .push_bold("Queued updated!")
-            .mention(&emoji)
+            .emoji(&emoji)
             .push_line("")
             .push_italic("You can list the queue your damn self")
             .build(),
-        )
-      })
+        ),
+      )
       .await?;
 
     Ok(())
   }
 }
 
-fn get_arg(
-  args: &HashMap<String, Option<CommandDataOptionValue>>,
-  key: &str,
-) -> Result<usize, String> {
-  args
-    .get(key)
-    .and_then(|v| v.to_owned())
-    .and_then(|d| match d {
-      CommandDataOptionValue::Integer(v) => Some(v),
-      _ => None,
-    })
-    .map(|i| i as usize)
-    .ok_or_else(|| "Missing bound".into())
-}
-
-fn validate_position<T>(maybe_pos: Result<usize, T>, queue_size: usize) -> Result<usize, String> {
+fn validate_position(
+  maybe_pos: Result<&i64, anyhow::Error>,
+  queue_size: usize,
+) -> Result<usize, anyhow::Error> {
   let pos = match maybe_pos {
-    Err(_) => return Err("Must provide a numeric position".into()),
+    Err(e) => return Err(anyhow!("Must provide a numeric position").context(e)),
     Ok(v) => v,
   };
-  if pos <= 1 {
-    return Err("Cannot move first item".into());
+  if *pos <= 1 {
+    return Err(anyhow!("Cannot move first item"));
   }
-  if pos > queue_size {
-    return Err("Can only move item to end of queue".into());
+  let posb = *pos as usize;
+  if posb > queue_size {
+    return Err(anyhow!("Can only move item to end of queue"));
   }
-  Ok(pos)
+  Ok(posb)
 }

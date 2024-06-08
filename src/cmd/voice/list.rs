@@ -1,12 +1,8 @@
-use std::error::Error;
-
-use super::SubCommandHandler;
+use super::{play::ListMetadata, SubCommandHandler};
+use crate::cmd::arg_util::Args;
+use anyhow::anyhow;
 use serenity::{
-  async_trait,
-  client::Context,
-  model::prelude::interaction::application_command::{
-    ApplicationCommandInteraction, CommandDataOption,
-  },
+  all::CommandInteraction, async_trait, builder::EditInteractionResponse, client::Context,
   utils::MessageBuilder,
 };
 
@@ -18,53 +14,39 @@ impl SubCommandHandler for List {
   async fn handle(
     &self,
     ctx: &Context,
-    itx: &ApplicationCommandInteraction,
-    _: &CommandDataOption,
-  ) -> Result<(), Box<dyn Error>> {
-    let guild_id = match itx.guild_id {
-      Some(g) => g,
-      None => {
-        return Err("No Guild Id on Interaction".into());
-      }
-    };
+    itx: &CommandInteraction,
+    _: &Args,
+  ) -> Result<(), anyhow::Error> {
+    let guild_id = itx
+      .guild_id
+      .ok_or_else(|| anyhow!("No Guild Id on Interaction"))?;
 
     let manager = songbird::get(ctx)
       .await
       .expect("Songbird Voice client placed in at initialisation.")
       .clone();
-    let handler_lock = match manager.get(guild_id) {
-      None => {
-        itx
-          .edit_original_interaction_response(&ctx.http, |f| {
-            f.content("I'm currently not in a voice channel")
-          })
-          .await?;
-        return Ok(());
-      }
-      Some(v) => v,
-    };
+
+    let handler_lock = manager
+      .get(guild_id)
+      .ok_or_else(|| anyhow!("I'm currently not in a voice channel"))?;
     let handler = handler_lock.lock().await;
 
     let mut bld = MessageBuilder::new();
     bld.push_bold_line("Current Queue:");
     let mut body = String::new();
     for (idx, trk) in handler.queue().current_queue().iter().enumerate() {
-      body.push_str(&format!(
-        "{}. '{}'\n",
-        idx + 1,
-        trk
-          .metadata()
-          .track
-          .as_ref()
-          .or_else(|| trk.metadata().title.as_ref())
-          .unwrap_or(&"<UNKNOWN>".to_string())
-      ));
+      let typ = trk.typemap().read().await;
+      let md = typ
+        .get::<ListMetadata>()
+        .expect("Guaranteed to exist from Play");
+      body.push_str(&format!("{}. '{}'\n", idx + 1, md.title));
     }
 
     itx
-      .edit_original_interaction_response(&ctx.http, |f| {
-        f.content(bld.push_codeblock(body, None).build())
-      })
+      .edit_response(
+        &ctx.http,
+        EditInteractionResponse::new().content(bld.push_codeblock(body, None).build()),
+      )
       .await?;
     Ok(())
   }

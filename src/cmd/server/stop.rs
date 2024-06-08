@@ -1,14 +1,12 @@
+use crate::{
+  cmd::{arg_util::Args, SubCommandHandler},
+  docker::Docker,
+};
+use anyhow::anyhow;
 use derive_new::new;
 use serenity::{
-  async_trait,
-  model::prelude::interaction::application_command::{
-    ApplicationCommandInteraction, CommandDataOption, CommandDataOptionValue,
-  },
-  prelude::Context,
+  all::CommandInteraction, async_trait, builder::EditInteractionResponse, prelude::Context,
 };
-use std::collections::HashMap;
-
-use crate::{cmd::SubCommandHandler, docker::Docker};
 
 #[derive(new)]
 pub struct Stop {
@@ -20,31 +18,19 @@ impl SubCommandHandler for Stop {
   async fn handle(
     &self,
     ctx: &Context,
-    itx: &ApplicationCommandInteraction,
-    subopt: &CommandDataOption,
-  ) -> Result<(), Box<dyn std::error::Error>> {
-    // TODO: Let's move to autocomplete on these
-    let args: HashMap<String, _> = subopt
-      .options
-      .iter()
-      .map(|d| (d.name.to_owned(), d.resolved.to_owned()))
-      .collect();
-
+    itx: &CommandInteraction,
+    args: &Args,
+  ) -> Result<(), anyhow::Error> {
     let name = args
-      .get("server-name")
-      .and_then(|v| v.to_owned())
-      .and_then(|d| match d {
-        CommandDataOptionValue::String(v) => Some(v),
-        _ => None,
-      })
-      .ok_or("Must provide a server name")?;
+      .str("server-name")
+      .map_err(|e| anyhow!("Must provide a server name").context(e))?;
 
     let msg = match self.docker.stop(&name).await {
       Ok(_) => "Server stopped".into(),
       Err(e) => format!("{}", e),
     };
     itx
-      .edit_original_interaction_response(&ctx.http, |f| f.content(msg))
+      .edit_response(&ctx.http, EditInteractionResponse::new().content(msg))
       .await?;
     Ok(())
   }

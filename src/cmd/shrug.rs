@@ -37,7 +37,7 @@ impl ShrugHandler {
 impl MessageListener for ShrugHandler {
   #[instrument(name = "Shrug", level = "INFO", skip(self, ctx, msg))]
   async fn message(&self, ctx: &Context, msg: &Message) {
-    if msg.is_own(&ctx.cache) {
+    if msg.author.id == ctx.cache.as_ref().current_user().id {
       info!("Skipping, self message");
       return;
     }
@@ -62,13 +62,10 @@ impl MessageListener for ShrugHandler {
 
     let emoji = self.emoji.get(&ctx.http, &ctx.cache, guild_id).await;
 
-    let send = match emoji {
-      Ok(e) => self.react_and_send(e, ctx, msg).await,
-      Err(cause) => Err(cause),
-    };
-
-    match send {
-      Ok(_) => {}
+    match emoji {
+      Ok(e) => {
+        let _ = self.react_and_send(e, ctx, msg).await;
+      }
       Err(cause) => {
         error!("Failed to react {:?}", cause);
         if let Err(why) = msg
@@ -80,6 +77,6 @@ impl MessageListener for ShrugHandler {
           return;
         }
       }
-    }
+    };
   }
 }

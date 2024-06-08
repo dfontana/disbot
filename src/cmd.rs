@@ -1,27 +1,21 @@
 use self::{
+  arg_util::Args,
   check_in::{CheckInActor, CheckInMessage},
   poll::{PollActor, PollMessage},
 };
 use crate::{actor::ActorHandle, config::Config, docker::Docker, emoji::EmojiLookup};
+use itertools::Itertools;
 use reqwest::Client;
 use serenity::{
+  all::{CommandInteraction, ComponentInteraction, Interaction},
   async_trait,
-  builder::CreateApplicationCommands,
+  builder::CreateCommand,
   futures::future,
-  model::{
-    channel::Message,
-    gateway::Ready,
-    id::GuildId,
-    prelude::interaction::{
-      application_command::{ApplicationCommandInteraction, CommandDataOption},
-      message_component::MessageComponentInteraction,
-      Interaction,
-    },
-  },
+  model::{channel::Message, gateway::Ready},
   prelude::*,
 };
-use std::error::Error;
 
+mod arg_util;
 mod check_in;
 mod dice_roll;
 mod poll;
@@ -38,9 +32,9 @@ trait MessageListener: Send + Sync {
 
 #[async_trait]
 trait AppInteractor: Send + Sync {
-  fn register(&self, commands: &mut CreateApplicationCommands);
-  async fn app_interact(&self, ctx: &Context, itx: &ApplicationCommandInteraction);
-  async fn msg_interact(&self, _: &Context, _: &MessageComponentInteraction) {
+  fn commands(&self) -> Vec<CreateCommand>;
+  async fn app_interact(&self, ctx: &Context, itx: &CommandInteraction);
+  async fn msg_interact(&self, _: &Context, _: &ComponentInteraction) {
     // Default is no-op
   }
 }
@@ -50,9 +44,9 @@ trait SubCommandHandler: Send + Sync {
   async fn handle(
     &self,
     ctx: &Context,
-    itx: &ApplicationCommandInteraction,
-    subopt: &CommandDataOption,
-  ) -> Result<(), Box<dyn Error>>;
+    itx: &CommandInteraction,
+    args: &Args,
+  ) -> Result<(), anyhow::Error>;
 }
 
 pub struct Handler {
@@ -93,14 +87,17 @@ impl EventHandler for Handler {
   async fn ready(&self, ctx: Context, rdy: Ready) {
     // Register Slash commands with each guild that Shibba is connected to
     for guild_id in ctx.cache.guilds() {
-      GuildId::set_application_commands(&guild_id, &ctx.http, |commands| {
-        self.app_interactors.iter().for_each(|app| {
-          app.register(commands);
-        });
-        commands
-      })
-      .await
-      .expect("Failed to Register Application Context");
+      guild_id
+        .set_commands(
+          &ctx.http,
+          self
+            .app_interactors
+            .iter()
+            .flat_map(|ai| ai.commands().into_iter())
+            .collect_vec(),
+        )
+        .await
+        .expect("Failed to Register Application Context");
     }
 
     self.ready.ready(&ctx, &rdy).await;
@@ -108,7 +105,7 @@ impl EventHandler for Handler {
 
   async fn interaction_create(&self, ctx: Context, itx: Interaction) {
     match itx {
-      Interaction::MessageComponent(d) => {
+      Interaction::Component(d) => {
         future::join_all(
           self
             .app_interactors
@@ -117,7 +114,7 @@ impl EventHandler for Handler {
         )
         .await;
       }
-      Interaction::ApplicationCommand(d) => {
+      Interaction::Command(d) => {
         future::join_all(
           self
             .app_interactors

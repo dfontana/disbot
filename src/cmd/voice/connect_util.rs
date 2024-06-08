@@ -94,9 +94,9 @@ impl DisconnectActor {
       .say(
         &details.http,
         MessageBuilder::new()
-          .mention(&details.emoji)
+          .emoji(&details.emoji)
           .push(" Cya later NERD ")
-          .mention(&details.emoji)
+          .emoji(&details.emoji)
           .build(),
       )
       .await;

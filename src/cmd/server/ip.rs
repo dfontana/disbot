@@ -1,18 +1,17 @@
-use std::{error::Error, time::Duration};
-
-use crate::{cmd::SubCommandHandler, emoji::EmojiLookup};
+use crate::{
+  cmd::{arg_util::Args, SubCommandHandler},
+  emoji::EmojiLookup,
+};
+use anyhow::anyhow;
 use derive_new::new;
 use rand::seq::SliceRandom;
 use rand::thread_rng;
 use reqwest::Client;
 use serenity::{
-  async_trait,
-  client::Context,
-  model::prelude::interaction::application_command::{
-    ApplicationCommandInteraction, CommandDataOption,
-  },
+  all::CommandInteraction, async_trait, builder::EditInteractionResponse, client::Context,
   utils::MessageBuilder,
 };
+use std::time::Duration;
 
 const IP_ECHOERS: &[&str; 3] = &[
   "https://api.ipify.org/",
@@ -31,13 +30,13 @@ impl SubCommandHandler for Ip {
   async fn handle(
     &self,
     ctx: &Context,
-    itx: &ApplicationCommandInteraction,
-    _subopt: &CommandDataOption,
-  ) -> Result<(), Box<dyn Error>> {
+    itx: &CommandInteraction,
+    _args: &Args,
+  ) -> Result<(), anyhow::Error> {
     let guild_id = match itx.guild_id {
       Some(g) => g,
       None => {
-        return Err("No Guild Id on Interaction".into());
+        return Err(anyhow!("No Guild Id on Interaction"));
       }
     };
 
@@ -52,9 +51,10 @@ impl SubCommandHandler for Ip {
     }
     let Some(the_ip) = maybe_the_ip else {
       itx
-        .edit_original_interaction_response(&ctx.http, |f| {
-          f.content("Could not resolve IP of server, Shibba is death")
-        })
+        .edit_response(
+          &ctx.http,
+          EditInteractionResponse::new().content("Could not resolve IP of server, Shibba is death"),
+        )
         .await?;
       return Ok(());
     };
@@ -65,9 +65,12 @@ impl SubCommandHandler for Ip {
       .push_bold("Ya boi shruggin at ")
       .push_mono(the_ip)
       .push_bold(" I guess")
-      .mention(&emoji);
+      .emoji(&emoji);
     itx
-      .edit_original_interaction_response(&ctx.http, |f| f.content(build.build()))
+      .edit_response(
+        &ctx.http,
+        EditInteractionResponse::new().content(build.build()),
+      )
       .await?;
 
     Ok(())

@@ -1,15 +1,9 @@
-use std::error::Error;
-
-use crate::emoji::EmojiLookup;
-
 use super::SubCommandHandler;
+use crate::{cmd::arg_util::Args, emoji::EmojiLookup};
+use anyhow::anyhow;
 use derive_new::new;
 use serenity::{
-  async_trait,
-  client::Context,
-  model::prelude::interaction::application_command::{
-    ApplicationCommandInteraction, CommandDataOption,
-  },
+  all::CommandInteraction, async_trait, builder::EditInteractionResponse, client::Context,
   utils::MessageBuilder,
 };
 
@@ -23,15 +17,12 @@ impl SubCommandHandler for Skip {
   async fn handle(
     &self,
     ctx: &Context,
-    itx: &ApplicationCommandInteraction,
-    _subopt: &CommandDataOption,
-  ) -> Result<(), Box<dyn Error>> {
-    let guild_id = match itx.guild_id {
-      Some(g) => g,
-      None => {
-        return Err("No Guild Id on Interaction".into());
-      }
-    };
+    itx: &CommandInteraction,
+    _: &Args,
+  ) -> Result<(), anyhow::Error> {
+    let guild_id = itx
+      .guild_id
+      .ok_or_else(|| anyhow!("No Guild Id on Interaction"))?;
 
     let manager = songbird::get(ctx)
       .await
@@ -40,30 +31,25 @@ impl SubCommandHandler for Skip {
 
     let emoji = self.emoji.get(&ctx.http, &ctx.cache, guild_id).await?;
 
-    match manager.get(guild_id) {
-      None => {
-        itx
-          .edit_original_interaction_response(&ctx.http, |f| {
-            f.content("Not in a voice channel to play in")
-          })
-          .await?;
-      }
-      Some(handler_lock) => {
-        let handler = handler_lock.lock().await;
-        let queue = handler.queue();
-        let _ = queue.skip();
-        itx
-          .edit_original_interaction_response(&ctx.http, |f| {
-            f.content(
-              MessageBuilder::new()
-                .push("I didn't like that song either ")
-                .mention(&emoji)
-                .build(),
-            )
-          })
-          .await?;
-      }
-    }
+    let handler_lock = manager
+      .get(guild_id)
+      .ok_or_else(|| anyhow!("Not in a voice channel to play in"))?;
+    let handler = handler_lock.lock().await;
+
+    let queue = handler.queue();
+    let _ = queue.skip();
+    itx
+      .edit_response(
+        &ctx.http,
+        EditInteractionResponse::new().content(
+          MessageBuilder::new()
+            .push("I didn't like that song either ")
+            .emoji(&emoji)
+            .build(),
+        ),
+      )
+      .await?;
+
     Ok(())
   }
 }

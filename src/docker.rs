@@ -18,7 +18,7 @@ impl Docker {
   }
 
   pub async fn list(&self) -> Result<Vec<ContainerSummary>, anyhow::Error> {
-    let mut list_container_filters: HashMap<String, Vec<String>> = HashMap::new();
+    let list_container_filters: HashMap<String, Vec<String>> = HashMap::new();
     // TODO: Use a label filter and set that label ("shibba:true") on each container that can
     //       be managed. Should only work on containers that have been started once, eg container is
     //       already made. No need to interact with compose.

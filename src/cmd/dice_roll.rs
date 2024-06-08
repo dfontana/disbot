@@ -1,24 +1,19 @@
-use std::error::Error;
-
-use super::AppInteractor;
+use super::{arg_util::Args, AppInteractor};
 use crate::emoji::EmojiLookup;
+use anyhow::anyhow;
 use derive_new::new;
 use rand::Rng;
 use serenity::{
+  all::{CommandInteraction, CommandOptionType, CommandType, CreateCommandOption},
   async_trait,
-  builder::CreateApplicationCommands,
-  client::Context,
-  model::prelude::{
-    command::{CommandOptionType, CommandType},
-    interaction::{
-      application_command::{
-        ApplicationCommandInteraction, CommandDataOption, CommandDataOptionValue,
-      },
-      InteractionResponseType,
-    },
+  builder::{
+    CreateCommand, CreateInteractionResponse, CreateInteractionResponseMessage,
+    EditInteractionResponse,
   },
+  client::Context,
   utils::MessageBuilder,
 };
+use std::error::Error;
 use tracing::{instrument, log::error};
 
 const NAME: &str = "roll";
@@ -30,36 +25,27 @@ pub struct DiceRoll {
 
 #[async_trait]
 impl AppInteractor for DiceRoll {
-  #[instrument(name = "Roll", level = "INFO", skip(self, commands))]
-  fn register(&self, commands: &mut CreateApplicationCommands) {
-    commands.create_application_command(|command| {
-      command
-        .name(NAME)
-        .description("Roll a die, optionally between the given bounds")
-        .kind(CommandType::ChatInput)
-        .create_option(|option| {
-          option
-            .kind(CommandOptionType::Integer)
-            .name("lower")
-            .description("Above or equal to")
-            .min_int_value(0)
-            .max_int_value(100)
-            .required(false)
-        })
-        .create_option(|option| {
-          option
-            .kind(CommandOptionType::Integer)
-            .name("upper")
-            .description("Below or equal to")
-            .min_int_value(0)
-            .max_int_value(100)
-            .required(false)
-        })
-    });
+  #[instrument(name = "Roll", level = "INFO", skip(self))]
+  fn commands(&self) -> Vec<CreateCommand> {
+    vec![CreateCommand::new(NAME)
+      .description("Roll a die, optionally between the given bounds")
+      .kind(CommandType::ChatInput)
+      .add_option(
+        CreateCommandOption::new(CommandOptionType::Integer, "lower", "Above or equal to")
+          .min_int_value(0)
+          .max_int_value(100)
+          .required(false),
+      )
+      .add_option(
+        CreateCommandOption::new(CommandOptionType::Integer, "upper", "Below or equal to")
+          .min_int_value(0)
+          .max_int_value(100)
+          .required(false),
+      )]
   }
 
   #[instrument(name = "Roll", level = "INFO", skip(self, ctx, itx))]
-  async fn app_interact(&self, ctx: &Context, itx: &ApplicationCommandInteraction) {
+  async fn app_interact(&self, ctx: &Context, itx: &CommandInteraction) {
     let mut err = false;
     if let Err(e) = self._handle_app(ctx, itx).await {
       error!("Failed to roll {:?}", e);
@@ -67,7 +53,12 @@ impl AppInteractor for DiceRoll {
     }
     if err {
       if let Err(e) = itx
-        .edit_original_interaction_response(&ctx.http, |f| f.content("Command failed"))
+        .create_response(
+          &ctx.http,
+          CreateInteractionResponse::Message(
+            CreateInteractionResponseMessage::new().content("Command failed"),
+          ),
+        )
         .await
       {
         error!("Failed to notify app failed {:?}", e);
@@ -80,25 +71,30 @@ impl DiceRoll {
   async fn _handle_app(
     &self,
     ctx: &Context,
-    itx: &ApplicationCommandInteraction,
+    itx: &CommandInteraction,
   ) -> Result<(), Box<dyn Error>> {
     if !itx.data.name.as_str().eq(NAME) {
       return Ok(());
     }
 
     itx
-      .create_interaction_response(&ctx.http, |bld| {
-        bld
-          .kind(InteractionResponseType::ChannelMessageWithSource)
-          .interaction_response_data(|f| f.content("Rolling..."))
-      })
+      .create_response(
+        &ctx.http,
+        CreateInteractionResponse::Message(
+          CreateInteractionResponseMessage::new().content("Rolling..."),
+        ),
+      )
       .await?;
-
-    let (lower, upper) = match validate(&itx.data.options) {
+    let raw_opts = itx.data.options();
+    let args = Args::from(&raw_opts);
+    let (lower, upper) = match validate(&args) {
       Ok(v) => v,
       Err(e) => {
         itx
-          .edit_original_interaction_response(&ctx.http, |f| f.content(e))
+          .edit_response(
+            &ctx.http,
+            EditInteractionResponse::new().content(format!("{}", e)),
+          )
           .await?;
         return Ok(());
       }
@@ -114,55 +110,51 @@ impl DiceRoll {
       .push(format!("<@{}>", itx.user.id))
       .push(" rolls ")
       .push(" ")
-      .mention(&emoji)
+      .emoji(&emoji)
       .push(" ");
 
     match roll {
-      1 => response.mention(&emoji),
+      1 => response.emoji(&emoji),
       21 => response.push_bold("21 - you stupid!"),
       47 => response.push_bold("god damn 47"),
       69 => response.push_bold("69").push_italic("...nice"),
-      _ => response.push_bold(roll),
+      _ => response.push_bold(roll.to_string()),
     };
 
     let resp_string = response
       .push(" ")
-      .mention(&emoji)
+      .emoji(&emoji)
       .push(" ")
       .push_mono(format!("({} - {})", lower, upper))
       .build();
 
     itx
-      .edit_original_interaction_response(&ctx.http, |f| f.content(resp_string))
+      .edit_response(
+        &ctx.http,
+        EditInteractionResponse::new().content(resp_string),
+      )
       .await?;
 
     Ok(())
   }
 }
 
-fn validate(args: &Vec<CommandDataOption>) -> Result<(u32, u32), String> {
+fn validate(args: &Args) -> Result<(u32, u32), anyhow::Error> {
   match args.len() {
     0 => Ok((1, 100)),
-    1 => Ok((extract_int(args, 0)?, 100)),
+    1 => Ok((
+      args.i64("lower").or(args.i64("upper")).map(|v| *v as u32)?,
+      100,
+    )),
     2 => {
-      let lower = extract_int(args, 0)?;
-      let upper = extract_int(args, 1)?;
+      let lower = args.i64("lower").map(|v| *v as u32)?;
+      let upper = args.i64("upper").map(|v| *v as u32)?;
       if upper < lower {
         Ok((upper, lower))
       } else {
         Ok((lower, upper))
       }
     }
-    _ => Err("Too many arugments provided".to_string()),
+    _ => Err(anyhow!("Too many arugments provided")),
   }
-}
-
-fn extract_int(args: &[CommandDataOption], idx: usize) -> Result<u32, String> {
-  args
-    .get(idx)
-    .and_then(|d| match d.resolved {
-      Some(CommandDataOptionValue::Integer(i)) => Some(i as u32),
-      _ => None,
-    })
-    .ok_or_else(|| "Could not parse".to_string())
 }

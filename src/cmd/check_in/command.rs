@@ -1,27 +1,25 @@
-use std::{collections::HashMap, error::Error, time::Duration};
-
+use super::{CheckInCtx, CheckInMessage};
+use crate::{
+  actor::ActorHandle,
+  cmd::{arg_util::Args, AppInteractor},
+  emoji::EmojiLookup,
+};
+use anyhow::anyhow;
 use chrono::NaiveTime;
 use derive_new::new;
 use humantime::parse_duration;
 use serenity::{
+  all::{CommandInteraction, CommandOptionType, CommandType, Role},
   async_trait,
-  builder::CreateApplicationCommands,
-  model::prelude::{
-    command::{CommandOptionType, CommandType},
-    interaction::{
-      application_command::{ApplicationCommandInteraction, CommandDataOptionValue},
-      InteractionResponseType,
-    },
-    Role,
+  builder::{
+    CreateCommand, CreateCommandOption, CreateInteractionResponse,
+    CreateInteractionResponseMessage, EditInteractionResponse,
   },
   prelude::Context,
   utils::MessageBuilder,
 };
+use std::time::Duration;
 use tracing::{error, instrument};
-
-use crate::{actor::ActorHandle, cmd::AppInteractor, emoji::EmojiLookup};
-
-use super::{CheckInCtx, CheckInMessage};
 
 const NAME: &str = "check-in";
 
@@ -33,57 +31,46 @@ pub struct CheckIn {
 
 #[async_trait]
 impl AppInteractor for CheckIn {
-  #[instrument(name = "CheckIn", level = "INFO", skip(self, commands))]
-  fn register(&self, commands: &mut CreateApplicationCommands) {
-    commands.create_application_command(|command| {
-      command
-        .name(NAME)
-        .description("Create a Check In for this Channel")
-        .kind(CommandType::ChatInput)
-        .create_option(|option| {
-          option
-            .kind(CommandOptionType::String)
-            .name("duration")
-            .description(
-              "How long until poll closes. Valid time units: 'day', 'hour', 'minute'. ex: 30minute",
-            )
-            .required(true)
-        })
-        .create_option(|option| {
-          option
-            .kind(CommandOptionType::String)
-            .name("time")
-            .description("What time to run the poll, eg 19:30:00")
-            .required(true)
-        })
-        .create_option(|option| {
-          option
-            .kind(CommandOptionType::Role)
-            .name("role")
-            .description("What role to tag, if any")
-            .required(false)
-        })
-    });
+  #[instrument(name = "CheckIn", level = "INFO", skip(self))]
+  fn commands(&self) -> Vec<CreateCommand> {
+    vec![CreateCommand::new(NAME)
+      .description("Create a Check In for this Channel")
+      .kind(CommandType::ChatInput)
+      .add_option(
+        CreateCommandOption::new(
+          CommandOptionType::String,
+          "duration",
+          "How long until poll closes. Valid time units: 'day', 'hour', 'minute'. ex: 30minute",
+        )
+        .required(true),
+      )
+      .add_option(
+        CreateCommandOption::new(
+          CommandOptionType::String,
+          "time",
+          "What time to run the poll, eg 19:30:00",
+        )
+        .required(true),
+      )
+      .add_option(
+        CreateCommandOption::new(CommandOptionType::Role, "role", "What role to tag, if any")
+          .required(false),
+      )]
   }
 
   #[instrument(name = "CheckIn", level = "INFO", skip(self, ctx, itx))]
-  async fn app_interact(&self, ctx: &Context, itx: &ApplicationCommandInteraction) {
-    let mut err = false;
+  async fn app_interact(&self, ctx: &Context, itx: &CommandInteraction) {
+    if !itx.data.name.as_str().eq(NAME) {
+      return;
+    }
     if let Err(e) = self._handle_app(ctx, itx).await {
       error!("Failed to create poll {:?}", e);
-      err = true;
-    }
-    if err {
-      if let Err(e) = itx
-        .create_interaction_response(&ctx.http, |bld| {
-          bld
-            .kind(InteractionResponseType::ChannelMessageWithSource)
-            .interaction_response_data(|f| f.content("Command failed"))
-        })
-        .await
-      {
-        error!("Failed to notify app failed {:?}", e);
-      }
+      let _ = itx
+        .edit_response(
+          &ctx.http,
+          EditInteractionResponse::new().content(&format!("{}", e)),
+        )
+        .await;
     }
   }
 }
@@ -92,51 +79,32 @@ impl CheckIn {
   async fn _handle_app(
     &self,
     ctx: &Context,
-    itx: &ApplicationCommandInteraction,
-  ) -> Result<(), Box<dyn Error>> {
-    if !itx.data.name.as_str().eq(NAME) {
-      return Ok(());
-    }
-    let guild_id = match itx.guild_id {
-      Some(g) => g,
-      None => {
-        return Err("No Guild Id on Interaction".into());
-      }
-    };
+    itx: &CommandInteraction,
+  ) -> Result<(), anyhow::Error> {
+    let guild_id = itx
+      .guild_id
+      .ok_or_else(|| anyhow!("No Guild Id on Interaction"))?;
     let emoji = self.emoji.get(&ctx.http, &ctx.cache, guild_id).await?;
-    let args = &itx.data.options;
-    let map: HashMap<String, _> = args
-      .iter()
-      .map(|d| (d.name.to_owned(), d.resolved.to_owned()))
-      .collect();
+    let raw_args = &itx.data.options();
+    let args = Args::from(raw_args);
 
-    let duration: Duration = map
-      .get("duration")
-      .and_then(|v| v.to_owned())
-      .and_then(|d| match d {
-        CommandDataOptionValue::String(v) => Some(v),
-        _ => None,
-      })
-      .ok_or("No duration given")
-      .and_then(|s| parse_duration(&s).map_err(|_| "Invalid duration given"))?;
+    let duration: Duration = args
+      .str("duration")
+      .map_err(|e| anyhow!("Duration not given").context(e))
+      .and_then(|s| parse_duration(&s).map_err(|e| anyhow!("Invalid duration given").context(e)))?;
 
-    let time: NaiveTime = map
-      .get("time")
-      .and_then(|v| v.to_owned())
-      .and_then(|d| match d {
-        CommandDataOptionValue::String(v) => Some(v),
-        _ => None,
-      })
-      .ok_or("No time given")
-      .and_then(|s| s.parse::<NaiveTime>().map_err(|_| "Invalid time given"))?;
+    let time: NaiveTime = args
+      .str("time")
+      .map_err(|e| anyhow!("No time given").context(e))
+      .and_then(|s| {
+        s.parse::<NaiveTime>()
+          .map_err(|e| anyhow!("Invalid time given").context(e))
+      })?;
 
-    let at_group: Option<Role> = map
-      .get("role")
-      .and_then(|v| v.to_owned())
-      .and_then(|d| match d {
-        CommandDataOptionValue::Role(v) => Some(v),
-        _ => None,
-      });
+    let at_group: Option<Role> = args
+      .opt_role("role")
+      .map_err(|e| anyhow!("Invalid role given").context(e))
+      .map(|v| v.map(|r| r.clone()))?;
 
     self
       .actor
@@ -150,22 +118,22 @@ impl CheckIn {
       )))
       .await;
     itx
-      .create_interaction_response(&ctx.http, |f| {
-        f.kind(InteractionResponseType::ChannelMessageWithSource)
-          .interaction_response_data(|k| {
-            k.content(
-              MessageBuilder::new()
-                .mention(&emoji)
-                .push_bold("Check in set to ")
-                .push_italic(time)
-                .push_bold(" lasting ")
-                .push_italic(duration.as_secs())
-                .push_bold(" seconds.")
-                .mention(&emoji)
-                .build(),
-            )
-          })
-      })
+      .create_response(
+        &ctx.http,
+        CreateInteractionResponse::Message(
+          CreateInteractionResponseMessage::new().content(
+            MessageBuilder::new()
+              .emoji(&emoji)
+              .push_bold("Check in set to ")
+              .push_italic(time.to_string())
+              .push_bold(" lasting ")
+              .push_italic(duration.as_secs().to_string())
+              .push_bold(" seconds.")
+              .emoji(&emoji)
+              .build(),
+          ),
+        ),
+      )
       .await?;
     Ok(())
   }
