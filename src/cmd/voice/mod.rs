@@ -7,17 +7,19 @@ mod skip;
 mod stop;
 
 use self::connect_util::{DisconnectActor, DisconnectMessage};
+use super::arg_util::Args;
 use super::{AppInteractor, SubCommandHandler};
 use crate::{actor::ActorHandle, config::Config, emoji::EmojiLookup};
 use list::*;
 use play::*;
 use reorder::*;
 use serenity::all::{CommandOptionType, CommandType, CreateCommand, CreateCommandOption};
-use serenity::builder::{CreateInteractionResponse, CreateInteractionResponseMessage};
+use serenity::builder::{
+  CreateInteractionResponse, CreateInteractionResponseMessage, EditInteractionResponse,
+};
 use serenity::{all::CommandInteraction, async_trait, client::Context};
 use shuffle::*;
 use skip::*;
-use std::error::Error;
 use stop::*;
 use tracing::{instrument, log::error};
 
@@ -106,64 +108,49 @@ impl AppInteractor for Voice {
 
   #[instrument(name = "Voice", level = "INFO", skip(self, ctx, itx))]
   async fn app_interact(&self, ctx: &Context, itx: &CommandInteraction) {
-    let mut err = false;
-    if let Err(e) = self._handle_app(ctx, itx).await {
-      error!("Failed voice operation {:?}", e);
-      err = true;
-    }
-    if err {
-      if let Err(e) = itx
-        .create_response(
-          &ctx.http,
-          CreateInteractionResponse::Message(
-            CreateInteractionResponseMessage::new().content("Command failed"),
-          ),
-        )
-        .await
-      {
-        error!("Failed to notify app failed {:?}", e);
-      }
-    }
-  }
-}
-
-impl Voice {
-  async fn _handle_app(
-    &self,
-    ctx: &Context,
-    itx: &CommandInteraction,
-  ) -> Result<(), Box<dyn Error>> {
     if !itx.data.name.as_str().eq(NAME) {
-      return Ok(());
+      return;
     }
-    itx
+
+    if let Err(e) = itx
       .create_response(
         &ctx.http,
         CreateInteractionResponse::Message(
           CreateInteractionResponseMessage::new().content("Loading..."),
         ),
       )
-      .await?;
+      .await
+    {
+      error!("{:?}", e);
+      return;
+    }
 
     // This is a bit annoying of an interface but when we're talking
     // subcommands here the options vec should only ever be 1 long
     // and its gonna have the option on it.
-    let subopt = itx
-      .data
-      .options
-      .first()
-      .expect("Discord did not pass sub-opt");
-
-    match subopt.name.as_str() {
-      "yt" => self.play.handle(ctx, itx, subopt).await?,
-      "stop" => self.stop.handle(ctx, itx, subopt).await?,
-      "skip" => self.skip.handle(ctx, itx, subopt).await?,
-      "reorder" => self.reorder.handle(ctx, itx, subopt).await?,
-      "list" => self.list.handle(ctx, itx, subopt).await?,
-      "shuffle" => self.shuffle.handle(ctx, itx, subopt).await?,
-      _ => unreachable!(),
+    let top_args = itx.data.options();
+    let subopt = top_args.first().expect("Discord did not pass sub-opt");
+    let args = match &subopt.value {
+      serenity::all::ResolvedValue::SubCommand(c) => Args::from(c),
+      _ => unreachable!("Dev error - subopt was not subcommand"),
     };
 
-    Ok(())
+    if let Err(e) = match subopt.name {
+      "yt" => self.play.handle(ctx, itx, &args).await,
+      "stop" => self.stop.handle(ctx, itx, &args).await,
+      "skip" => self.skip.handle(ctx, itx, &args).await,
+      "reorder" => self.reorder.handle(ctx, itx, &args).await,
+      "list" => self.list.handle(ctx, itx, &args).await,
+      "shuffle" => self.shuffle.handle(ctx, itx, &args).await,
+      _ => unreachable!(),
+    } {
+      error!("{:?}", e);
+      let _ = itx
+        .edit_response(
+          &ctx.http,
+          EditInteractionResponse::new().content(&format!("{}", e)),
+        )
+        .await;
+    }
   }
 }

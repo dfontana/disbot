@@ -1,13 +1,13 @@
-use crate::{cmd::SubCommandHandler, docker::Docker};
+use crate::{
+  cmd::{arg_util::Args, SubCommandHandler},
+  docker::Docker,
+};
+use anyhow::anyhow;
 use bollard::service::ContainerStateStatusEnum::{CREATED, EXITED};
 use derive_new::new;
 use serenity::{
-  all::{CommandDataOption, CommandInteraction, ResolvedValue},
-  async_trait,
-  builder::EditInteractionResponse,
-  client::Context,
+  all::CommandInteraction, async_trait, builder::EditInteractionResponse, client::Context,
 };
-use std::collections::HashMap;
 
 #[derive(new)]
 pub struct Start {
@@ -20,23 +20,12 @@ impl SubCommandHandler for Start {
     &self,
     ctx: &Context,
     itx: &CommandInteraction,
-    _subopt: &CommandDataOption,
-  ) -> Result<(), Box<dyn std::error::Error>> {
+    args: &Args,
+  ) -> Result<(), anyhow::Error> {
     // TODO: Let's move to autocomplete on these
-    let args: HashMap<String, _> = itx
-      .data
-      .options()
-      .iter()
-      .map(|d| (d.name.to_owned(), d.value.to_owned()))
-      .collect();
-
     let name = args
-      .get("server-name")
-      .and_then(|d| match d {
-        ResolvedValue::String(v) => Some(v),
-        _ => None,
-      })
-      .ok_or("Must provide a server name")?;
+      .str("server-name")
+      .map_err(|e| anyhow!("Must provide a server name").context(e))?;
 
     match self.docker.status(&name).await {
       Ok(CREATED | EXITED) => {}

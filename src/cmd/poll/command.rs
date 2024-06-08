@@ -4,12 +4,14 @@ use crate::{
   cmd::{poll::pollstate::PollState, AppInteractor},
   emoji::EmojiLookup,
 };
+use anyhow::anyhow;
 use derive_new::new;
 use serenity::{
   all::{CommandInteraction, CommandOptionType, CommandType, ComponentInteraction},
   async_trait,
   builder::{
-    CreateCommand, CreateCommandOption, CreateInteractionResponse, CreateInteractionResponseMessage,
+    CreateCommand, CreateCommandOption, CreateInteractionResponse,
+    CreateInteractionResponseMessage, EditInteractionResponse,
   },
   client::Context,
 };
@@ -74,23 +76,17 @@ impl AppInteractor for Poll {
 
   #[instrument(name = "Poller", level = "INFO", skip(self, ctx, itx))]
   async fn app_interact(&self, ctx: &Context, itx: &CommandInteraction) {
-    let mut err = false;
+    if !itx.data.name.as_str().eq(NAME) {
+      return;
+    }
     if let Err(e) = self._handle_app(ctx, itx).await {
       error!("Failed to create poll {:?}", e);
-      err = true;
-    }
-    if err {
-      if let Err(e) = itx
-        .create_response(
+      let _ = itx
+        .edit_response(
           &ctx.http,
-          CreateInteractionResponse::Message(
-            CreateInteractionResponseMessage::new().content("Command failed"),
-          ),
+          EditInteractionResponse::new().content(&format!("{}", e)),
         )
-        .await
-      {
-        error!("Failed to notify app failed {:?}", e);
-      }
+        .await;
     }
   }
 
@@ -114,22 +110,17 @@ impl Poll {
     &self,
     ctx: &Context,
     itx: &CommandInteraction,
-  ) -> Result<(), Box<dyn Error>> {
-    if !itx.data.name.as_str().eq(NAME) {
-      return Ok(());
-    }
-    let guild_id = match itx.guild_id {
-      Some(g) => g,
-      None => {
-        return Err("No Guild Id on Interaction".into());
-      }
-    };
-    let emoji = self.emoji.get(&ctx.http, &ctx.cache, guild_id).await?;
-    let ps = PollState::from_args(ctx, emoji, itx)?;
-    self
-      .actor
-      .send(PollMessage::CreatePoll((ps, itx.channel_id)))
-      .await;
+  ) -> Result<(), anyhow::Error> {
+    let guild_id = itx
+      .guild_id
+      .ok_or_else(|| anyhow!("No Guild Id on Interaction"))?;
+    let pm = self
+      .emoji
+      .get(&ctx.http, &ctx.cache, guild_id)
+      .await
+      .and_then(|emoji| PollState::from_args(ctx, emoji, itx))
+      .map(|ps| PollMessage::CreatePoll((ps, itx.channel_id)))?;
+    self.actor.send(pm).await;
     let _ = itx
       .create_response(
         &ctx.http,

@@ -1,17 +1,17 @@
-use std::{error::Error, time::Duration};
-
-use crate::{cmd::SubCommandHandler, emoji::EmojiLookup};
+use crate::{
+  cmd::{arg_util::Args, SubCommandHandler},
+  emoji::EmojiLookup,
+};
+use anyhow::anyhow;
 use derive_new::new;
 use rand::seq::SliceRandom;
 use rand::thread_rng;
 use reqwest::Client;
 use serenity::{
-  all::{CommandDataOption, CommandInteraction},
-  async_trait,
-  builder::EditInteractionResponse,
-  client::Context,
+  all::CommandInteraction, async_trait, builder::EditInteractionResponse, client::Context,
   utils::MessageBuilder,
 };
+use std::time::Duration;
 
 const IP_ECHOERS: &[&str; 3] = &[
   "https://api.ipify.org/",
@@ -31,12 +31,12 @@ impl SubCommandHandler for Ip {
     &self,
     ctx: &Context,
     itx: &CommandInteraction,
-    _subopt: &CommandDataOption,
-  ) -> Result<(), Box<dyn Error>> {
+    _args: &Args,
+  ) -> Result<(), anyhow::Error> {
     let guild_id = match itx.guild_id {
       Some(g) => g,
       None => {
-        return Err("No Guild Id on Interaction".into());
+        return Err(anyhow!("No Guild Id on Interaction"));
       }
     };
 

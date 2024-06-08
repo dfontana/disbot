@@ -1,12 +1,10 @@
-use super::AppInteractor;
+use super::{arg_util::Args, AppInteractor};
 use crate::emoji::EmojiLookup;
+use anyhow::anyhow;
 use derive_new::new;
 use rand::Rng;
 use serenity::{
-  all::{
-    CommandInteraction, CommandOptionType, CommandType, CreateCommandOption, ResolvedOption,
-    ResolvedValue,
-  },
+  all::{CommandInteraction, CommandOptionType, CommandType, CreateCommandOption},
   async_trait,
   builder::{
     CreateCommand, CreateInteractionResponse, CreateInteractionResponseMessage,
@@ -87,12 +85,16 @@ impl DiceRoll {
         ),
       )
       .await?;
-
-    let (lower, upper) = match validate(&itx.data.options()) {
+    let raw_opts = itx.data.options();
+    let args = Args::from(&raw_opts);
+    let (lower, upper) = match validate(&args) {
       Ok(v) => v,
       Err(e) => {
         itx
-          .edit_response(&ctx.http, EditInteractionResponse::new().content(e))
+          .edit_response(
+            &ctx.http,
+            EditInteractionResponse::new().content(format!("{}", e)),
+          )
           .await?;
         return Ok(());
       }
@@ -137,29 +139,22 @@ impl DiceRoll {
   }
 }
 
-fn validate(args: &Vec<ResolvedOption>) -> Result<(u32, u32), String> {
+fn validate(args: &Args) -> Result<(u32, u32), anyhow::Error> {
   match args.len() {
     0 => Ok((1, 100)),
-    1 => Ok((extract_int(args, 0)?, 100)),
+    1 => Ok((
+      args.i64("lower").or(args.i64("upper")).map(|v| *v as u32)?,
+      100,
+    )),
     2 => {
-      let lower = extract_int(args, 0)?;
-      let upper = extract_int(args, 1)?;
+      let lower = args.i64("lower").map(|v| *v as u32)?;
+      let upper = args.i64("upper").map(|v| *v as u32)?;
       if upper < lower {
         Ok((upper, lower))
       } else {
         Ok((lower, upper))
       }
     }
-    _ => Err("Too many arugments provided".to_string()),
+    _ => Err(anyhow!("Too many arugments provided")),
   }
-}
-
-fn extract_int(args: &[ResolvedOption], idx: usize) -> Result<u32, String> {
-  args
-    .get(idx)
-    .and_then(|d| match d.value {
-      ResolvedValue::Integer(i) => Some(i as u32),
-      _ => None,
-    })
-    .ok_or_else(|| "Could not parse".to_string())
 }

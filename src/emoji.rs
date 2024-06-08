@@ -1,5 +1,5 @@
 use crate::config::Config;
-
+use anyhow::anyhow;
 use cached::proc_macro::cached;
 use once_cell::sync::Lazy;
 use serenity::{
@@ -28,7 +28,12 @@ impl EmojiLookup {
     }
   }
 
-  pub async fn get(&self, http: &Http, cache: &Cache, guild_id: GuildId) -> Result<Emoji, String> {
+  pub async fn get(
+    &self,
+    http: &Http,
+    cache: &Cache,
+    guild_id: GuildId,
+  ) -> Result<Emoji, anyhow::Error> {
     get_emoji(http, cache, guild_id, self.emote_name.clone()).await
   }
 }
@@ -45,13 +50,13 @@ async fn get_emoji(
   scache: &Cache,
   guild_id: GuildId,
   name: String,
-) -> Result<Emoji, String> {
+) -> Result<Emoji, anyhow::Error> {
   // Check if the guild has the emoji registered (have to search by name, not id)
   // return if they do (we don't want to re-create it)
   let emojis = scache
     .guild(guild_id)
     .map(|g| g.emojis.clone())
-    .ok_or_else(|| "Failed to pull emojis for Guild".to_string())?;
+    .ok_or_else(|| anyhow!("Failed to pull emojis for Guild"))?;
   if let Some((_, emote)) = emojis.iter().find(|(_, em)| em.name == name) {
     info!("Resolved emoji {} for guild {}", name, guild_id);
     return Ok(emote.clone());
@@ -62,6 +67,6 @@ async fn get_emoji(
   let emote = guild_id
     .create_emoji(http, &name, &EMOJI_IMAGE)
     .await
-    .map_err(|err| format!("{:?}", err))?;
+    .map_err(|err| anyhow!(err))?;
   Ok(emote)
 }

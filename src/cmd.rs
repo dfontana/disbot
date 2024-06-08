@@ -1,4 +1,5 @@
 use self::{
+  arg_util::Args,
   check_in::{CheckInActor, CheckInMessage},
   poll::{PollActor, PollMessage},
 };
@@ -6,15 +7,15 @@ use crate::{actor::ActorHandle, config::Config, docker::Docker, emoji::EmojiLook
 use itertools::Itertools;
 use reqwest::Client;
 use serenity::{
-  all::{CommandDataOption, CommandInteraction, ComponentInteraction, Interaction},
+  all::{CommandInteraction, ComponentInteraction, Interaction},
   async_trait,
   builder::CreateCommand,
   futures::future,
   model::{channel::Message, gateway::Ready},
   prelude::*,
 };
-use std::error::Error;
 
+mod arg_util;
 mod check_in;
 mod dice_roll;
 mod poll;
@@ -44,8 +45,8 @@ trait SubCommandHandler: Send + Sync {
     &self,
     ctx: &Context,
     itx: &CommandInteraction,
-    subopt: &CommandDataOption,
-  ) -> Result<(), Box<dyn Error>>;
+    args: &Args,
+  ) -> Result<(), anyhow::Error>;
 }
 
 pub struct Handler {

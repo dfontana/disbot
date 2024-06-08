@@ -3,7 +3,7 @@ mod list;
 mod start;
 mod stop;
 
-use super::{AppInteractor, SubCommandHandler};
+use super::{arg_util::Args, AppInteractor, SubCommandHandler};
 use crate::{docker::Docker, emoji::EmojiLookup};
 use ip::*;
 use list::*;
@@ -132,17 +132,18 @@ impl GameServers {
     // This is a bit annoying of an interface but when we're talking
     // subcommands here the options vec should only ever be 1 long
     // and its gonna have the option on it.
-    let subopt = itx
-      .data
-      .options
-      .first()
-      .expect("Discord did not pass sub-opt");
+    let top_args = itx.data.options();
+    let subopt = top_args.first().expect("Discord did not pass sub-opt");
+    let args = match &subopt.value {
+      serenity::all::ResolvedValue::SubCommand(c) => Args::from(c),
+      _ => return Err("Dev error - subopt registered that's not a subcommand".into()),
+    };
 
-    match subopt.name.as_str() {
-      "start" => self.start.handle(ctx, itx, subopt).await?,
-      "stop" => self.stop.handle(ctx, itx, subopt).await?,
-      "list" => self.list.handle(ctx, itx, subopt).await?,
-      "ip" => self.ip.handle(ctx, itx, subopt).await?,
+    match subopt.name {
+      "start" => self.start.handle(ctx, itx, &args).await?,
+      "stop" => self.stop.handle(ctx, itx, &args).await?,
+      "list" => self.list.handle(ctx, itx, &args).await?,
+      "ip" => self.ip.handle(ctx, itx, &args).await?,
       _ => unreachable!(),
     };
 

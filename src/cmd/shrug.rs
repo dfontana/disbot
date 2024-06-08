@@ -62,13 +62,10 @@ impl MessageListener for ShrugHandler {
 
     let emoji = self.emoji.get(&ctx.http, &ctx.cache, guild_id).await;
 
-    let send = match emoji {
-      Ok(e) => self.react_and_send(e, ctx, msg).await,
-      Err(cause) => Err(cause),
-    };
-
-    match send {
-      Ok(_) => {}
+    match emoji {
+      Ok(e) => {
+        let _ = self.react_and_send(e, ctx, msg).await;
+      }
       Err(cause) => {
         error!("Failed to react {:?}", cause);
         if let Err(why) = msg
@@ -80,6 +77,6 @@ impl MessageListener for ShrugHandler {
           return;
         }
       }
-    }
+    };
   }
 }

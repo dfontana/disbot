@@ -1,13 +1,9 @@
-use std::{collections::HashMap, error::Error};
-
 use super::SubCommandHandler;
-use crate::emoji::EmojiLookup;
+use crate::{cmd::arg_util::Args, emoji::EmojiLookup};
+use anyhow::anyhow;
 use derive_new::new;
 use serenity::{
-  all::{CommandDataOption, CommandInteraction, ResolvedValue},
-  async_trait,
-  builder::EditInteractionResponse,
-  client::Context,
+  all::CommandInteraction, async_trait, builder::EditInteractionResponse, client::Context,
   utils::MessageBuilder,
 };
 
@@ -22,69 +18,27 @@ impl SubCommandHandler for Reorder {
     &self,
     ctx: &Context,
     itx: &CommandInteraction,
-    _subopt: &CommandDataOption,
-  ) -> Result<(), Box<dyn Error>> {
-    // 2 args: from, to. Min value 1. Integers.
-    let args: HashMap<String, _> = itx
-      .data
-      .options()
-      .iter()
-      .map(|d| (d.name.to_owned(), d.value.to_owned()))
-      .collect();
-
-    // Get the handler
-    let guild_id = match itx.guild_id {
-      Some(g) => g,
-      None => {
-        return Err("No Guild Id on Interaction".into());
-      }
-    };
+    args: &Args,
+  ) -> Result<(), anyhow::Error> {
+    let guild_id = itx
+      .guild_id
+      .ok_or_else(|| anyhow!("No Guild Id on Interaction"))?;
     let manager = songbird::get(ctx)
       .await
       .expect("Songbird Voice client placed in at initialisation.")
       .clone();
-    let handler_lock = match manager.get(guild_id) {
-      None => {
-        itx
-          .edit_response(
-            &ctx.http,
-            EditInteractionResponse::new().content("Not in a voice channel"),
-          )
-          .await?;
-        return Ok(());
-      }
-      Some(v) => v,
-    };
+    let handler_lock = manager
+      .get(guild_id)
+      .ok_or_else(|| anyhow!("Not in a voice channel"))?;
     let handler = handler_lock.lock().await;
 
-    //  Validate the position args
+    // 2 args: from, to. Min value 1. Integers.
+    // Validate the position args
     let queue_size = handler.queue().current_queue().len();
-    let posa = match validate_position(get_arg(&args, "from"), queue_size) {
-      Ok(v) => v,
-      Err(e) => {
-        itx
-          .edit_response(&ctx.http, EditInteractionResponse::new().content(&e))
-          .await?;
-        return Ok(());
-      }
-    };
-    let posb = match validate_position(get_arg(&args, "to"), queue_size) {
-      Ok(v) => v,
-      Err(e) => {
-        itx
-          .edit_response(&ctx.http, EditInteractionResponse::new().content(&e))
-          .await?;
-        return Ok(());
-      }
-    };
+    let posa = validate_position(args.i64("from"), queue_size)?;
+    let posb = validate_position(args.i64("to"), queue_size)?;
     if posa == posb {
-      itx
-        .edit_response(
-          &ctx.http,
-          EditInteractionResponse::new().content("A touch psychotic are we?"),
-        )
-        .await?;
-      return Ok(());
+      return Err(anyhow!("A touch psychotic are we?"));
     }
 
     // Perform the movement
@@ -119,27 +73,20 @@ impl SubCommandHandler for Reorder {
   }
 }
 
-fn get_arg(args: &HashMap<String, ResolvedValue>, key: &str) -> Result<usize, String> {
-  args
-    .get(key)
-    .and_then(|d| match d {
-      ResolvedValue::Integer(v) => Some(v.to_owned()),
-      _ => None,
-    })
-    .map(|i| i as usize)
-    .ok_or_else(|| "Missing bound".into())
-}
-
-fn validate_position<T>(maybe_pos: Result<usize, T>, queue_size: usize) -> Result<usize, String> {
+fn validate_position(
+  maybe_pos: Result<&i64, anyhow::Error>,
+  queue_size: usize,
+) -> Result<usize, anyhow::Error> {
   let pos = match maybe_pos {
-    Err(_) => return Err("Must provide a numeric position".into()),
+    Err(e) => return Err(anyhow!("Must provide a numeric position").context(e)),
     Ok(v) => v,
   };
-  if pos <= 1 {
-    return Err("Cannot move first item".into());
+  if *pos <= 1 {
+    return Err(anyhow!("Cannot move first item"));
   }
-  if pos > queue_size {
-    return Err("Can only move item to end of queue".into());
+  let posb = *pos as usize;
+  if posb > queue_size {
+    return Err(anyhow!("Can only move item to end of queue"));
   }
-  Ok(pos)
+  Ok(posb)
 }

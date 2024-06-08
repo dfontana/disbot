@@ -1,21 +1,25 @@
+use super::{CheckInCtx, CheckInMessage};
+use crate::{
+  actor::ActorHandle,
+  cmd::{arg_util::Args, AppInteractor},
+  emoji::EmojiLookup,
+};
+use anyhow::anyhow;
 use chrono::NaiveTime;
 use derive_new::new;
 use humantime::parse_duration;
 use serenity::{
-  all::{CommandInteraction, CommandOptionType, CommandType, ResolvedValue, Role},
+  all::{CommandInteraction, CommandOptionType, CommandType, Role},
   async_trait,
   builder::{
-    CreateCommand, CreateCommandOption, CreateInteractionResponse, CreateInteractionResponseMessage,
+    CreateCommand, CreateCommandOption, CreateInteractionResponse,
+    CreateInteractionResponseMessage, EditInteractionResponse,
   },
   prelude::Context,
   utils::MessageBuilder,
 };
-use std::{collections::HashMap, error::Error, time::Duration};
+use std::time::Duration;
 use tracing::{error, instrument};
-
-use crate::{actor::ActorHandle, cmd::AppInteractor, emoji::EmojiLookup};
-
-use super::{CheckInCtx, CheckInMessage};
 
 const NAME: &str = "check-in";
 
@@ -56,23 +60,17 @@ impl AppInteractor for CheckIn {
 
   #[instrument(name = "CheckIn", level = "INFO", skip(self, ctx, itx))]
   async fn app_interact(&self, ctx: &Context, itx: &CommandInteraction) {
-    let mut err = false;
+    if !itx.data.name.as_str().eq(NAME) {
+      return;
+    }
     if let Err(e) = self._handle_app(ctx, itx).await {
       error!("Failed to create poll {:?}", e);
-      err = true;
-    }
-    if err {
-      if let Err(e) = itx
-        .create_response(
+      let _ = itx
+        .edit_response(
           &ctx.http,
-          CreateInteractionResponse::Message(
-            CreateInteractionResponseMessage::new().content("Command failed"),
-          ),
+          EditInteractionResponse::new().content(&format!("{}", e)),
         )
-        .await
-      {
-        error!("Failed to notify app failed {:?}", e);
-      }
+        .await;
     }
   }
 }
@@ -82,45 +80,31 @@ impl CheckIn {
     &self,
     ctx: &Context,
     itx: &CommandInteraction,
-  ) -> Result<(), Box<dyn Error>> {
-    if !itx.data.name.as_str().eq(NAME) {
-      return Ok(());
-    }
-    let guild_id = match itx.guild_id {
-      Some(g) => g,
-      None => {
-        return Err("No Guild Id on Interaction".into());
-      }
-    };
+  ) -> Result<(), anyhow::Error> {
+    let guild_id = itx
+      .guild_id
+      .ok_or_else(|| anyhow!("No Guild Id on Interaction"))?;
     let emoji = self.emoji.get(&ctx.http, &ctx.cache, guild_id).await?;
-    let args = &itx.data.options();
-    let map: HashMap<String, _> = args
-      .iter()
-      .map(|d| (d.name.to_owned(), d.value.to_owned()))
-      .collect();
+    let raw_args = &itx.data.options();
+    let args = Args::from(raw_args);
 
-    let duration: Duration = map
-      .get("duration")
-      .and_then(|d| match d {
-        ResolvedValue::String(v) => Some(v),
-        _ => None,
-      })
-      .ok_or("No duration given")
-      .and_then(|s| parse_duration(&s).map_err(|_| "Invalid duration given"))?;
+    let duration: Duration = args
+      .str("duration")
+      .map_err(|e| anyhow!("Duration not given").context(e))
+      .and_then(|s| parse_duration(&s).map_err(|e| anyhow!("Invalid duration given").context(e)))?;
 
-    let time: NaiveTime = map
-      .get("time")
-      .and_then(|d| match d {
-        ResolvedValue::String(v) => Some(v),
-        _ => None,
-      })
-      .ok_or("No time given")
-      .and_then(|s| s.parse::<NaiveTime>().map_err(|_| "Invalid time given"))?;
+    let time: NaiveTime = args
+      .str("time")
+      .map_err(|e| anyhow!("No time given").context(e))
+      .and_then(|s| {
+        s.parse::<NaiveTime>()
+          .map_err(|e| anyhow!("Invalid time given").context(e))
+      })?;
 
-    let at_group: Option<Role> = map.get("role").and_then(|d| match d {
-      ResolvedValue::Role(v) => Some((*v).clone()),
-      _ => None,
-    });
+    let at_group: Option<Role> = args
+      .opt_role("role")
+      .map_err(|e| anyhow!("Invalid role given").context(e))
+      .map(|v| v.map(|r| r.clone()))?;
 
     self
       .actor

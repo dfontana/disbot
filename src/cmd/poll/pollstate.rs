@@ -1,6 +1,7 @@
+use anyhow::anyhow;
 use humantime::parse_duration;
 use serenity::{
-  all::{CommandInteraction, ResolvedValue},
+  all::CommandInteraction,
   http::Http,
   model::prelude::{ChannelId, Emoji},
   prelude::Context,
@@ -13,7 +14,7 @@ use std::{
 use tracing::{info, instrument, warn};
 use uuid::Uuid;
 
-use crate::cmd::check_in::CheckInCtx;
+use crate::cmd::{arg_util::Args, check_in::CheckInCtx};
 
 use super::cache::Expiring;
 
@@ -70,42 +71,28 @@ impl PollState {
     ctx: &Context,
     emoji: Emoji,
     itx: &CommandInteraction,
-  ) -> Result<PollState, String> {
-    let args = &itx.data.options();
+  ) -> Result<PollState, anyhow::Error> {
+    let raw_args = &itx.data.options();
+    let args = Args::from(raw_args);
 
-    let map: HashMap<String, _> = args
-      .iter()
-      .map(|d| (d.name.to_owned(), d.value.to_owned()))
-      .collect();
+    let duration: Duration = args
+      .str("duration")
+      .map_err(|e| anyhow!("Duration not given").context(e))
+      .and_then(|s| parse_duration(&s).map_err(|e| anyhow!("Invalid duration given").context(e)))?;
 
-    let duration: Duration = map
-      .get("duration")
-      .and_then(|d| match d {
-        ResolvedValue::String(v) => Some(v),
-        _ => None,
-      })
-      .ok_or("No duration given")
-      .and_then(|s| parse_duration(&s).map_err(|_| "Invalid duration given"))?;
-
-    let topic: String = map
-      .get("topic")
-      .and_then(|d| match d {
-        ResolvedValue::String(v) => Some(v.to_string()),
-        _ => None,
-      })
-      .ok_or("No topic given")?;
+    let topic: String = args
+      .str("topic")
+      .map_err(|e| anyhow!("No topic given").context(e))
+      .map(|s| s.to_string())?;
 
     let items: Vec<String> = { 0..9 }
       .map(|i| format!("option_{}", i))
-      .filter_map(|key| map.get(&key))
-      .filter_map(|d| match d {
-        ResolvedValue::String(v) => Some(v.to_string()),
-        _ => None,
-      })
+      .filter_map(|key| args.str(&key).ok())
+      .map(|s| s.to_string())
       .collect();
 
     if items.is_empty() {
-      return Err("None or Malformed options given".into());
+      return Err(anyhow!("None or Malformed options given"));
     }
 
     let opt_width = items.iter().map(String::len).max().unwrap_or(1);

@@ -14,13 +14,21 @@ mod env;
 use std::str::FromStr;
 
 use docker::Docker;
-use serenity::{client::Client, prelude::GatewayIntents};
+use serenity::{
+  client::Client,
+  prelude::{GatewayIntents, TypeMapKey},
+};
 use songbird::SerenityInit;
 use tracing::{error, Level};
 
 use cmd::Handler;
 use config::Config;
 use env::Environment;
+
+pub struct HttpClient;
+impl TypeMapKey for HttpClient {
+  type Value = reqwest::Client;
+}
 
 #[tokio::main]
 async fn main() {
@@ -39,6 +47,7 @@ async fn main() {
     .with_target(false)
     .init();
   let emoji = emoji::EmojiLookup::new(&config);
+  let http = reqwest::Client::new();
 
   let mut client = Client::builder(
     &config.api_key,
@@ -50,10 +59,11 @@ async fn main() {
       | GatewayIntents::GUILD_VOICE_STATES,
   )
   .register_songbird()
+  .type_map_insert::<HttpClient>(http.clone())
   .event_handler(Handler::new(
     config.clone(),
     emoji,
-    reqwest::Client::new(),
+    http,
     Docker::new().unwrap(),
   ))
   .application_id(config.app_id.into())

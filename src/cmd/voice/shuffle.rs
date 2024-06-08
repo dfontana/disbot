@@ -1,12 +1,9 @@
-use std::error::Error;
-
 use super::SubCommandHandler;
+use crate::cmd::arg_util::Args;
+use anyhow::anyhow;
 use rand::seq::SliceRandom;
 use serenity::{
-  all::{CommandDataOption, CommandInteraction},
-  async_trait,
-  builder::EditInteractionResponse,
-  client::Context,
+  all::CommandInteraction, async_trait, builder::EditInteractionResponse, client::Context,
 };
 
 #[derive(Default)]
@@ -18,30 +15,19 @@ impl SubCommandHandler for Shuffle {
     &self,
     ctx: &Context,
     itx: &CommandInteraction,
-    _: &CommandDataOption,
-  ) -> Result<(), Box<dyn Error>> {
-    let guild_id = match itx.guild_id {
-      Some(g) => g,
-      None => {
-        return Err("No Guild Id on Interaction".into());
-      }
-    };
+    _: &Args,
+  ) -> Result<(), anyhow::Error> {
+    let guild_id = itx
+      .guild_id
+      .ok_or_else(|| anyhow!("No Guild Id on Interaction"))?;
 
     let manager = songbird::get(ctx)
       .await
       .expect("Songbird Voice client placed in at initialisation.");
-    let handler_lock = match manager.get(guild_id) {
-      None => {
-        itx
-          .edit_response(
-            &ctx.http,
-            EditInteractionResponse::new().content("I'm currently not in a voice channel"),
-          )
-          .await?;
-        return Ok(());
-      }
-      Some(v) => v,
-    };
+
+    let handler_lock = manager
+      .get(guild_id)
+      .ok_or_else(|| anyhow!("I'm currently not in a voice channel"))?;
     let handler = handler_lock.lock().await;
 
     handler.queue().modify_queue(|f| {

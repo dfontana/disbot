@@ -1,14 +1,10 @@
-use std::error::Error;
-
-use crate::{actor::ActorHandle, cmd::voice::connect_util::DisconnectMessage};
-
 use super::SubCommandHandler;
-use derive_new::new;
-use serenity::{
-  all::{CommandDataOption, CommandInteraction},
-  async_trait,
-  client::Context,
+use crate::{
+  actor::ActorHandle,
+  cmd::{arg_util::Args, voice::connect_util::DisconnectMessage},
 };
+use derive_new::new;
+use serenity::{all::CommandInteraction, async_trait, client::Context};
 use tracing::info;
 
 #[derive(new)]
@@ -22,8 +18,8 @@ impl SubCommandHandler for Stop {
     &self,
     _ctx: &Context,
     _itx: &CommandInteraction,
-    _subopt: &CommandDataOption,
-  ) -> Result<(), Box<dyn Error>> {
+    _: &Args,
+  ) -> Result<(), anyhow::Error> {
     info!("Stopping voice playback");
     let _ = self
       .disconnect

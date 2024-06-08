@@ -1,24 +1,34 @@
-use std::{collections::HashMap, error::Error};
-
+use super::{connect_util::DisconnectMessage, SubCommandHandler};
 use crate::{
   actor::ActorHandle,
-  cmd::voice::connect_util::{DisconnectDetails, DisconnectEventHandler},
+  cmd::{
+    arg_util::Args,
+    voice::connect_util::{DisconnectDetails, DisconnectEventHandler},
+  },
   config::Config,
   emoji::EmojiLookup,
+  HttpClient,
 };
+use anyhow::anyhow;
 use derive_new::new;
 use serenity::{
-  all::{CommandDataOption, CommandInteraction, ResolvedValue},
-  async_trait,
-  builder::EditInteractionResponse,
-  client::Context,
-  utils::MessageBuilder,
+  all::CommandInteraction, async_trait, builder::EditInteractionResponse, client::Context,
+  prelude::TypeMapKey, utils::MessageBuilder,
 };
+use songbird::{
+  driver::Bitrate,
+  input::{Input, YoutubeDl},
+};
+use tracing::info;
 
-use tracing::{error, info};
-
-use super::{connect_util::DisconnectMessage, SubCommandHandler};
-use songbird::{driver::Bitrate, input::Input};
+#[derive(Clone)]
+pub struct ListMetadata {
+  pub title: String,
+  pub url: String,
+}
+impl TypeMapKey for ListMetadata {
+  type Value = ListMetadata;
+}
 
 #[derive(new)]
 pub struct Play {
@@ -33,16 +43,12 @@ impl SubCommandHandler for Play {
     &self,
     ctx: &Context,
     itx: &CommandInteraction,
-    subopt: &CommandDataOption,
-  ) -> Result<(), Box<dyn Error>> {
-    // 1 arg: link. String.
+    args: &Args,
+  ) -> Result<(), anyhow::Error> {
     let _ = self.disconnect.send(DisconnectMessage::Enqueue).await;
-    let res = wrapped_handle(self, ctx, itx, subopt).await;
+    let res = wrapped_handle(self, ctx, itx, args).await;
     let _ = self.disconnect.send(DisconnectMessage::Dequeue).await;
-    match res {
-      Ok(_) => Ok(()),
-      Err(e) => Err(e),
-    }
+    res
   }
 }
 
@@ -50,62 +56,29 @@ async fn wrapped_handle(
   play: &Play,
   ctx: &Context,
   itx: &CommandInteraction,
-  subopt: &CommandDataOption,
-) -> Result<(), Box<dyn Error + Send + Sync>> {
-  let guild_id = match itx.guild_id {
-    Some(g) => g,
-    None => {
-      return Err("No Guild Id on Interaction".into());
-    }
+  args: &Args<'_>,
+) -> Result<(), anyhow::Error> {
+  let (guild_id, channel_id) = {
+    let guild = itx
+      .guild_id
+      .ok_or_else(|| anyhow!("No Guild Id on Interaction"))?;
+    let channel = ctx
+      .cache
+      .guild(guild)
+      .and_then(|g| {
+        g.voice_states
+          .get(&itx.user.id)
+          .and_then(|vs| vs.channel_id)
+      })
+      .ok_or_else(|| anyhow!("Not in a voice channel"))?;
+    (guild, channel)
   };
 
-  let args: HashMap<String, _> = itx
-    .data
-    .options()
-    .iter()
-    .map(|d| (d.name.to_owned(), d.value.to_owned()))
-    .collect();
-
-  let maybe_args = args
-    .get("link_or_search")
-    .and_then(|d| match d {
-      ResolvedValue::String(v) => Some(v),
-      _ => None,
-    })
-    .ok_or("Must provide a url|search string");
-  let searchterm = match maybe_args {
-    Ok(v) => v.trim().to_string(),
-    Err(e) => {
-      itx
-        .edit_response(
-          &ctx.http,
-          EditInteractionResponse::new().content(&format!("{:?}", e)),
-        )
-        .await?;
-      return Ok(());
-    }
-  };
-
-  // Lookup context necessary to connect
-  let channel_id = ctx
-    .cache
-    .guild(guild_id)
-    .unwrap()
-    .voice_states
-    .get(&itx.user.id)
-    .and_then(|voice_state| voice_state.channel_id);
-  let connect_to = match channel_id {
-    Some(channel) => channel,
-    None => {
-      itx
-        .edit_response(
-          &ctx.http,
-          EditInteractionResponse::new().content("Not in a voice channel"),
-        )
-        .await?;
-      return Ok(());
-    }
-  };
+  // 1 arg: link. String.
+  let searchterm = args
+    .str("link_or_search")
+    .map_err(|e| anyhow!("Must provide a url|search string").context(e))?
+    .to_string();
 
   // Fetch the Songbird mgr & join channel
   let manager = songbird::get(ctx)
@@ -117,19 +90,10 @@ async fn wrapped_handle(
   let handler_lock = match manager.get(guild_id) {
     None => {
       info!("Joining voice for first time...");
-      let handler_lock = match manager.join(guild_id, connect_to).await {
-        Ok(v) => v,
-        Err(why) => {
-          error!("Err joining voice: {:?}", why);
-          itx
-            .edit_response(
-              &ctx.http,
-              EditInteractionResponse::new().content("Error joining voice channel"),
-            )
-            .await?;
-          return Ok(());
-        }
-      };
+      let handler_lock = manager
+        .join(guild_id, channel_id)
+        .await
+        .map_err(|e| anyhow!("Error joining voice channel").context(format!("{:?}", e)))?;
 
       // Register an event handler to listen for the duration of the call
       DisconnectEventHandler::register(play.config.timeout, play.disconnect.clone(), &handler_lock)
@@ -152,7 +116,7 @@ async fn wrapped_handle(
         // Rejoin the channel if we're not in it already, but we previously were
         let mut lock = l.lock().await;
         if lock.current_channel().is_none() {
-          let _ = lock.join(connect_to).await;
+          let _ = lock.join(channel_id).await;
         }
       }
       l
@@ -160,49 +124,53 @@ async fn wrapped_handle(
   };
 
   // Queue up the source
+  let http_client = {
+    let data = ctx.data.read().await;
+    data
+      .get::<HttpClient>()
+      .cloned()
+      .expect("Guaranteed to exist in the typemap.")
+  };
   let is_url = searchterm.starts_with("http");
   let resolved_src = match is_url {
-    true => Restartable::ytdl(searchterm, true).await,
-    false => Restartable::ytdl_search(searchterm, true).await,
+    false => YoutubeDl::new_search(http_client, searchterm),
+    true => YoutubeDl::new(http_client, searchterm),
+  };
+  let mut input = Input::from(resolved_src);
+
+  let (title, source_url) = input
+    .aux_metadata()
+    .await
+    .map(|m| {
+      let title = m.track.or(m.title);
+      let url = m.source_url;
+      (title, url)
+    })
+    .unwrap_or_default();
+  let list_metadata = ListMetadata {
+    title: title.unwrap_or_else(|| "<UNKNOWN>".to_string()),
+    url: source_url.unwrap_or_else(|| "<UNKNOWN>".to_string()),
   };
 
-  let input = match resolved_src {
-    Ok(inp) => Input::from(inp),
-    Err(why) => {
-      error!("Err starting source: {:?}", why);
-      itx
-        .edit_response(
-          &ctx.http,
-          EditInteractionResponse::new().content("Error sourcing ffmpeg"),
-        )
-        .await?;
-      return Ok(());
-    }
-  };
-
-  let emoji = play.emoji.get(&ctx.http, &ctx.cache, guild_id).await?;
-
-  let metadata = input.aux_metadata().await;
-  let title = match metadata.map(|m| m.track.or(m.title)) {
-    Ok(Some(v)) => v,
-    Err(_) | Ok(None) => "<UNKNOWN>".to_string(),
-  };
-  let source_url = match metadata.map(|m| m.source_url) {
-    Ok(Some(v)) => v,
-    Err(_) | Ok(None) => "Unknown Source".to_string(),
-  };
   let mut handler = handler_lock.lock().await;
   handler.set_bitrate(Bitrate::Max);
-  handler.enqueue_source(input);
+  let th = handler.enqueue_input(input).await;
+  {
+    th.typemap()
+      .write()
+      .await
+      .insert::<ListMetadata>(list_metadata.clone());
+  }
 
+  let emoji = play.emoji.get(&ctx.http, &ctx.cache, guild_id).await?;
   let mut build = MessageBuilder::new();
   build
     .push_bold("Queued")
     .push(format!(" ({}) ", handler.queue().len()))
-    .push_mono(title)
+    .push_mono(list_metadata.title)
     .emoji(&emoji);
   if !is_url {
-    build.push_line("").push(source_url);
+    build.push_line("").push(list_metadata.url);
   }
   itx
     .edit_response(
