@@ -2,7 +2,7 @@ use crate::{cmd::SubCommandHandler, docker::Docker};
 use bollard::service::ContainerStateStatusEnum::{CREATED, EXITED};
 use derive_new::new;
 use serenity::{
-  all::{CommandDataOption, CommandDataOptionValue, CommandInteraction},
+  all::{CommandDataOption, CommandInteraction, ResolvedValue},
   async_trait,
   builder::EditInteractionResponse,
   client::Context,
@@ -20,7 +20,7 @@ impl SubCommandHandler for Start {
     &self,
     ctx: &Context,
     itx: &CommandInteraction,
-    subopt: &CommandDataOption,
+    _subopt: &CommandDataOption,
   ) -> Result<(), Box<dyn std::error::Error>> {
     // TODO: Let's move to autocomplete on these
     let args: HashMap<String, _> = itx
@@ -33,7 +33,7 @@ impl SubCommandHandler for Start {
     let name = args
       .get("server-name")
       .and_then(|d| match d {
-        CommandDataOptionValue::String(v) => Some(v),
+        ResolvedValue::String(v) => Some(v),
         _ => None,
       })
       .ok_or("Must provide a server name")?;

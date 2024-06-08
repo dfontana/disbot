@@ -1,6 +1,7 @@
 use async_trait::async_trait;
 use serenity::{
-  model::prelude::{interaction::message_component::MessageComponentInteraction, ChannelId},
+  all::{ChannelId, ComponentInteraction, ComponentInteractionDataKind},
+  builder::EditMessage,
   prelude::Context,
 };
 use tokio::sync::mpsc::Receiver;
@@ -13,7 +14,7 @@ use super::{cache::Cache, messages, pollstate::PollState};
 
 #[derive(Clone)]
 pub enum PollMessage {
-  UpdateVote((Uuid, String, Context, MessageComponentInteraction)),
+  UpdateVote((Uuid, String, Context, ComponentInteraction)),
   CreatePoll((PollState, ChannelId)),
   ExpirePoll(Uuid),
 }
@@ -80,6 +81,13 @@ impl Actor<PollMessage> for PollActor {
         }
       }
       PollMessage::UpdateVote((id, voter, ctx, mtx)) => {
+        let votes = match mtx.data.kind {
+          ComponentInteractionDataKind::StringSelect { ref values } => values,
+          _ => {
+            error!("Wrong interaction kind passed to UpdateVote");
+            return;
+          }
+        };
         let new_body = match self
           .states
           .contains_key(&id)
@@ -90,7 +98,7 @@ impl Actor<PollMessage> for PollActor {
           .and_then(|_| {
             self
               .states
-              .invoke_mut(&id, |p| p.update_vote(&mtx.data.values, &voter))
+              .invoke_mut(&id, |p| p.update_vote(&votes, &voter))
           })
           .and_then(|_| self.states.invoke(&id, messages::build_poll_message))
         {
@@ -104,7 +112,7 @@ impl Actor<PollMessage> for PollActor {
         if let Err(e) = mtx
           .message
           .clone()
-          .edit(&ctx, |body| body.content(new_body))
+          .edit(&ctx, EditMessage::new().content(new_body))
           .await
         {
           error!("Failed to update the message body: {}", e);

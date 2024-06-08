@@ -6,11 +6,10 @@ use rand::seq::SliceRandom;
 use rand::thread_rng;
 use reqwest::Client;
 use serenity::{
+  all::{CommandDataOption, CommandInteraction},
   async_trait,
+  builder::EditInteractionResponse,
   client::Context,
-  model::prelude::interaction::application_command::{
-    ApplicationCommandInteraction, CommandDataOption,
-  },
   utils::MessageBuilder,
 };
 
@@ -31,7 +30,7 @@ impl SubCommandHandler for Ip {
   async fn handle(
     &self,
     ctx: &Context,
-    itx: &ApplicationCommandInteraction,
+    itx: &CommandInteraction,
     _subopt: &CommandDataOption,
   ) -> Result<(), Box<dyn Error>> {
     let guild_id = match itx.guild_id {
@@ -52,9 +51,10 @@ impl SubCommandHandler for Ip {
     }
     let Some(the_ip) = maybe_the_ip else {
       itx
-        .edit_original_interaction_response(&ctx.http, |f| {
-          f.content("Could not resolve IP of server, Shibba is death")
-        })
+        .edit_response(
+          &ctx.http,
+          EditInteractionResponse::new().content("Could not resolve IP of server, Shibba is death"),
+        )
         .await?;
       return Ok(());
     };
@@ -65,9 +65,12 @@ impl SubCommandHandler for Ip {
       .push_bold("Ya boi shruggin at ")
       .push_mono(the_ip)
       .push_bold(" I guess")
-      .mention(&emoji);
+      .emoji(&emoji);
     itx
-      .edit_original_interaction_response(&ctx.http, |f| f.content(build.build()))
+      .edit_response(
+        &ctx.http,
+        EditInteractionResponse::new().content(build.build()),
+      )
       .await?;
 
     Ok(())

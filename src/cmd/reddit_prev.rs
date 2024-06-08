@@ -183,7 +183,7 @@ fn cap_as_map(inp: &str) -> Option<HashMap<&str, &str>> {
 impl MessageListener for RedditPreviewHandler {
   #[instrument(name = "RedditPreview", level = "INFO", skip(self, ctx, msg))]
   async fn message(&self, ctx: &Context, msg: &Message) {
-    if msg.is_own(&ctx.cache) {
+    if msg.author.id == ctx.cache.as_ref().current_user().id {
       info!("Skipping, self message");
       return;
     }

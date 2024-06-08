@@ -8,8 +8,9 @@ use crate::{
 };
 use derive_new::new;
 use serenity::{
-  all::{CommandDataOption, CommandDataOptionValue, CommandInteraction},
+  all::{CommandDataOption, CommandInteraction, ResolvedValue},
   async_trait,
+  builder::EditInteractionResponse,
   client::Context,
   utils::MessageBuilder,
 };
@@ -58,17 +59,17 @@ async fn wrapped_handle(
     }
   };
 
-  let args: HashMap<String, _> = subopt
-    .options
+  let args: HashMap<String, _> = itx
+    .data
+    .options()
     .iter()
     .map(|d| (d.name.to_owned(), d.value.to_owned()))
     .collect();
 
   let maybe_args = args
     .get("link_or_search")
-    .and_then(|v| v.to_owned())
     .and_then(|d| match d {
-      CommandDataOptionValue::String(v) => Some(v),
+      ResolvedValue::String(v) => Some(v),
       _ => None,
     })
     .ok_or("Must provide a url|search string");
@@ -76,7 +77,10 @@ async fn wrapped_handle(
     Ok(v) => v.trim().to_string(),
     Err(e) => {
       itx
-        .edit_original_interaction_response(&ctx.http, |f| f.content(&format!("{:?}", e)))
+        .edit_response(
+          &ctx.http,
+          EditInteractionResponse::new().content(&format!("{:?}", e)),
+        )
         .await?;
       return Ok(());
     }
@@ -94,7 +98,10 @@ async fn wrapped_handle(
     Some(channel) => channel,
     None => {
       itx
-        .edit_original_interaction_response(&ctx.http, |f| f.content("Not in a voice channel"))
+        .edit_response(
+          &ctx.http,
+          EditInteractionResponse::new().content("Not in a voice channel"),
+        )
         .await?;
       return Ok(());
     }
@@ -115,9 +122,10 @@ async fn wrapped_handle(
         Err(why) => {
           error!("Err joining voice: {:?}", why);
           itx
-            .edit_original_interaction_response(&ctx.http, |f| {
-              f.content("Error joining voice channel")
-            })
+            .edit_response(
+              &ctx.http,
+              EditInteractionResponse::new().content("Error joining voice channel"),
+            )
             .await?;
           return Ok(());
         }
@@ -163,7 +171,10 @@ async fn wrapped_handle(
     Err(why) => {
       error!("Err starting source: {:?}", why);
       itx
-        .edit_original_interaction_response(&ctx.http, |f| f.content("Error sourcing ffmpeg"))
+        .edit_response(
+          &ctx.http,
+          EditInteractionResponse::new().content("Error sourcing ffmpeg"),
+        )
         .await?;
       return Ok(());
     }
@@ -189,12 +200,15 @@ async fn wrapped_handle(
     .push_bold("Queued")
     .push(format!(" ({}) ", handler.queue().len()))
     .push_mono(title)
-    .mention(&emoji);
+    .emoji(&emoji);
   if !is_url {
     build.push_line("").push(source_url);
   }
   itx
-    .edit_original_interaction_response(&ctx.http, |f| f.content(build.build()))
+    .edit_response(
+      &ctx.http,
+      EditInteractionResponse::new().content(build.build()),
+    )
     .await?;
 
   Ok(())

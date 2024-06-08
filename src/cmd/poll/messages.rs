@@ -1,5 +1,5 @@
 use serenity::{
-  builder::{CreateActionRow, CreateComponents},
+  builder::{CreateMessage, CreateSelectMenu, CreateSelectMenuKind, CreateSelectMenuOption},
   model::prelude::{ChannelId, ReactionType},
   utils::MessageBuilder,
 };
@@ -45,9 +45,9 @@ pub fn build_poll_message(ps: &PollState) -> String {
   voter_vec.sort();
 
   MessageBuilder::new()
-    .mention(&ps.ctx.emoji)
+    .emoji(&ps.ctx.emoji)
     .push_underline("Roommate Poll, Bobby, Roommate Poll!")
-    .mention(&ps.ctx.emoji)
+    .emoji(&ps.ctx.emoji)
     .push_line("")
     .push_line("")
     .push_bold(&ps.topic)
@@ -66,38 +66,35 @@ pub fn build_poll_message(ps: &PollState) -> String {
 
 pub async fn send_poll_message(ps: &PollState, itx: &ChannelId) -> serenity::Result<()> {
   itx
-    .send_message(&ps.ctx.http, |builder| {
-      let poll_msg = build_poll_message(ps);
-      let mut component = CreateComponents::default();
-      let mut action_row = CreateActionRow::default();
-
-      action_row.create_select_menu(|select| {
-        select
+    .send_message(
+      &ps.ctx.http,
+      CreateMessage::new()
+        .content(build_poll_message(ps))
+        .select_menu(
+          CreateSelectMenu::new(
+            ps.id.to_string(),
+            CreateSelectMenuKind::String {
+              options: ps
+                .votes
+                .iter()
+                .map(|(k, v)| {
+                  CreateSelectMenuOption::new(v.0.to_owned(), k.to_owned()).emoji(
+                    ReactionType::Custom {
+                      name: None,
+                      animated: false,
+                      id: ps.ctx.emoji.id,
+                    },
+                  )
+                })
+                .collect(),
+            },
+          )
           .placeholder("Choose your Answers")
-          .custom_id(ps.id)
+          .custom_id(ps.id.to_string())
           .min_values(1)
-          .max_values(ps.votes.len() as u64)
-          .options(|opts| {
-            ps.votes.iter().for_each(|(k, v)| {
-              opts.create_option(|opt| {
-                opt
-                  .label(v.0.to_owned())
-                  .value(k.to_owned())
-                  .emoji(ReactionType::Custom {
-                    name: None,
-                    animated: false,
-                    id: ps.ctx.emoji.id,
-                  })
-              });
-            });
-            opts
-          })
-      });
-
-      component.add_action_row(action_row);
-
-      builder.content(poll_msg).set_components(component)
-    })
+          .max_values(ps.votes.len() as u8),
+        ),
+    )
     .await
     .map(|_| ())
 }
@@ -111,9 +108,9 @@ pub fn build_exp_message(ps: &PollState) -> String {
     .unwrap_or_else(|| "<Error Poll Had No Options?>".to_string());
 
   MessageBuilder::new()
-    .mention(&ps.ctx.emoji)
+    .emoji(&ps.ctx.emoji)
     .push_underline("The Vote has Ended!")
-    .mention(&ps.ctx.emoji)
+    .emoji(&ps.ctx.emoji)
     .push_line("")
     .push_line("")
     .push("The winner of \"")

@@ -1,9 +1,8 @@
 use derive_new::new;
 use serenity::{
+  all::{CommandDataOption, CommandInteraction, ResolvedValue},
   async_trait,
-  model::prelude::interaction::application_command::{
-    ApplicationCommandInteraction, CommandDataOption, CommandDataOptionValue,
-  },
+  builder::EditInteractionResponse,
   prelude::Context,
 };
 use std::collections::HashMap;
@@ -20,21 +19,21 @@ impl SubCommandHandler for Stop {
   async fn handle(
     &self,
     ctx: &Context,
-    itx: &ApplicationCommandInteraction,
-    subopt: &CommandDataOption,
+    itx: &CommandInteraction,
+    _subopt: &CommandDataOption,
   ) -> Result<(), Box<dyn std::error::Error>> {
     // TODO: Let's move to autocomplete on these
-    let args: HashMap<String, _> = subopt
-      .options
+    let args: HashMap<String, _> = itx
+      .data
+      .options()
       .iter()
-      .map(|d| (d.name.to_owned(), d.resolved.to_owned()))
+      .map(|d| (d.name.to_owned(), d.value.to_owned()))
       .collect();
 
     let name = args
       .get("server-name")
-      .and_then(|v| v.to_owned())
       .and_then(|d| match d {
-        CommandDataOptionValue::String(v) => Some(v),
+        ResolvedValue::String(v) => Some(v),
         _ => None,
       })
       .ok_or("Must provide a server name")?;
@@ -44,7 +43,7 @@ impl SubCommandHandler for Stop {
       Err(e) => format!("{}", e),
     };
     itx
-      .edit_original_interaction_response(&ctx.http, |f| f.content(msg))
+      .edit_response(&ctx.http, EditInteractionResponse::new().content(msg))
       .await?;
     Ok(())
   }

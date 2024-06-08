@@ -38,7 +38,7 @@ impl EmojiLookup {
   result = true,
   sync_writes = true,
   key = "String",
-  convert = r##"{format!("{}:{}", guild_id.0, name)}"##
+  convert = r##"{format!("{}:{}", guild_id, name)}"##
 )]
 async fn get_emoji(
   http: &Http,
@@ -49,15 +49,16 @@ async fn get_emoji(
   // Check if the guild has the emoji registered (have to search by name, not id)
   // return if they do (we don't want to re-create it)
   let emojis = scache
-    .guild_field(guild_id, |guild| guild.emojis.clone())
+    .guild(guild_id)
+    .map(|g| g.emojis.clone())
     .ok_or_else(|| "Failed to pull emojis for Guild".to_string())?;
   if let Some((_, emote)) = emojis.iter().find(|(_, em)| em.name == name) {
-    info!("Resolved emoji {} for guild {}", name, guild_id.0);
+    info!("Resolved emoji {} for guild {}", name, guild_id);
     return Ok(emote.clone());
   }
 
   // Otherwise they don't have it, so let's make it for them
-  info!("Registering emoji {} for guild {}", name, guild_id.0);
+  info!("Registering emoji {} for guild {}", name, guild_id);
   let emote = guild_id
     .create_emoji(http, &name, &EMOJI_IMAGE)
     .await

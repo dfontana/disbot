@@ -3,11 +3,10 @@ use std::error::Error;
 use super::SubCommandHandler;
 use rand::seq::SliceRandom;
 use serenity::{
+  all::{CommandDataOption, CommandInteraction},
   async_trait,
+  builder::EditInteractionResponse,
   client::Context,
-  model::prelude::interaction::application_command::{
-    ApplicationCommandInteraction, CommandDataOption,
-  },
 };
 
 #[derive(Default)]
@@ -18,7 +17,7 @@ impl SubCommandHandler for Shuffle {
   async fn handle(
     &self,
     ctx: &Context,
-    itx: &ApplicationCommandInteraction,
+    itx: &CommandInteraction,
     _: &CommandDataOption,
   ) -> Result<(), Box<dyn Error>> {
     let guild_id = match itx.guild_id {
@@ -34,9 +33,10 @@ impl SubCommandHandler for Shuffle {
     let handler_lock = match manager.get(guild_id) {
       None => {
         itx
-          .edit_original_interaction_response(&ctx.http, |f| {
-            f.content("I'm currently not in a voice channel")
-          })
+          .edit_response(
+            &ctx.http,
+            EditInteractionResponse::new().content("I'm currently not in a voice channel"),
+          )
           .await?;
         return Ok(());
       }
@@ -53,7 +53,10 @@ impl SubCommandHandler for Shuffle {
     });
 
     itx
-      .edit_original_interaction_response(&ctx.http, |f| f.content("Queue shuffled!"))
+      .edit_response(
+        &ctx.http,
+        EditInteractionResponse::new().content("Queue shuffled!"),
+      )
       .await?;
     Ok(())
   }

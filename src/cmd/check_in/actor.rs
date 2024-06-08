@@ -7,8 +7,9 @@ use chrono::{DateTime, NaiveDateTime, NaiveTime, TimeZone, Utc};
 use chrono_tz::America;
 use derive_new::new;
 use serenity::{
+  all::Role,
   http::Http,
-  model::prelude::{ChannelId, Emoji, Role},
+  model::prelude::{ChannelId, Emoji},
 };
 use std::{sync::Arc, time::Duration};
 use tokio::sync::mpsc::Receiver;

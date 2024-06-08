@@ -5,11 +5,9 @@ use crate::{actor::ActorHandle, cmd::voice::connect_util::DisconnectMessage};
 use super::SubCommandHandler;
 use derive_new::new;
 use serenity::{
+  all::{CommandDataOption, CommandInteraction},
   async_trait,
   client::Context,
-  model::prelude::interaction::application_command::{
-    ApplicationCommandInteraction, CommandDataOption,
-  },
 };
 use tracing::info;
 
@@ -23,7 +21,7 @@ impl SubCommandHandler for Stop {
   async fn handle(
     &self,
     _ctx: &Context,
-    _itx: &ApplicationCommandInteraction,
+    _itx: &CommandInteraction,
     _subopt: &CommandDataOption,
   ) -> Result<(), Box<dyn Error>> {
     info!("Stopping voice playback");

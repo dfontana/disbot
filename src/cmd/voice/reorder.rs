@@ -4,7 +4,7 @@ use super::SubCommandHandler;
 use crate::emoji::EmojiLookup;
 use derive_new::new;
 use serenity::{
-  all::{CommandDataOption, CommandDataOptionValue, CommandInteraction},
+  all::{CommandDataOption, CommandInteraction, ResolvedValue},
   async_trait,
   builder::EditInteractionResponse,
   client::Context,
@@ -22,12 +22,12 @@ impl SubCommandHandler for Reorder {
     &self,
     ctx: &Context,
     itx: &CommandInteraction,
-    subopt: &CommandDataOption,
+    _subopt: &CommandDataOption,
   ) -> Result<(), Box<dyn Error>> {
     // 2 args: from, to. Min value 1. Integers.
     let args: HashMap<String, _> = itx
       .data
-      .options
+      .options()
       .iter()
       .map(|d| (d.name.to_owned(), d.value.to_owned()))
       .collect();
@@ -105,9 +105,9 @@ impl SubCommandHandler for Reorder {
         &ctx.http,
         EditInteractionResponse::new().content(
           MessageBuilder::new()
-            .mention(&emoji)
+            .emoji(&emoji)
             .push_bold("Queued updated!")
-            .mention(&emoji)
+            .emoji(&emoji)
             .push_line("")
             .push_italic("You can list the queue your damn self")
             .build(),
@@ -119,11 +119,11 @@ impl SubCommandHandler for Reorder {
   }
 }
 
-fn get_arg(args: &HashMap<String, CommandDataOptionValue>, key: &str) -> Result<usize, String> {
+fn get_arg(args: &HashMap<String, ResolvedValue>, key: &str) -> Result<usize, String> {
   args
     .get(key)
     .and_then(|d| match d {
-      CommandDataOptionValue::Integer(v) => Some(v.to_owned()),
+      ResolvedValue::Integer(v) => Some(v.to_owned()),
       _ => None,
     })
     .map(|i| i as usize)

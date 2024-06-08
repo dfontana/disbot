@@ -2,11 +2,10 @@ use std::error::Error;
 
 use super::SubCommandHandler;
 use serenity::{
+  all::{CommandDataOption, CommandInteraction},
   async_trait,
+  builder::EditInteractionResponse,
   client::Context,
-  model::prelude::interaction::application_command::{
-    ApplicationCommandInteraction, CommandDataOption,
-  },
   utils::MessageBuilder,
 };
 
@@ -18,7 +17,7 @@ impl SubCommandHandler for List {
   async fn handle(
     &self,
     ctx: &Context,
-    itx: &ApplicationCommandInteraction,
+    itx: &CommandInteraction,
     _: &CommandDataOption,
   ) -> Result<(), Box<dyn Error>> {
     let guild_id = match itx.guild_id {
@@ -35,9 +34,10 @@ impl SubCommandHandler for List {
     let handler_lock = match manager.get(guild_id) {
       None => {
         itx
-          .edit_original_interaction_response(&ctx.http, |f| {
-            f.content("I'm currently not in a voice channel")
-          })
+          .edit_response(
+            &ctx.http,
+            EditInteractionResponse::new().content("I'm currently not in a voice channel"),
+          )
           .await?;
         return Ok(());
       }
@@ -62,9 +62,10 @@ impl SubCommandHandler for List {
     }
 
     itx
-      .edit_original_interaction_response(&ctx.http, |f| {
-        f.content(bld.push_codeblock(body, None).build())
-      })
+      .edit_response(
+        &ctx.http,
+        EditInteractionResponse::new().content(bld.push_codeblock(body, None).build()),
+      )
       .await?;
     Ok(())
   }

@@ -2,12 +2,11 @@ use chrono::NaiveTime;
 use derive_new::new;
 use humantime::parse_duration;
 use serenity::{
-  all::{CommandDataOptionValue, CommandInteraction, CommandOptionType, CommandType},
+  all::{CommandInteraction, CommandOptionType, CommandType, ResolvedValue, Role},
   async_trait,
   builder::{
     CreateCommand, CreateCommandOption, CreateInteractionResponse, CreateInteractionResponseMessage,
   },
-  model::prelude::Role,
   prelude::Context,
   utils::MessageBuilder,
 };
@@ -94,17 +93,16 @@ impl CheckIn {
       }
     };
     let emoji = self.emoji.get(&ctx.http, &ctx.cache, guild_id).await?;
-    let args = &itx.data.options;
+    let args = &itx.data.options();
     let map: HashMap<String, _> = args
       .iter()
-      .map(|d| (d.name.to_owned(), d.resolved.to_owned()))
+      .map(|d| (d.name.to_owned(), d.value.to_owned()))
       .collect();
 
     let duration: Duration = map
       .get("duration")
-      .and_then(|v| v.to_owned())
       .and_then(|d| match d {
-        CommandDataOptionValue::String(v) => Some(v),
+        ResolvedValue::String(v) => Some(v),
         _ => None,
       })
       .ok_or("No duration given")
@@ -112,21 +110,17 @@ impl CheckIn {
 
     let time: NaiveTime = map
       .get("time")
-      .and_then(|v| v.to_owned())
       .and_then(|d| match d {
-        CommandDataOptionValue::String(v) => Some(v),
+        ResolvedValue::String(v) => Some(v),
         _ => None,
       })
       .ok_or("No time given")
       .and_then(|s| s.parse::<NaiveTime>().map_err(|_| "Invalid time given"))?;
 
-    let at_group: Option<Role> = map
-      .get("role")
-      .and_then(|v| v.to_owned())
-      .and_then(|d| match d {
-        CommandDataOptionValue::Role(v) => Some(v),
-        _ => None,
-      });
+    let at_group: Option<Role> = map.get("role").and_then(|d| match d {
+      ResolvedValue::Role(v) => Some((*v).clone()),
+      _ => None,
+    });
 
     self
       .actor
@@ -145,13 +139,13 @@ impl CheckIn {
         CreateInteractionResponse::Message(
           CreateInteractionResponseMessage::new().content(
             MessageBuilder::new()
-              .mention(&emoji)
+              .emoji(&emoji)
               .push_bold("Check in set to ")
-              .push_italic(time)
+              .push_italic(time.to_string())
               .push_bold(" lasting ")
-              .push_italic(duration.as_secs())
+              .push_italic(duration.as_secs().to_string())
               .push_bold(" seconds.")
-              .mention(&emoji)
+              .emoji(&emoji)
               .build(),
           ),
         ),

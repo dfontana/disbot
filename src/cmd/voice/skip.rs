@@ -5,11 +5,10 @@ use crate::emoji::EmojiLookup;
 use super::SubCommandHandler;
 use derive_new::new;
 use serenity::{
+  all::{CommandDataOption, CommandInteraction},
   async_trait,
+  builder::EditInteractionResponse,
   client::Context,
-  model::prelude::interaction::application_command::{
-    ApplicationCommandInteraction, CommandDataOption,
-  },
   utils::MessageBuilder,
 };
 
@@ -23,7 +22,7 @@ impl SubCommandHandler for Skip {
   async fn handle(
     &self,
     ctx: &Context,
-    itx: &ApplicationCommandInteraction,
+    itx: &CommandInteraction,
     _subopt: &CommandDataOption,
   ) -> Result<(), Box<dyn Error>> {
     let guild_id = match itx.guild_id {
@@ -43,9 +42,10 @@ impl SubCommandHandler for Skip {
     match manager.get(guild_id) {
       None => {
         itx
-          .edit_original_interaction_response(&ctx.http, |f| {
-            f.content("Not in a voice channel to play in")
-          })
+          .edit_response(
+            &ctx.http,
+            EditInteractionResponse::new().content("Not in a voice channel to play in"),
+          )
           .await?;
       }
       Some(handler_lock) => {
@@ -53,14 +53,15 @@ impl SubCommandHandler for Skip {
         let queue = handler.queue();
         let _ = queue.skip();
         itx
-          .edit_original_interaction_response(&ctx.http, |f| {
-            f.content(
+          .edit_response(
+            &ctx.http,
+            EditInteractionResponse::new().content(
               MessageBuilder::new()
                 .push("I didn't like that song either ")
-                .mention(&emoji)
+                .emoji(&emoji)
                 .build(),
-            )
-          })
+            ),
+          )
           .await?;
       }
     }
