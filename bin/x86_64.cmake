@@ -1,5 +1,5 @@
 set(CMAKE_SYSTEM_NAME Linux)
-set(CMAKE_SYSROOT /opt/homebrew/Cellar/x86_64-unknown-linux-gnu/11.2.0/toolchain/x86_64-unknown-linux-gnu/sysroot/)
+set(CMAKE_SYSROOT /opt/homebrew/Cellar/x86_64-unknown-linux-gnu/13.2.0/toolchain/x86_64-unknown-linux-gnu/sysroot/)
 set(tools /opt/homebrew/bin)
 set(CMAKE_C_COMPILER /opt/homebrew/bin/x86_64-unknown-linux-gnu-gcc)
 set(CMAKE_CXX_COMPILER /opt/homebrew/bin/x86_64-unknown-linux-gnu-g++)
