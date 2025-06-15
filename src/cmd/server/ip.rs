@@ -4,8 +4,8 @@ use crate::{
 };
 use anyhow::anyhow;
 use derive_new::new;
-use rand::seq::SliceRandom;
 use rand::rng;
+use rand::seq::SliceRandom;
 use reqwest::Client;
 use serenity::{
   all::CommandInteraction, async_trait, builder::EditInteractionResponse, client::Context,

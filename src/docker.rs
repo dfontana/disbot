@@ -39,7 +39,10 @@ impl Docker {
   pub async fn status(&self, name: &str) -> Result<ContainerStateStatusEnum, anyhow::Error> {
     self
       .client
-      .inspect_container(name, None::<bollard::query_parameters::InspectContainerOptions>)
+      .inspect_container(
+        name,
+        None::<bollard::query_parameters::InspectContainerOptions>,
+      )
       .await
       .map_err(|e| anyhow::anyhow!(e))
       .and_then(|res| {
@@ -53,7 +56,10 @@ impl Docker {
   pub async fn start(&self, name: &str) -> Result<(), anyhow::Error> {
     self
       .client
-      .start_container(name, None::<bollard::query_parameters::StartContainerOptions>)
+      .start_container(
+        name,
+        None::<bollard::query_parameters::StartContainerOptions>,
+      )
       .await
       .map_err(|e| anyhow::anyhow!(e))
   }
