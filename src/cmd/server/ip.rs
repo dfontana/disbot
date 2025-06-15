@@ -5,7 +5,7 @@ use crate::{
 use anyhow::anyhow;
 use derive_new::new;
 use rand::seq::SliceRandom;
-use rand::thread_rng;
+use rand::rng;
 use reqwest::Client;
 use serenity::{
   all::CommandInteraction, async_trait, builder::EditInteractionResponse, client::Context,
@@ -42,7 +42,7 @@ impl SubCommandHandler for Ip {
 
     let mut maybe_the_ip = None;
     let mut ip_echoers = IP_ECHOERS.clone();
-    ip_echoers.shuffle(&mut thread_rng());
+    ip_echoers.shuffle(&mut rng());
     for addr in ip_echoers {
       if let Ok(ip) = attempt_resolve(&self.http, addr).await {
         maybe_the_ip = Some(ip);

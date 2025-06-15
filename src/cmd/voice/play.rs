@@ -154,13 +154,12 @@ async fn wrapped_handle(
 
   let mut handler = handler_lock.lock().await;
   handler.set_bitrate(Bitrate::Max);
-  let th = handler.enqueue_input(input).await;
-  {
-    th.typemap()
-      .write()
-      .await
-      .insert::<ListMetadata>(list_metadata.clone());
-  }
+  let _th = handler.enqueue_input(input).await;
+  // TODO: Fix metadata storage for new songbird version
+  // {
+  //   let mut typemap = th.typemap().lock().await;
+  //   typemap.insert::<ListMetadata>(list_metadata.clone());
+  // }
 
   let emoji = play.emoji.get(&ctx.http, &ctx.cache, guild_id).await?;
   let mut build = MessageBuilder::new();

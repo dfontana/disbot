@@ -99,7 +99,7 @@ impl DiceRoll {
         return Ok(());
       }
     };
-    let roll = rand::thread_rng().gen_range(lower..upper + 1);
+    let roll = rand::rng().random_range(lower..upper + 1);
     let guild_id = match itx.guild_id {
       Some(id) => id,
       None => return Ok(()),

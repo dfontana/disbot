@@ -58,7 +58,7 @@ async fn build_list_msg(docker: &Docker) -> Result<MessageBuilder, anyhow::Error
         summary
           .state
           .as_ref()
-          .map(|s| s.as_str())
+          .map(|s| format!("{:?}", s))
           .unwrap_or_else(|| "(No State)".into()),
       ));
       acc

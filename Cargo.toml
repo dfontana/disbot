@@ -6,7 +6,7 @@ edition = "2021"
 
 [dependencies]
 base64 = "0.22.1"
-cached = "0.55.1"
+cached = { version = "0.55.1", features = ["async"] }
 chrono = "0.4.25"
 chrono-tz = {version="0.10.3", features=["case-insensitive"]}
 derive_builder = "0.20.2"

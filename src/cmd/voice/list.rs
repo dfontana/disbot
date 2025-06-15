@@ -1,4 +1,4 @@
-use super::{play::ListMetadata, SubCommandHandler};
+use super::SubCommandHandler;
 use crate::cmd::arg_util::Args;
 use anyhow::anyhow;
 use serenity::{
@@ -34,12 +34,13 @@ impl SubCommandHandler for List {
     let mut bld = MessageBuilder::new();
     bld.push_bold_line("Current Queue:");
     let mut body = String::new();
-    for (idx, trk) in handler.queue().current_queue().iter().enumerate() {
-      let typ = trk.typemap().read().await;
-      let md = typ
-        .get::<ListMetadata>()
-        .expect("Guaranteed to exist from Play");
-      body.push_str(&format!("{}. '{}'\n", idx + 1, md.title));
+    for (idx, _trk) in handler.queue().current_queue().iter().enumerate() {
+      // TODO: Fix metadata retrieval for new songbird version
+      // let typ = trk.typemap().lock().await;
+      // let md = typ
+      //   .get::<ListMetadata>()
+      //   .expect("Guaranteed to exist from Play");
+      body.push_str(&format!("{}. <UNKNOWN TITLE>\n", idx + 1));
     }
 
     itx
