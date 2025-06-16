@@ -45,7 +45,14 @@ else
   RUSTFLAGS=-Awarnings cargo build --quiet --release
 fi
 
-if [[ ! -f "target/$ARCH/release/disbot" || ! -f "$env.env" ]]; then
+host_arch=$(rustc -vV | grep "host:" | cut -d' ' -f2)
+if [[ $host_arch == $ARCH ]]; then
+  binary="target/release/disbot"
+else
+  binary="target/$ARCH/release/disbot"
+fi
+
+if [[ ! -f $binary || ! -f "$env.env" ]]; then
   echo "Missing necessary files, not touching server";
   exit 1
 fi
@@ -56,6 +63,6 @@ ssh $USER@$host 'mkdir -p ~/deploy'
 scp "$env.env" $USER@$host:~/deploy/
 echo "Restarting disbot-$env service on $host"
 ssh -t $USER@$host 'sudo systemctl stop '"disbot-$env"
-scp target/$ARCH/release/disbot $USER@$host:~/deploy/"disbot-$env"
+scp $binary $USER@$host:~/deploy/"disbot-$env"
 ssh -t $USER@$host 'sudo systemctl restart '"disbot-$env"
 echo "Done."
