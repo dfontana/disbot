@@ -13,21 +13,20 @@ use anyhow::anyhow;
 use derive_new::new;
 use serenity::{
   all::CommandInteraction, async_trait, builder::EditInteractionResponse, client::Context,
-  prelude::TypeMapKey, utils::MessageBuilder,
+  utils::MessageBuilder,
 };
 use songbird::{
   driver::Bitrate,
   input::{Input, YoutubeDl},
+  tracks::Track,
 };
+use std::sync::Arc;
 use tracing::info;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct ListMetadata {
   pub title: String,
   pub url: String,
-}
-impl TypeMapKey for ListMetadata {
-  type Value = ListMetadata;
 }
 
 #[derive(new)]
@@ -154,13 +153,13 @@ async fn wrapped_handle(
 
   let mut handler = handler_lock.lock().await;
   handler.set_bitrate(Bitrate::Max);
-  let th = handler.enqueue_input(input).await;
-  {
-    th.typemap()
-      .write()
-      .await
-      .insert::<ListMetadata>(list_metadata.clone());
-  }
+
+  // Create track with custom metadata using songbird 0.5.0 API
+  let track_with_data = Track::new_with_data(
+    input,
+    Arc::new(list_metadata.clone()) as Arc<dyn std::any::Any + Send + Sync>,
+  );
+  let _th = handler.enqueue(track_with_data).await;
 
   let emoji = play.emoji.get(&ctx.http, &ctx.cache, guild_id).await?;
   let mut build = MessageBuilder::new();

@@ -32,7 +32,7 @@ impl SubCommandHandler for Shuffle {
 
     handler.queue().modify_queue(|f| {
       let front = f.pop_front();
-      f.make_contiguous().shuffle(&mut rand::thread_rng());
+      f.make_contiguous().shuffle(&mut rand::rng());
       if let Some(v) = front {
         f.push_front(v);
       }

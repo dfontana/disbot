@@ -1,6 +1,6 @@
 use anyhow::anyhow;
 use bollard::{
-  container::{ListContainersOptions, StopContainerOptions},
+  query_parameters::{ListContainersOptions, StopContainerOptions},
   service::{ContainerStateStatusEnum, ContainerSummary},
 };
 use std::collections::HashMap;
@@ -29,7 +29,7 @@ impl Docker {
       .client
       .list_containers(Some(ListContainersOptions {
         all: true,
-        filters: list_container_filters,
+        filters: Some(list_container_filters),
         ..Default::default()
       }))
       .await
@@ -39,7 +39,10 @@ impl Docker {
   pub async fn status(&self, name: &str) -> Result<ContainerStateStatusEnum, anyhow::Error> {
     self
       .client
-      .inspect_container(name, None)
+      .inspect_container(
+        name,
+        None::<bollard::query_parameters::InspectContainerOptions>,
+      )
       .await
       .map_err(|e| anyhow::anyhow!(e))
       .and_then(|res| {
@@ -53,7 +56,10 @@ impl Docker {
   pub async fn start(&self, name: &str) -> Result<(), anyhow::Error> {
     self
       .client
-      .start_container::<String>(name, None)
+      .start_container(
+        name,
+        None::<bollard::query_parameters::StartContainerOptions>,
+      )
       .await
       .map_err(|e| anyhow::anyhow!(e))
   }
@@ -64,7 +70,7 @@ impl Docker {
       .stop_container(
         name,
         Some(StopContainerOptions {
-          t: 120,
+          t: Some(120),
           ..Default::default()
         }),
       )

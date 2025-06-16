@@ -1,5 +1,6 @@
 use crate::config::Config;
 use anyhow::anyhow;
+use base64::{engine::general_purpose, Engine as _};
 use cached::proc_macro::cached;
 use once_cell::sync::Lazy;
 use serenity::{
@@ -12,7 +13,7 @@ use tracing::info;
 static EMOJI_IMAGE: Lazy<String> = Lazy::new(|| {
   format!(
     "data:image/png;base64,{}",
-    base64::encode(include_bytes!("img/shrug-dog.png"))
+    general_purpose::STANDARD.encode(include_bytes!("img/shrug-dog.png"))
   )
 });
 
@@ -41,7 +42,6 @@ impl EmojiLookup {
 #[cached(
   time = 600,
   result = true,
-  sync_writes = true,
   key = "String",
   convert = r##"{format!("{}:{}", guild_id, name)}"##
 )]

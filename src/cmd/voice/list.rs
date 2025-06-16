@@ -35,11 +35,16 @@ impl SubCommandHandler for List {
     bld.push_bold_line("Current Queue:");
     let mut body = String::new();
     for (idx, trk) in handler.queue().current_queue().iter().enumerate() {
-      let typ = trk.typemap().read().await;
-      let md = typ
-        .get::<ListMetadata>()
-        .expect("Guaranteed to exist from Play");
-      body.push_str(&format!("{}. '{}'\n", idx + 1, md.title));
+      // Retrieve custom metadata using songbird 0.5.0 API
+      // Note: data() will panic if type doesn't match, so we use a simple fallback approach
+      let title = match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        trk.data::<ListMetadata>().title.clone()
+      })) {
+        Ok(title) => title,
+        Err(_) => "<UNKNOWN TITLE>".to_string(),
+      };
+
+      body.push_str(&format!("{}. {}\n", idx + 1, title));
     }
 
     itx
