@@ -27,46 +27,83 @@ pub fn render_admin_page(config: &Config, error: Option<&str>, success: Option<&
     <style>
         body {{
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            max-width: 800px;
+            max-width: 600px;
             margin: 0 auto;
-            padding: 20px;
+            padding: 15px;
             background-color: #f5f5f5;
-            line-height: 1.6;
+            line-height: 1.4;
         }}
         
         .container {{
             background: white;
             border-radius: 8px;
-            padding: 30px;
+            padding: 15px;
             box-shadow: 0 2px 10px rgba(0,0,0,0.1);
         }}
         
         h1 {{
             color: #333;
             text-align: center;
-            margin-bottom: 30px;
+            margin-bottom: 20px;
             border-bottom: 2px solid #007bff;
-            padding-bottom: 10px;
+            padding-bottom: 8px;
+            font-size: 22px;
         }}
         
         .form-group {{
-            margin-bottom: 20px;
+            margin-bottom: 12px;
+        }}
+        
+        .form-row {{
+            display: flex;
+            gap: 15px;
+            margin-bottom: 12px;
+        }}
+        
+        .form-row .form-group {{
+            flex: 1;
+            margin-bottom: 0;
+        }}
+        
+        @media (max-width: 480px) {{
+            .form-row {{
+                flex-direction: column;
+                gap: 8px;
+            }}
         }}
         
         label {{
             display: block;
-            margin-bottom: 5px;
+            margin-bottom: 3px;
             font-weight: 600;
             color: #555;
+            font-size: 13px;
         }}
         
         input, select, textarea {{
             width: 100%;
-            padding: 10px;
+            padding: 8px;
             border: 2px solid #ddd;
             border-radius: 4px;
             font-size: 14px;
             box-sizing: border-box;
+        }}
+        
+        .readonly {{
+            background-color: #f8f9fa;
+            color: #6c757d;
+            cursor: not-allowed;
+            padding: 6px 8px;
+            font-size: 13px;
+        }}
+        
+        .readonly-compact {{
+            background-color: #f8f9fa;
+            color: #6c757d;
+            cursor: not-allowed;
+            padding: 4px 6px;
+            font-size: 12px;
+            border: 1px solid #e9ecef;
         }}
         
         input:focus, select:focus, textarea:focus {{
@@ -74,36 +111,46 @@ pub fn render_admin_page(config: &Config, error: Option<&str>, success: Option<&
             border-color: #007bff;
         }}
         
-        .readonly {{
-            background-color: #f8f9fa;
-            color: #6c757d;
-            cursor: not-allowed;
-        }}
-        
         .form-section {{
             border: 1px solid #e9ecef;
             border-radius: 6px;
-            padding: 20px;
-            margin-bottom: 25px;
+            padding: 12px;
+            margin-bottom: 15px;
         }}
         
         .form-section h3 {{
             margin-top: 0;
-            margin-bottom: 15px;
+            margin-bottom: 10px;
             color: #495057;
-            font-size: 18px;
+            font-size: 16px;
+        }}
+        
+        .compact-section {{
+            border: 1px solid #e9ecef;
+            border-radius: 6px;
+            padding: 8px;
+            margin-bottom: 12px;
+            background-color: #f8f9fa;
+        }}
+        
+        .compact-section h3 {{
+            margin-top: 0;
+            margin-bottom: 8px;
+            color: #495057;
+            font-size: 14px;
+            font-weight: 600;
         }}
         
         .submit-btn {{
             background-color: #007bff;
             color: white;
-            padding: 12px 30px;
+            padding: 10px 24px;
             border: none;
             border-radius: 4px;
-            font-size: 16px;
+            font-size: 15px;
             cursor: pointer;
             width: 100%;
-            margin-top: 20px;
+            margin-top: 15px;
         }}
         
         .submit-btn:hover {{
@@ -129,14 +176,15 @@ pub fn render_admin_page(config: &Config, error: Option<&str>, success: Option<&
         }}
         
         .help-text {{
-            font-size: 12px;
+            font-size: 11px;
             color: #6c757d;
-            margin-top: 4px;
+            margin-top: 2px;
+            line-height: 1.3;
         }}
         
         .restart-indicator {{
             color: #dc3545;
-            font-size: 12px;
+            font-size: 11px;
             font-weight: 500;
         }}
     </style>
@@ -149,18 +197,20 @@ pub fn render_admin_page(config: &Config, error: Option<&str>, success: Option<&
         {success_html}
         
         <form method="post" action="/admin">
-            <div class="form-section">
+            <div class="compact-section">
                 <h3>🔐 Bot Credentials</h3>
-                <div class="form-group">
-                    <label for="api_key">API Key</label>
-                    <input type="text" id="api_key" name="api_key" value="{api_key_display}" readonly class="readonly">
-                    <div class="help-text">Bot token - read only for security</div>
-                </div>
-                
-                <div class="form-group">
-                    <label for="app_id">Application ID</label>
-                    <input type="text" id="app_id" name="app_id" value="{app_id_display}" readonly class="readonly">
-                    <div class="help-text">Discord application ID - read only for security</div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="api_key">API Key</label>
+                        <input type="text" id="api_key" name="api_key" value="{api_key_display}" readonly class="readonly-compact">
+                        <div class="help-text">Bot token - read only for security</div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="app_id">Application ID</label>
+                        <input type="text" id="app_id" name="app_id" value="{app_id_display}" readonly class="readonly-compact">
+                        <div class="help-text">Discord application ID - read only for security</div>
+                    </div>
                 </div>
             </div>
             
@@ -174,30 +224,32 @@ pub fn render_admin_page(config: &Config, error: Option<&str>, success: Option<&
                 
                 <div class="form-group">
                     <label for="emote_users">Emote Users</label>
-                    <textarea id="emote_users" name="emote_users" rows="3" placeholder="User1, User2, User3">{emote_users_display}</textarea>
+                    <textarea id="emote_users" name="emote_users" rows="2" placeholder="User1, User2, User3">{emote_users_display}</textarea>
                     <div class="help-text">Comma-separated list of users for emote reactions</div>
                 </div>
             </div>
             
             <div class="form-section">
                 <h3>📊 Logging & Performance</h3>
-                <div class="form-group">
-                    <label for="log_level">Log Level</label>
-                    <select id="log_level" name="log_level" required>
-                        <option value="TRACE" {trace_selected}>TRACE</option>
-                        <option value="DEBUG" {debug_selected}>DEBUG</option>
-                        <option value="INFO" {info_selected}>INFO</option>
-                        <option value="WARN" {warn_selected}>WARN</option>
-                        <option value="ERROR" {error_selected}>ERROR</option>
-                    </select>
-                    <div class="help-text">✅ Takes effect immediately</div>
-                </div>
-                
-                <div class="form-group">
-                    <label for="voice_channel_timeout_seconds">Voice Channel Timeout (seconds)</label>
-                    <input type="number" id="voice_channel_timeout_seconds" name="voice_channel_timeout_seconds" 
-                           value="{timeout}" min="10" max="3600" required>
-                    <div class="help-text">Time before bot leaves voice channel when inactive (10-3600 seconds)</div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="log_level">Log Level</label>
+                        <select id="log_level" name="log_level" required>
+                            <option value="TRACE" {trace_selected}>TRACE</option>
+                            <option value="DEBUG" {debug_selected}>DEBUG</option>
+                            <option value="INFO" {info_selected}>INFO</option>
+                            <option value="WARN" {warn_selected}>WARN</option>
+                            <option value="ERROR" {error_selected}>ERROR</option>
+                        </select>
+                        <div class="help-text">✅ Takes effect immediately</div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="voice_channel_timeout_seconds">Voice Channel Timeout (seconds)</label>
+                        <input type="number" id="voice_channel_timeout_seconds" name="voice_channel_timeout_seconds" 
+                               value="{timeout}" min="10" max="3600" required>
+                        <div class="help-text">Time before bot leaves voice channel when inactive (10-3600 seconds)</div>
+                    </div>
                 </div>
             </div>
             
