@@ -9,6 +9,7 @@ pub fn create_router(config_path: String) -> Router {
       "/admin",
       get(handlers::get_admin).post(handlers::post_admin),
     )
+    .route("/favicon.ico", get(handlers::get_favicon))
     .layer(Extension(config_path))
 }
 

@@ -191,7 +191,7 @@ pub fn render_admin_page(config: &Config, error: Option<&str>, success: Option<&
 </head>
 <body>
     <div class="container">
-        <h1>🤖 DisBot Admin Configuration</h1>
+        <h1><img src="/favicon.ico" alt="DisBot" style="width: 24px; height: 24px; vertical-align: middle; margin-right: 8px;">DisBot Admin Configuration</h1>
         
         {error_html}
         {success_html}

@@ -1,6 +1,6 @@
 use axum::{
   extract::{Extension, Form, Query},
-  http::StatusCode,
+  http::{header, StatusCode},
   response::{Html, IntoResponse, Redirect, Response},
 };
 use std::collections::HashMap;
@@ -98,4 +98,13 @@ fn parse_form_data(params: HashMap<String, String>) -> Result<FormData, String> 
     log_level,
     voice_channel_timeout_seconds,
   })
+}
+
+pub async fn get_favicon() -> Result<impl IntoResponse, StatusCode> {
+  let favicon_data = include_bytes!("../img/shrug-dog.png");
+
+  Ok((
+    [(header::CONTENT_TYPE, "image/png")],
+    favicon_data.as_slice(),
+  ))
 }
