@@ -21,7 +21,7 @@ use serenity::{
 };
 use songbird::SerenityInit;
 use tracing::{error, Level};
-use tracing_subscriber::{filter, prelude::*, reload, Registry};
+use tracing_subscriber::{filter::LevelFilter, prelude::*, reload, Registry};
 
 use cmd::Handler;
 use config::Config;
@@ -46,7 +46,7 @@ struct Cli {
 
 // Global handle for runtime log level changes
 static LOG_RELOAD_HANDLE: once_cell::sync::Lazy<
-  std::sync::Mutex<Option<reload::Handle<filter::LevelFilter, Registry>>>,
+  std::sync::Mutex<Option<reload::Handle<LevelFilter, Registry>>>,
 > = once_cell::sync::Lazy::new(|| std::sync::Mutex::new(None));
 
 pub fn set_log_level(level: Level) -> Result<(), String> {
@@ -55,7 +55,7 @@ pub fn set_log_level(level: Level) -> Result<(), String> {
     .map_err(|e| format!("Lock error: {}", e))?;
   if let Some(handle) = handle_guard.as_ref() {
     handle
-      .modify(|filter| *filter = filter::LevelFilter::from_level(level))
+      .modify(|filter| *filter = LevelFilter::from_level(level))
       .map_err(|e| format!("Failed to update log level: {}", e))?;
     Ok(())
   } else {
@@ -100,7 +100,7 @@ async fn main() {
 
   // Set up reloadable tracing subscriber
   let initial_level = Level::from_str(&config.log_level).unwrap();
-  let (filter, reload_handle) = reload::Layer::new(filter::LevelFilter::from_level(initial_level));
+  let (filter, reload_handle) = reload::Layer::new(LevelFilter::from_level(initial_level));
 
   // Store the reload handle globally
   {

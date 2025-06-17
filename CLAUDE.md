@@ -20,6 +20,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ### Stylistic Notes
 - After the tracing logger is initialized don't use print statements anymore. Favor the tracing macros for logging.
+- Avoid long method references by importing, keeping at least one level on the import where appropriate (for example "LevelFilter::from_level" is better than "filter::LevelFilter::from_level")
+- Prefer method chaining and leveraging monadic methods, where possible to reduce nesting. For example "Result::and_then" instead of nested match arms
 
 ### Documentation for Crates
 - Use `docs.rs` for all external crate related documentation

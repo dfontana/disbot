@@ -33,7 +33,7 @@ impl Docker {
         ..Default::default()
       }))
       .await
-      .map_err(|e| anyhow::anyhow!(e))
+      .map_err(|e| anyhow!(e))
   }
 
   pub async fn status(&self, name: &str) -> Result<ContainerStateStatusEnum, anyhow::Error> {
@@ -44,7 +44,7 @@ impl Docker {
         None::<bollard::query_parameters::InspectContainerOptions>,
       )
       .await
-      .map_err(|e| anyhow::anyhow!(e))
+      .map_err(|e| anyhow!(e))
       .and_then(|res| {
         res
           .state
@@ -61,7 +61,7 @@ impl Docker {
         None::<bollard::query_parameters::StartContainerOptions>,
       )
       .await
-      .map_err(|e| anyhow::anyhow!(e))
+      .map_err(|e| anyhow!(e))
   }
 
   pub async fn stop(&self, name: &str) -> Result<(), anyhow::Error> {
@@ -75,6 +75,6 @@ impl Docker {
         }),
       )
       .await
-      .map_err(|e| anyhow::anyhow!(e))
+      .map_err(|e| anyhow!(e))
   }
 }
