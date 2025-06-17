@@ -50,11 +50,11 @@ async fn build_list_msg(docker: &Docker) -> Result<MessageBuilder, anyhow::Error
   table.push_str(&format!("{:-<max_len$}---{:-<stat_len$}\n", "", ""));
   let msg = summaries
     .iter()
-    .sorted_by_key(|summary| extract_name(&summary))
+    .sorted_by_key(|summary| extract_name(summary))
     .fold(table, |mut acc, summary| {
       acc.push_str(&format!(
         "{:<max_len$} | {:<stat_len$}\n",
-        extract_name(&summary),
+        extract_name(summary),
         summary
           .state
           .as_ref()
@@ -67,11 +67,11 @@ async fn build_list_msg(docker: &Docker) -> Result<MessageBuilder, anyhow::Error
   Ok(bdy)
 }
 
-fn extract_name<'a>(summary: &'a ContainerSummary) -> &'a str {
+fn extract_name(summary: &ContainerSummary) -> &str {
   summary
     .names
     .as_ref()
-    .and_then(|v| v.get(0))
+    .and_then(|v| v.first())
     .and_then(|s| s.strip_prefix("/"))
-    .unwrap_or_else(|| "(No Name)")
+    .unwrap_or("(No Name)")
 }

@@ -27,7 +27,7 @@ impl SubCommandHandler for Start {
       .str("server-name")
       .map_err(|e| anyhow!("Must provide a server name").context(e))?;
 
-    match self.docker.status(&name).await {
+    match self.docker.status(name).await {
       Ok(CREATED | EXITED) => {}
       Ok(s) => {
         itx
@@ -50,7 +50,7 @@ impl SubCommandHandler for Start {
       }
     }
 
-    let msg = match self.docker.start(&name).await {
+    let msg = match self.docker.start(name).await {
       Ok(_) => "Server starting".into(),
       Err(e) => format!("{}", e),
     };

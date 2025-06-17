@@ -126,7 +126,7 @@ impl Config {
   fn validate_form_data(&self, form_data: &FormData) -> Result<(), ValidationError> {
     // Validate emote_name
     if form_data.emote_name.is_empty() {
-      return Err(ValidationError::InvalidEmoteName(
+      return Err(ValidationError::EmoteName(
         "Emote name cannot be empty".to_string(),
       ));
     }
@@ -135,7 +135,7 @@ impl Config {
       .chars()
       .all(|c| c.is_alphanumeric() || c == '_' || c == '-')
     {
-      return Err(ValidationError::InvalidEmoteName(
+      return Err(ValidationError::EmoteName(
         "Emote name can only contain alphanumeric characters, underscores, and dashes".to_string(),
       ));
     }
@@ -143,7 +143,7 @@ impl Config {
     // Validate log_level
     let valid_levels = ["TRACE", "DEBUG", "INFO", "WARN", "ERROR"];
     if !valid_levels.contains(&form_data.log_level.as_str()) {
-      return Err(ValidationError::InvalidLogLevel(format!(
+      return Err(ValidationError::LogLevel(format!(
         "Log level must be one of: {}",
         valid_levels.join(", ")
       )));
@@ -153,7 +153,7 @@ impl Config {
     if form_data.voice_channel_timeout_seconds < 10
       || form_data.voice_channel_timeout_seconds > 3600
     {
-      return Err(ValidationError::InvalidTimeout(
+      return Err(ValidationError::Timeout(
         "Voice channel timeout must be between 10 and 3600 seconds".to_string(),
       ));
     }
@@ -176,17 +176,17 @@ pub struct FormData {
 
 #[derive(Debug)]
 pub enum ValidationError {
-  InvalidEmoteName(String),
-  InvalidLogLevel(String),
-  InvalidTimeout(String),
+  EmoteName(String),
+  LogLevel(String),
+  Timeout(String),
 }
 
 impl std::fmt::Display for ValidationError {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     match self {
-      ValidationError::InvalidEmoteName(msg) => write!(f, "Invalid emote name: {}", msg),
-      ValidationError::InvalidLogLevel(msg) => write!(f, "Invalid log level: {}", msg),
-      ValidationError::InvalidTimeout(msg) => write!(f, "Invalid timeout: {}", msg),
+      ValidationError::EmoteName(msg) => write!(f, "Invalid emote name: {}", msg),
+      ValidationError::LogLevel(msg) => write!(f, "Invalid log level: {}", msg),
+      ValidationError::Timeout(msg) => write!(f, "Invalid timeout: {}", msg),
     }
   }
 }

@@ -25,7 +25,7 @@ impl SubCommandHandler for Stop {
       .str("server-name")
       .map_err(|e| anyhow!("Must provide a server name").context(e))?;
 
-    let msg = match self.docker.stop(&name).await {
+    let msg = match self.docker.stop(name).await {
       Ok(_) => "Server stopped".into(),
       Err(e) => format!("{}", e),
     };
