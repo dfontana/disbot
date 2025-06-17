@@ -20,7 +20,7 @@ use serenity::{
   prelude::{GatewayIntents, TypeMapKey},
 };
 use songbird::SerenityInit;
-use tracing::{error, Level};
+use tracing::{error, info, Level};
 use tracing_subscriber::{filter::LevelFilter, prelude::*, reload, Registry};
 
 use cmd::Handler;
@@ -80,7 +80,7 @@ async fn main() {
     .unwrap_or_else(|| cli.environment.as_toml_file());
 
   // Load configuration from TOML file
-  println!("Loading configuration from {}", final_config_path);
+  info!("Loading configuration from {}", final_config_path);
   let config = match Config::from_toml(&final_config_path, cli.environment) {
     Ok(config) => {
       // Update global instance
@@ -90,7 +90,7 @@ async fn main() {
       config
     }
     Err(e) => {
-      eprintln!(
+      error!(
         "Error loading configuration from {}: {}",
         final_config_path, e
       );
@@ -135,7 +135,10 @@ async fn main() {
   ))
   .application_id(config.app_id.into())
   .await
-  .expect("Err creating client");
+  .unwrap_or_else(|e| {
+    error!("Error creating Discord client: {:?}", e);
+    std::process::exit(1);
+  });
 
   // Start web server and Discord client concurrently
   let web_server = web::start_server(final_config_path, cli.port);

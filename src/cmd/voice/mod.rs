@@ -21,7 +21,7 @@ use serenity::{all::CommandInteraction, async_trait, client::Context};
 use shuffle::*;
 use skip::*;
 use stop::*;
-use tracing::{instrument, log::error};
+use tracing::{error, instrument};
 
 const NAME: &str = "play";
 
@@ -38,7 +38,7 @@ impl Voice {
   pub fn new(config: Config, emoji: EmojiLookup) -> Self {
     let disconnect =
       ActorHandle::<DisconnectMessage>::spawn(|r, _| Box::new(DisconnectActor::new(r)));
-    Voice {
+    Self {
       play: Play::new(config, emoji.clone(), disconnect.clone()),
       stop: Stop::new(disconnect),
       skip: Skip::new(emoji.clone()),

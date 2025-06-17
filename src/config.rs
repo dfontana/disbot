@@ -1,5 +1,6 @@
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
+use tracing::{info, warn};
 
 use crate::Environment;
 use std::sync::RwLock;
@@ -42,22 +43,18 @@ impl Config {
 
     // If file doesn't exist, generate it with defaults
     if !path_ref.exists() {
-      println!(
+      info!(
         "Configuration file {} not found. Generating default configuration...",
         path_ref.display()
       );
 
       // Determine environment from filename
-      let env = if path_ref
+      let env = path_ref
         .file_name()
         .and_then(|name| name.to_str())
-        .map(|name| name.starts_with("prod"))
-        .unwrap_or(false)
-      {
-        Environment::Prod
-      } else {
-        Environment::Dev
-      };
+        .filter(|name| name.starts_with("prod"))
+        .map(|_| Environment::Prod)
+        .unwrap_or(Environment::Dev);
 
       let default_config = Config {
         api_key: "your_discord_bot_token_here".to_string(),
@@ -74,7 +71,7 @@ impl Config {
       };
 
       default_config.to_toml(path_ref)?;
-      println!(
+      info!(
         "Generated {} - please edit this file with your bot credentials and restart.",
         path_ref.display()
       );
@@ -103,19 +100,26 @@ impl Config {
     self.emote_users = form_data
       .emote_users
       .split(',')
-      .map(|s| s.trim().to_string())
-      .filter(|s| !s.is_empty())
+      .filter_map(|s| {
+        let trimmed = s.trim();
+        if trimmed.is_empty() {
+          None
+        } else {
+          Some(trimmed.to_string())
+        }
+      })
       .collect();
 
     // Update log level and apply runtime change
     if self.log_level != form_data.log_level {
       self.log_level = form_data.log_level.clone();
       // Apply log level change at runtime
-      if let Ok(level) = form_data.log_level.parse::<tracing::Level>() {
-        if let Err(e) = crate::set_log_level(level) {
-          eprintln!("Warning: Failed to update runtime log level: {}", e);
-        }
-      }
+      form_data
+        .log_level
+        .parse::<tracing::Level>()
+        .map_err(|_| ())
+        .and_then(|level| crate::set_log_level(level).map_err(|_| ()))
+        .unwrap_or_else(|_| warn!("Failed to update runtime log level"));
     }
 
     self.voice_channel_timeout_seconds = form_data.voice_channel_timeout_seconds;

@@ -57,21 +57,18 @@ async fn wrapped_handle(
   itx: &CommandInteraction,
   args: &Args<'_>,
 ) -> Result<(), anyhow::Error> {
-  let (guild_id, channel_id) = {
-    let guild = itx
-      .guild_id
-      .ok_or_else(|| anyhow!("No Guild Id on Interaction"))?;
-    let channel = ctx
-      .cache
-      .guild(guild)
-      .and_then(|g| {
-        g.voice_states
-          .get(&itx.user.id)
-          .and_then(|vs| vs.channel_id)
-      })
-      .ok_or_else(|| anyhow!("Not in a voice channel"))?;
-    (guild, channel)
-  };
+  let guild_id = itx
+    .guild_id
+    .ok_or_else(|| anyhow!("No Guild Id on Interaction"))?;
+  let channel_id = ctx
+    .cache
+    .guild(guild_id)
+    .and_then(|g| {
+      g.voice_states
+        .get(&itx.user.id)
+        .and_then(|vs| vs.channel_id)
+    })
+    .ok_or_else(|| anyhow!("Not in a voice channel"))?;
 
   // 1 arg: link. String.
   let searchterm = args
@@ -82,8 +79,7 @@ async fn wrapped_handle(
   // Fetch the Songbird mgr & join channel
   let manager = songbird::get(ctx)
     .await
-    .expect("Songbird Voice client placed in at initialisation.")
-    .clone();
+    .ok_or_else(|| anyhow!("Songbird Voice client not initialized"))?;
 
   // Check if we're already in the channel or not, connecting if not
   let handler_lock = match manager.get(guild_id) {
@@ -132,7 +128,7 @@ async fn wrapped_handle(
     data
       .get::<HttpClient>()
       .cloned()
-      .expect("Guaranteed to exist in the typemap.")
+      .ok_or_else(|| anyhow!("HttpClient not found in typemap"))?
   };
   let is_url = searchterm.starts_with("http");
   let resolved_src = match is_url {
@@ -141,19 +137,20 @@ async fn wrapped_handle(
   };
   let mut input = Input::from(resolved_src);
 
-  let (title, source_url) = input
+  let list_metadata = input
     .aux_metadata()
     .await
-    .map(|m| {
-      let title = m.track.or(m.title);
-      let url = m.source_url;
-      (title, url)
+    .map(|m| ListMetadata {
+      title: m
+        .track
+        .or(m.title)
+        .unwrap_or_else(|| "<UNKNOWN>".to_string()),
+      url: m.source_url.unwrap_or_else(|| "<UNKNOWN>".to_string()),
     })
-    .unwrap_or_default();
-  let list_metadata = ListMetadata {
-    title: title.unwrap_or_else(|| "<UNKNOWN>".to_string()),
-    url: source_url.unwrap_or_else(|| "<UNKNOWN>".to_string()),
-  };
+    .unwrap_or_else(|_| ListMetadata {
+      title: "<UNKNOWN>".to_string(),
+      url: "<UNKNOWN>".to_string(),
+    });
 
   let mut handler = handler_lock.lock().await;
   handler.set_bitrate(Bitrate::Max);

@@ -8,19 +8,28 @@ use std::collections::HashMap;
 use crate::config::{Config, FormData};
 use crate::web::templates;
 
+// Helper function to get config or return default
+fn get_config_or_default() -> Config {
+  Config::global_instance()
+    .read()
+    .map(|c| c.clone())
+    .unwrap_or_default()
+}
+
+// Helper function to render error response
+fn render_error_response(error: &str) -> Html<String> {
+  let config = get_config_or_default();
+  Html(templates::render_admin_page(&config, Some(error), None))
+}
+
 pub async fn get_admin(
   Query(params): Query<HashMap<String, String>>,
 ) -> Result<Html<String>, StatusCode> {
-  let config = match Config::global_instance().read() {
-    Ok(config) => config.clone(),
-    Err(_) => return Err(StatusCode::INTERNAL_SERVER_ERROR),
-  };
-
+  let config = get_config_or_default();
   let success = params
     .get("success")
     .map(|_| "Configuration saved successfully!");
-  let html = templates::render_admin_page(&config, None, success);
-  Ok(Html(html))
+  Ok(Html(templates::render_admin_page(&config, None, success)))
 }
 
 pub async fn post_admin(
@@ -30,14 +39,7 @@ pub async fn post_admin(
   // Parse form data
   let form_data = match parse_form_data(params) {
     Ok(data) => data,
-    Err(error) => {
-      let config = Config::global_instance()
-        .read()
-        .map(|c| c.clone())
-        .unwrap_or_default();
-      let html = templates::render_admin_page(&config, Some(&error), None);
-      return Html(html).into_response();
-    }
+    Err(error) => return render_error_response(&error).into_response(),
   };
 
   // Update configuration
@@ -45,13 +47,7 @@ pub async fn post_admin(
     let mut config = match Config::global_instance().write() {
       Ok(config) => config,
       Err(_) => {
-        let config = Config::global_instance()
-          .read()
-          .map(|c| c.clone())
-          .unwrap_or_default();
-        let html =
-          templates::render_admin_page(&config, Some("Failed to acquire configuration lock"), None);
-        return Html(html).into_response();
+        return render_error_response("Failed to acquire configuration lock").into_response()
       }
     };
 
@@ -76,14 +72,7 @@ pub async fn post_admin(
       // Redirect to show success
       Redirect::to("/admin?success=1").into_response()
     }
-    Err(error) => {
-      let config = Config::global_instance()
-        .read()
-        .map(|c| c.clone())
-        .unwrap_or_default();
-      let html = templates::render_admin_page(&config, Some(&error), None);
-      Html(html).into_response()
-    }
+    Err(error) => render_error_response(&error).into_response(),
   }
 }
 
