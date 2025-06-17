@@ -1,161 +1,165 @@
-# Disbot Admin Interface Implementation Plan
+# Disbot Admin Interface Implementation - COMPLETED
 
 ## Project Overview
-Add a simple static admin web interface to the Rust-based Discord bot "disbot" for managing configuration at runtime over the local network. The bot currently runs on a Raspberry Pi via systemd and uses environment files for configuration.
+✅ **COMPLETED**: Added a static admin web interface to the Rust-based Discord bot "disbot" for managing configuration at runtime over the local network. Successfully migrated from environment variables to TOML-based configuration with enhanced CLI.
 
-## Requirements
+## Final Implementation
 
 ### Technical Stack
-- **Web Server**: Axum framework
+- **Web Server**: Axum framework (0.7)
 - **Frontend**: Pure HTML forms + CSS (no JavaScript)
-- **Configuration Format**: TOML file
-- **Config File Location**: Same directory as binary (unless CLI argument specifies otherwise)
+- **Configuration Format**: Environment-specific TOML files (`prod.toml`, `dev.toml`)
+- **CLI**: Clap-rs with derive API for robust argument parsing
 - **Web Server Port**: CLI parameter, default 3450
 
 ### Security & Access
-- Sensitive fields (API_KEY, APP_ID) must be read-only and obfuscated with 5 asterisks
-- Web interface accessible over local network only
-- No authentication required (secured by network isolation)
+- ✅ Sensitive fields (API_KEY, APP_ID) are read-only and obfuscated with "*****"
+- ✅ Web interface accessible over local network only
+- ✅ No authentication required (secured by network isolation)
 
-### Configuration Management
-- Replace current environment variable system with TOML-based configuration
-- Use existing global `INSTANCE: Lazy<RwLock<Config>>` pattern
-- All configuration changes require service restart initially (can be optimized later)
-- Page refresh acceptable to see updates (no real-time updates needed)
+## Key Architectural Decisions
 
-## Current Config Structure
+### Environment Management
+- **Breaking Change**: Environment removed from web interface
+- Environment determined solely by CLI argument: `cargo run -- dev` vs `cargo run -- prod`
+- TOML files are environment-specific: `dev.toml`, `prod.toml`
+- `env` field excluded from TOML serialization (`#[serde(skip)]`)
+
+### Runtime Configuration
+- **Log Level**: Changes take effect immediately via `tracing-subscriber::reload`
+- **Other Settings**: Require service restart (as planned)
+- **Auto-Generation**: Missing config files created with appropriate defaults
+
+### CLI Enhancement
+- **Replaced**: Manual argument parsing with clap-rs
+- **Features**: Automatic help, validation, error messages
+- **Usage**: `cargo run -- [ENVIRONMENT] [OPTIONS]`
+
+## Final Config Structure
 
 ```rust
-use once_cell::sync::Lazy;
-use std::sync::RwLock;
-
-static INSTANCE: Lazy<RwLock<Config>> = Lazy::new(|| RwLock::new(Config::default()));
-
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Config {
-  pub api_key: String,           // Sensitive - read-only, obfuscated
-  pub app_id: u64,              // Sensitive - read-only, obfuscated  
-  pub emote_name: String,        // Configurable
-  pub emote_users: Vec<String>,  // Configurable - comma-separated input
-  pub env: Environment,          // Configurable - dropdown
-  pub log_level: String,         // Configurable - dropdown (tracing::Level compatible)
-  pub timeout: u64,             // Rename to voice_channel_timeout_seconds
+  pub api_key: String,                    // Sensitive - read-only, obfuscated
+  pub app_id: u64,                        // Sensitive - read-only, obfuscated  
+  pub emote_name: String,                 // Configurable via web
+  pub emote_users: Vec<String>,           // Configurable via web
+  #[serde(skip)]
+  pub env: Environment,                   // CLI-only, not in TOML
+  pub log_level: String,                  // Configurable via web - immediate effect
+  pub voice_channel_timeout_seconds: u64, // Configurable via web
 }
 
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, ValueEnum, Serialize, Deserialize)]
 pub enum Environment {
-  #[default]
+  #[default] 
   Prod,
   Dev,
 }
 ```
 
-## Target TOML Structure
+## Final TOML Structure
 
 ```toml
-# config.toml
-api_key = "your_bot_token_here"
+# dev.toml / prod.toml (no env field)
+api_key = "your_discord_bot_token_here"
 app_id = 123456789012345678
 emote_name = "shrug_dog"
 emote_users = ["User1", "User2", "User3"]
-env = "prod"
 log_level = "INFO"
 voice_channel_timeout_seconds = 600
 ```
 
-## Implementation Requirements
+## Implementation Results
 
-### Configuration Management
-- **Update Flow**: Update global instance → Write TOML file → Rollback instance if file write fails
-- **Concurrency**: Use existing RwLock pattern for thread safety
-- **Validation**: All-or-nothing validation - reject entire form if any field is invalid
-- **No Backups**: File writes happen on form submission, no backup files needed
+### ✅ Completed Features
+
+1. **TOML Configuration System**
+   - Environment-specific config files
+   - Auto-generation with defaults
+   - Form validation and error handling
+
+2. **Axum Web Server**
+   - GET/POST `/admin` routes
+   - Form validation with error display
+   - Sensitive field obfuscation
+
+3. **HTML Interface**
+   - Single responsive page with embedded CSS
+   - Clear success/error feedback
+   - Runtime vs restart indicators
+
+4. **CLI with Clap-rs**
+   - Professional help system (`--help`)
+   - Automatic validation and error messages
+   - Type-safe argument parsing
+
+5. **Runtime Log Level Changes**
+   - Immediate effect via `tracing-subscriber::reload`
+   - No restart required for log level adjustments
 
 ### Form Validation Rules
 - `emote_name`: Non-empty, alphanumeric + underscore/dash
-- `emote_users`: Any number of comma-separated usernames (trim whitespace)
-- `env`: Dropdown restricted to ["prod", "dev"]
-- `log_level`: Dropdown restricted to ["TRACE", "DEBUG", "INFO", "WARN", "ERROR"] (tracing::Level compatible)
-- `voice_channel_timeout_seconds`: Number input, range 10-3600 seconds
+- `emote_users`: Comma-separated usernames (trimmed)
+- `log_level`: Dropdown ["TRACE", "DEBUG", "INFO", "WARN", "ERROR"]
+- `voice_channel_timeout_seconds`: Number 10-3600 seconds
 
-### Web Interface Design
-- Single HTML page with embedded CSS
-- Form sections organized logically
-- Restart requirement indicators: Small icon with hover tooltip for fields requiring restart
-- Error display: Show validation errors on same page after form submission
-- Sensitive field display: Show "*****" for api_key and app_id
-- Success feedback: Clear indication when configuration saved successfully
+### Usage Examples
 
-### Error Handling
-- Display validation errors directly on webpage
-- Preserve valid form data when showing errors
-- First-come-first-serve for concurrent users (RwLock handles this)
-- Clear error messages for file write failures
+```bash
+# Basic usage
+cargo run -- dev                           # dev.toml, port 3450
+cargo run -- prod                          # prod.toml, port 3450
 
-## Implementation Tasks
+# With options
+cargo run -- dev --port 8080              # Custom port
+cargo run -- dev --config custom.toml     # Custom config file
 
-### 1. Update Config Struct
-- Add Serde derive macros for TOML serialization
-- Rename `timeout` to `voice_channel_timeout_seconds`
-- Change `log_level` to use `tracing::Level` enum
-- Add custom serde modules for Environment and Level enums
+# Help
+cargo run -- --help                       # Show usage
+```
 
-### 2. Configuration Management
-- Implement `Config::from_toml(path: &str)` method
-- Implement `Config::update_from_form()` with rollback logic
-- Update global instance integration
-- Add TOML file I/O with error handling
+## Dependencies Added
 
-### 3. Axum Web Server
-- Create HTTP server with configurable port
-- Implement GET route for admin page
-- Implement POST route for configuration updates
-- Add form validation and error handling
-- Serve static HTML with embedded CSS
-
-### 4. HTML Interface
-- Create responsive form layout
-- Add field validation and error display
-- Implement restart requirement indicators
-- Handle sensitive field obfuscation
-- Add success/error feedback
-
-### 5. CLI Integration
-- Add command line argument for config file path
-- Add command line argument for web server port (default 3450)
-- Update main application to use TOML configuration
-
-## Dependencies to Add
 ```toml
-[dependencies]
 axum = "0.7"
-serde = { version = "1.0", features = ["derive"] }
+clap = { version = "4.0", features = ["derive"] }
 toml = "0.8"
-tokio = { version = "1.0", features = ["full"] }
 tower = "0.4"
 tower-http = { version = "0.5", features = ["fs"] }
-tracing = "0.1"
 ```
 
 ## File Structure
+
 ```
 src/
-├── main.rs              # Entry point with CLI args
-├── config.rs            # Config struct and TOML handling
+├── main.rs              # Entry point with clap CLI
+├── config.rs            # Config struct and TOML handling  
+├── env.rs               # Environment enum with ValueEnum
 ├── web/
 │   ├── mod.rs          # Web server module
-│   ├── handlers.rs     # Route handlers
+│   ├── handlers.rs     # GET/POST route handlers
 │   └── templates.rs    # HTML template generation
-└── environment.rs       # Environment enum
 ```
 
-## Testing Checklist
-- [ ] TOML file read/write operations
-- [ ] Form validation for all field types
-- [ ] Concurrent access handling
-- [ ] Rollback functionality on file write failure
-- [ ] Sensitive field obfuscation
-- [ ] Error message display
-- [ ] Configuration persistence across restarts
-- [ ] CLI argument parsing
-- [ ] Web server binding and accessibility
+## Breaking Changes Made
+
+1. **Removed .env Support**: No backward compatibility with environment files
+2. **Environment CLI-Only**: Cannot be changed via web interface
+3. **Field Rename**: `timeout` → `voice_channel_timeout_seconds`
+4. **CLI Changes**: Arguments now require `--` separator: `cargo run -- dev`
+
+## Benefits Achieved
+
+- **Clean Architecture**: Separation of deployment (CLI) vs runtime (web) configuration
+- **Better UX**: Professional CLI with help and validation
+- **Runtime Flexibility**: Log level changes without restart
+- **Maintainability**: Declarative CLI, reduced manual parsing code
+- **Security**: Sensitive fields properly protected
+- **Robustness**: Auto-config generation, comprehensive validation
+
+## Access
+
+- **Web Interface**: `http://localhost:3450/admin` (or custom port)
+- **Features**: Form-based configuration management with immediate feedback
+- **Security**: Network-isolated, no authentication required
