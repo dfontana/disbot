@@ -8,6 +8,18 @@ use serenity::{
   all::CommandInteraction, async_trait, builder::EditInteractionResponse, prelude::Context,
 };
 
+// Helper function to send response
+async fn send_response(
+  ctx: &Context,
+  itx: &CommandInteraction,
+  message: String,
+) -> Result<(), anyhow::Error> {
+  itx
+    .edit_response(&ctx.http, EditInteractionResponse::new().content(message))
+    .await?;
+  Ok(())
+}
+
 #[derive(new)]
 pub struct Stop {
   docker: Docker,
@@ -25,13 +37,9 @@ impl SubCommandHandler for Stop {
       .str("server-name")
       .map_err(|e| anyhow!("Must provide a server name").context(e))?;
 
-    let msg = match self.docker.stop(&name).await {
-      Ok(_) => "Server stopped".into(),
-      Err(e) => format!("{}", e),
-    };
-    itx
-      .edit_response(&ctx.http, EditInteractionResponse::new().content(msg))
-      .await?;
-    Ok(())
+    match self.docker.stop(name).await {
+      Ok(_) => send_response(ctx, itx, "Server stopped".to_string()).await,
+      Err(e) => send_response(ctx, itx, format!("{}", e)).await,
+    }
   }
 }

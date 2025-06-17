@@ -78,7 +78,7 @@ impl PollState {
     let duration: Duration = args
       .str("duration")
       .map_err(|e| anyhow!("Duration not given").context(e))
-      .and_then(|s| parse_duration(&s).map_err(|e| anyhow!("Invalid duration given").context(e)))?;
+      .and_then(|s| parse_duration(s).map_err(|e| anyhow!("Invalid duration given").context(e)))?;
 
     let topic: String = args
       .str("topic")

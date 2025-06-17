@@ -9,6 +9,18 @@ use serenity::{
   all::CommandInteraction, async_trait, builder::EditInteractionResponse, client::Context,
 };
 
+// Helper function to send error response
+async fn send_error_response(
+  ctx: &Context,
+  itx: &CommandInteraction,
+  message: String,
+) -> Result<(), anyhow::Error> {
+  itx
+    .edit_response(&ctx.http, EditInteractionResponse::new().content(message))
+    .await?;
+  Ok(())
+}
+
 #[derive(new)]
 pub struct Start {
   docker: Docker,
@@ -27,36 +39,24 @@ impl SubCommandHandler for Start {
       .str("server-name")
       .map_err(|e| anyhow!("Must provide a server name").context(e))?;
 
-    match self.docker.status(&name).await {
+    match self.docker.status(name).await {
       Ok(CREATED | EXITED) => {}
       Ok(s) => {
-        itx
-          .edit_response(
-            &ctx.http,
-            EditInteractionResponse::new()
-              .content(format!("Server in state that can't be started: {}", s)),
-          )
-          .await?;
-        return Ok(());
+        return send_error_response(
+          ctx,
+          itx,
+          format!("Server in state that can't be started: {}", s),
+        )
+        .await;
       }
       Err(e) => {
-        itx
-          .edit_response(
-            &ctx.http,
-            EditInteractionResponse::new().content(format!("{}", e)),
-          )
-          .await?;
-        return Ok(());
+        return send_error_response(ctx, itx, format!("{}", e)).await;
       }
     }
 
-    let msg = match self.docker.start(&name).await {
-      Ok(_) => "Server starting".into(),
-      Err(e) => format!("{}", e),
-    };
-    itx
-      .edit_response(&ctx.http, EditInteractionResponse::new().content(msg))
-      .await?;
-    Ok(())
+    match self.docker.start(name).await {
+      Ok(_) => send_error_response(ctx, itx, "Server starting".to_string()).await,
+      Err(e) => send_error_response(ctx, itx, format!("{}", e)).await,
+    }
   }
 }

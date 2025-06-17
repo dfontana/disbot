@@ -68,7 +68,7 @@ impl AppInteractor for CheckIn {
       let _ = itx
         .edit_response(
           &ctx.http,
-          EditInteractionResponse::new().content(&format!("{}", e)),
+          EditInteractionResponse::new().content(format!("{}", e)),
         )
         .await;
     }
@@ -91,7 +91,7 @@ impl CheckIn {
     let duration: Duration = args
       .str("duration")
       .map_err(|e| anyhow!("Duration not given").context(e))
-      .and_then(|s| parse_duration(&s).map_err(|e| anyhow!("Invalid duration given").context(e)))?;
+      .and_then(|s| parse_duration(s).map_err(|e| anyhow!("Invalid duration given").context(e)))?;
 
     let time: NaiveTime = args
       .str("time")
@@ -104,7 +104,7 @@ impl CheckIn {
     let at_group: Option<Role> = args
       .opt_role("role")
       .map_err(|e| anyhow!("Invalid role given").context(e))
-      .map(|v| v.map(|r| r.clone()))?;
+      .map(|v| v.cloned())?;
 
     self
       .actor

@@ -3,3 +3,5 @@ wip/
 /target
 disbot
 .vscode/
+dev.toml
+prod.toml

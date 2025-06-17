@@ -38,22 +38,22 @@ For ArmV7 (eg Raspberry Pi) or `x86_64` Linux (eg Linux Server).
 
 ## Deploying
  
-1. Define a `prod.env` file inside the root of this repo:
+1. Define a `prod.toml` file inside the root of this repo:
 
-```
-#prod.env
-API_KEY=<Your Bot's Token Here>
-APP_ID=<Your Bot's Application Id Here>
-EMOTE_NAME=<your-emote || shrug_dog>
-EMOTE_USERS=<csv of users || User1,User2,User3>
-SERVER_MAC=<game-server-mac>
-SERVER_IP=<game-server-ip>
-SERVER_DOCKER_PORT=<docker-tcp-port-on-game-server>
-SERVER_USER=<game-server-user>
-LOG_LEVEL=INFO
-TIMEOUT=600
+```toml
+# prod.toml
+api_key = "<Your Bot's Token Here>"
+app_id = <Your Bot's Application Id Here>
+emote_name = "<your-emote || shrug_dog>"
+emote_users = ["User1", "User2", "User3"]
+server_mac = "<game-server-mac>"
+server_ip = "<game-server-ip>"
+server_docker_port = <docker-tcp-port-on-game-server>
+server_user = "<game-server-user>"
+log_level = "INFO"
+voice_channel_timeout_seconds = 600
 
-#You can repeat this for dev.env as well
+# You can repeat this for dev.toml as well
 ```
 
 1. `ARCH={armv7-unknown-linux-gnueabihf|x86_64-unknown-linux-gnu} ./deploy.sh {dev|prod} {server.local|raspberrypi.local}`

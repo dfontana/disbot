@@ -1,6 +1,9 @@
+use clap::ValueEnum;
+use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, ValueEnum)]
+#[serde(rename_all = "lowercase")]
 pub enum Environment {
   #[default]
   Prod,
@@ -8,10 +11,10 @@ pub enum Environment {
 }
 
 impl Environment {
-  pub fn as_file(&self) -> String {
+  pub fn as_toml_file(&self) -> String {
     match &self {
-      Environment::Prod => String::from("prod.env"),
-      Environment::Dev => String::from("dev.env"),
+      Environment::Prod => String::from("prod.toml"),
+      Environment::Dev => String::from("dev.toml"),
     }
   }
 }

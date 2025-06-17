@@ -84,7 +84,7 @@ impl AppInteractor for Poll {
       let _ = itx
         .edit_response(
           &ctx.http,
-          EditInteractionResponse::new().content(&format!("{}", e)),
+          EditInteractionResponse::new().content(format!("{}", e)),
         )
         .await;
     }

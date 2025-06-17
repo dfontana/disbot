@@ -4,28 +4,27 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Commands
 
-### Building
-- `cargo build` - Standard build
-- `cargo build --release` - Release build for native architecture
-- `cross build --release --target armv7-unknown-linux-gnueabihf` - Cross-compile for Raspberry Pi (requires `cargo install cross`)
-- `./bin/build_for_arm` - Build for ARMv7 using native toolchain
-- `./bin/build_for_x86_64` - Build for x86_64 using native toolchain
-
-### Formatting
-- `cargo fmt`
+### Change lifecycle
+- Always run `cargo build` the application to ensure it compiles
+- When relevant, run the the unit tests
+- Use `cargo clippy` to report any linting violations. Fix any warnings at the end of your changes.
+- Use `cargo fmt` to run the formatter, always at the end of your changes
 
 ### Testing
 - `cargo test` - Run all tests
 - `cargo test test_name` - Run specific test
-- Tests are primarily located in `cmd/check_in` and `cmd/reddit_prev` modules
+- Tests should be co-located in the module being tested
+- Never delete dev.toml or prod.toml files. Testing config generation should use a custom config path ("testing.toml").
+- Only run the dev profile when testing, via `cargo run -- dev` 
+- Use timeout 10 when running the application to check startup
+
+### Stylistic Notes
+- After the tracing logger is initialized don't use print statements anymore. Favor the tracing macros for logging.
+- Avoid long method references by importing, keeping at least one level on the import where appropriate (for example "LevelFilter::from_level" is better than "filter::LevelFilter::from_level")
+- Prefer method chaining and leveraging monadic methods, where possible to reduce nesting. For example "Result::and_then" instead of nested match arms
 
 ### Documentation for Crates
 - Use `docs.rs` for all external crate related documentation
-
-### Running Locally
-- Requires `prod.env` or `dev.env` file with Discord bot credentials
-- `cargo run prod` or `cargo run dev` after setting up environment
-- Only run dev, never prod
 
 ## Architecture
 
@@ -63,8 +62,9 @@ Custom actor implementation in `src/actor/mod.rs` handles asynchronous state man
 
 **Configuration (`config.rs`):**
 - Singleton pattern with environment-specific loading
-- Supports both `prod.env` and `dev.env` configurations
+- Supports both `prod.toml` and `dev.toml` TOML configurations
 - Centralized access to Discord tokens, server details, and feature flags
+- Runtime configuration updates via web interface
 
 **Emoji Management (`emoji.rs`):**
 - Cached emoji creation and retrieval (10-minute TTL)
@@ -83,22 +83,6 @@ Custom actor implementation in `src/actor/mod.rs` handles asynchronous state man
 **Audio Dependencies:**
 - `symphonia` - Audio codec support
 - Requires system dependencies: `libopus-dev`, `ffmpeg`, `yt-dlp`
-
-### Environment Setup
-
-**Required Environment Variables:**
-```
-API_KEY=<Discord Bot Token>
-APP_ID=<Discord Application ID>
-EMOTE_NAME=<Custom emoji name>
-EMOTE_USERS=<Comma-separated user list>
-SERVER_MAC=<Game server MAC address>
-SERVER_IP=<Game server IP>
-SERVER_DOCKER_PORT=<Docker TCP port>
-SERVER_USER=<Game server SSH user>
-LOG_LEVEL=INFO
-TIMEOUT=600
-```
 
 ### Deployment Architecture
 
@@ -125,7 +109,7 @@ TIMEOUT=600
 **Security Considerations:**
 - SSH key-based deployment (no password authentication)
 - Sudo privileges required for server shutdown commands
-- Environment variable-based secret management
+- TOML file-based configuration management
 - Docker TCP API exposed only on local network
 
 ### Docker Game Server Support

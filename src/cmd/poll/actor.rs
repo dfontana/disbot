@@ -98,7 +98,7 @@ impl Actor<PollMessage> for PollActor {
           .and_then(|_| {
             self
               .states
-              .invoke_mut(&id, |p| p.update_vote(&votes, &voter))
+              .invoke_mut(&id, |p| p.update_vote(votes, &voter))
           })
           .and_then(|_| self.states.invoke(&id, messages::build_poll_message))
         {

@@ -41,7 +41,7 @@ impl SubCommandHandler for Ip {
     };
 
     let mut maybe_the_ip = None;
-    let mut ip_echoers = IP_ECHOERS.clone();
+    let mut ip_echoers = *IP_ECHOERS;
     ip_echoers.shuffle(&mut rng());
     for addr in ip_echoers {
       if let Ok(ip) = attempt_resolve(&self.http, addr).await {

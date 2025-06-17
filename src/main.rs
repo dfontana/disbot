@@ -1,4 +1,3 @@
-extern crate dotenv;
 extern crate hex;
 extern crate rand;
 extern crate regex;
@@ -10,20 +9,59 @@ mod config;
 mod docker;
 mod emoji;
 mod env;
+mod web;
 
-use std::str::FromStr;
+use std::{path::PathBuf, str::FromStr};
 
+use clap::Parser;
 use docker::Docker;
 use serenity::{
   client::Client,
   prelude::{GatewayIntents, TypeMapKey},
 };
 use songbird::SerenityInit;
-use tracing::{error, Level};
+use tracing::{error, info, Level};
+use tracing_subscriber::{filter::LevelFilter, prelude::*, reload, Registry};
 
 use cmd::Handler;
 use config::Config;
 use env::Environment;
+
+#[derive(Parser)]
+#[command(name = "disbot")]
+#[command(about = "Discord bot with admin web interface")]
+struct Cli {
+  /// Environment to run in
+  #[arg(value_enum, default_value = "dev")]
+  environment: Environment,
+
+  /// Custom configuration file path
+  #[arg(short, long)]
+  config: Option<PathBuf>,
+
+  /// Web server port
+  #[arg(short, long, default_value = "3450")]
+  port: u16,
+}
+
+// Global handle for runtime log level changes
+static LOG_RELOAD_HANDLE: once_cell::sync::Lazy<
+  std::sync::Mutex<Option<reload::Handle<LevelFilter, Registry>>>,
+> = once_cell::sync::Lazy::new(|| std::sync::Mutex::new(None));
+
+pub fn set_log_level(level: Level) -> Result<(), String> {
+  let handle_guard = LOG_RELOAD_HANDLE
+    .lock()
+    .map_err(|e| format!("Lock error: {}", e))?;
+  if let Some(handle) = handle_guard.as_ref() {
+    handle
+      .modify(|filter| *filter = LevelFilter::from_level(level))
+      .map_err(|e| format!("Failed to update log level: {}", e))?;
+    Ok(())
+  } else {
+    Err("Log reload handle not initialized".to_string())
+  }
+}
 
 pub struct HttpClient;
 impl TypeMapKey for HttpClient {
@@ -32,19 +70,48 @@ impl TypeMapKey for HttpClient {
 
 #[tokio::main]
 async fn main() {
-  let env = std::env::args()
-    .nth(1)
-    .or_else(|| std::env::var("RUN_ENV").ok())
-    .map_or(Environment::default(), |v| {
-      println!("Given '{}' env to run", &v);
-      Environment::from_str(&v).unwrap()
-    });
-  dotenv::from_filename(env.as_file()).ok();
-  let config = Config::set(env).expect("Err parsing environment");
+  // Parse CLI arguments with clap
+  let cli = Cli::parse();
 
-  tracing_subscriber::fmt()
-    .with_max_level(Level::from_str(&config.log_level).unwrap())
-    .with_target(false)
+  // Determine config file path
+  let final_config_path = cli
+    .config
+    .map(|p| p.to_string_lossy().to_string())
+    .unwrap_or_else(|| cli.environment.as_toml_file());
+
+  // Load configuration from TOML file
+  info!("Loading configuration from {}", final_config_path);
+  let config = match Config::from_toml(&final_config_path, cli.environment) {
+    Ok(config) => {
+      // Update global instance
+      if let Ok(mut inst) = Config::global_instance().write() {
+        *inst = config.clone();
+      }
+      config
+    }
+    Err(e) => {
+      error!(
+        "Error loading configuration from {}: {}",
+        final_config_path, e
+      );
+      std::process::exit(1);
+    }
+  };
+
+  // Set up reloadable tracing subscriber
+  let initial_level = Level::from_str(&config.log_level).unwrap();
+  let (filter, reload_handle) = reload::Layer::new(LevelFilter::from_level(initial_level));
+
+  // Store the reload handle globally
+  {
+    let mut handle_guard = LOG_RELOAD_HANDLE.lock().unwrap();
+    *handle_guard = Some(reload_handle);
+  }
+
+  // Initialize subscriber with reloadable filter
+  tracing_subscriber::Registry::default()
+    .with(filter)
+    .with(tracing_subscriber::fmt::Layer::default().with_target(false))
     .init();
   let emoji = emoji::EmojiLookup::new(&config);
   let http = reqwest::Client::new();
@@ -68,9 +135,25 @@ async fn main() {
   ))
   .application_id(config.app_id.into())
   .await
-  .expect("Err creating client");
+  .unwrap_or_else(|e| {
+    error!("Error creating Discord client: {:?}", e);
+    std::process::exit(1);
+  });
 
-  if let Err(why) = client.start().await {
-    error!("Failed to start Discord Client {:?}", why);
+  // Start web server and Discord client concurrently
+  let web_server = web::start_server(final_config_path, cli.port);
+  let discord_client = client.start();
+
+  tokio::select! {
+    result = web_server => {
+      if let Err(why) = result {
+        error!("Failed to start web server: {:?}", why);
+      }
+    }
+    result = discord_client => {
+      if let Err(why) = result {
+        error!("Failed to start Discord Client: {:?}", why);
+      }
+    }
   }
 }
