@@ -96,6 +96,15 @@ WantedBy=multi-user.target
 1. `systemctl enable disbot`
 1. logs: `journalctl -u disbot -b -f` (`-b` is current boot filter)
 
+### (First time admin UI setup)
+
+If you want to use the admin UI the port exposed needs to be unblocked by the firewall. For Fedora this means the port is listed under `ports` in: `sudo firewall-cmd --list-all`. If not:
+
+```
+sudo firewall-cmd --permanent --add-port=3450/tcp
+sudo firewall-cmd --reload
+```
+
 ### Docker interactions
 
 For docker interactions to work over the local network you'll need to edit the systemd service to enable TCP access over the local network:
