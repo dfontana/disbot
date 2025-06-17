@@ -60,8 +60,9 @@ Custom actor implementation in `src/actor/mod.rs` handles asynchronous state man
 
 **Configuration (`config.rs`):**
 - Singleton pattern with environment-specific loading
-- Supports both `prod.env` and `dev.env` configurations
+- Supports both `prod.toml` and `dev.toml` TOML configurations
 - Centralized access to Discord tokens, server details, and feature flags
+- Runtime configuration updates via web interface
 
 **Emoji Management (`emoji.rs`):**
 - Cached emoji creation and retrieval (10-minute TTL)
@@ -106,7 +107,7 @@ Custom actor implementation in `src/actor/mod.rs` handles asynchronous state man
 **Security Considerations:**
 - SSH key-based deployment (no password authentication)
 - Sudo privileges required for server shutdown commands
-- Environment variable-based secret management
+- TOML file-based configuration management
 - Docker TCP API exposed only on local network
 
 ### Docker Game Server Support
