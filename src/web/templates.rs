@@ -2,15 +2,24 @@ use crate::config::Config;
 use crate::env::Environment;
 
 pub fn render_admin_page(config: &Config, error: Option<&str>, success: Option<&str>) -> String {
-    let api_key_display = if config.api_key.is_empty() { "" } else { "*****" };
-    let app_id_display = if config.app_id == 0 { "0" } else { "*****" };
-    
-    let emote_users_display = config.emote_users.join(", ");
-    
-    let error_html = error.map(|e| format!(r#"<div class="error">❌ {}</div>"#, html_escape(e))).unwrap_or_default();
-    let success_html = success.map(|s| format!(r#"<div class="success">✅ {}</div>"#, html_escape(s))).unwrap_or_default();
+  let api_key_display = if config.api_key.is_empty() {
+    ""
+  } else {
+    "*****"
+  };
+  let app_id_display = if config.app_id == 0 { "0" } else { "*****" };
 
-    format!(r#"<!DOCTYPE html>
+  let emote_users_display = config.emote_users.join(", ");
+
+  let error_html = error
+    .map(|e| format!(r#"<div class="error">❌ {}</div>"#, html_escape(e)))
+    .unwrap_or_default();
+  let success_html = success
+    .map(|s| format!(r#"<div class="success">✅ {}</div>"#, html_escape(s)))
+    .unwrap_or_default();
+
+  format!(
+    r#"<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -207,27 +216,55 @@ pub fn render_admin_page(config: &Config, error: Option<&str>, success: Option<&
     </div>
 </body>
 </html>"#,
-        error_html = error_html,
-        success_html = success_html,
-        api_key_display = html_escape(api_key_display),
-        app_id_display = html_escape(app_id_display),
-        emote_name = html_escape(&config.emote_name),
-        emote_users_display = html_escape(&emote_users_display),
-        prod_selected = if config.env == Environment::Prod { "selected" } else { "" },
-        dev_selected = if config.env == Environment::Dev { "selected" } else { "" },
-        trace_selected = if config.log_level == "TRACE" { "selected" } else { "" },
-        debug_selected = if config.log_level == "DEBUG" { "selected" } else { "" },
-        info_selected = if config.log_level == "INFO" { "selected" } else { "" },
-        warn_selected = if config.log_level == "WARN" { "selected" } else { "" },
-        error_selected = if config.log_level == "ERROR" { "selected" } else { "" },
-        timeout = config.voice_channel_timeout_seconds,
-    )
+    error_html = error_html,
+    success_html = success_html,
+    api_key_display = html_escape(api_key_display),
+    app_id_display = html_escape(app_id_display),
+    emote_name = html_escape(&config.emote_name),
+    emote_users_display = html_escape(&emote_users_display),
+    prod_selected = if config.env == Environment::Prod {
+      "selected"
+    } else {
+      ""
+    },
+    dev_selected = if config.env == Environment::Dev {
+      "selected"
+    } else {
+      ""
+    },
+    trace_selected = if config.log_level == "TRACE" {
+      "selected"
+    } else {
+      ""
+    },
+    debug_selected = if config.log_level == "DEBUG" {
+      "selected"
+    } else {
+      ""
+    },
+    info_selected = if config.log_level == "INFO" {
+      "selected"
+    } else {
+      ""
+    },
+    warn_selected = if config.log_level == "WARN" {
+      "selected"
+    } else {
+      ""
+    },
+    error_selected = if config.log_level == "ERROR" {
+      "selected"
+    } else {
+      ""
+    },
+    timeout = config.voice_channel_timeout_seconds,
+  )
 }
 
 fn html_escape(s: &str) -> String {
-    s.replace('&', "&amp;")
-        .replace('<', "&lt;")
-        .replace('>', "&gt;")
-        .replace('"', "&quot;")
-        .replace('\'', "&#x27;")
+  s.replace('&', "&amp;")
+    .replace('<', "&lt;")
+    .replace('>', "&gt;")
+    .replace('"', "&quot;")
+    .replace('\'', "&#x27;")
 }

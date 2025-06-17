@@ -1,4 +1,3 @@
-extern crate dotenv;
 extern crate hex;
 extern crate rand;
 extern crate regex;
@@ -34,19 +33,18 @@ impl TypeMapKey for HttpClient {
 #[tokio::main]
 async fn main() {
   let args: Vec<String> = std::env::args().collect();
-  
+
   // Parse CLI arguments
   let mut env = Environment::default();
-  let mut config_path = "config.toml".to_string();
+  let mut config_path: Option<String> = None;
   let mut web_port = 3450u16;
-  let mut use_env_file = false;
-  
+
   let mut i = 1;
   while i < args.len() {
     match args[i].as_str() {
       "--config" | "-c" => {
         if i + 1 < args.len() {
-          config_path = args[i + 1].clone();
+          config_path = Some(args[i + 1].clone());
           i += 2;
         } else {
           eprintln!("Error: --config requires a file path");
@@ -70,42 +68,37 @@ async fn main() {
           eprintln!("Error: Invalid environment");
           std::process::exit(1);
         });
-        use_env_file = true;
         i += 1;
       }
       _ => {
         // Check if it's an environment argument without flag
         if let Ok(parsed_env) = Environment::from_str(&args[i]) {
           env = parsed_env;
-          use_env_file = true;
         }
         i += 1;
       }
     }
   }
-  
-  // Load configuration
-  let config = if use_env_file {
-    // Legacy mode: load from .env file
-    println!("Loading configuration from {} environment file", env.as_file());
-    dotenv::from_filename(env.as_file()).ok();
-    Config::set(env).expect("Error parsing environment")
-  } else {
-    // New mode: load from TOML file
-    println!("Loading configuration from {}", config_path);
-    match Config::from_toml(&config_path) {
-      Ok(config) => {
-        // Update global instance
-        if let Ok(mut inst) = Config::global_instance().write() {
-          *inst = config.clone();
-        }
-        config
+
+  // Determine config file path
+  let final_config_path = config_path.unwrap_or_else(|| env.as_toml_file());
+
+  // Load configuration from TOML file
+  println!("Loading configuration from {}", final_config_path);
+  let config = match Config::from_toml(&final_config_path) {
+    Ok(config) => {
+      // Update global instance
+      if let Ok(mut inst) = Config::global_instance().write() {
+        *inst = config.clone();
       }
-      Err(e) => {
-        eprintln!("Error loading configuration from {}: {}", config_path, e);
-        eprintln!("You can use 'prod' or 'dev' arguments to use legacy .env files");
-        std::process::exit(1);
-      }
+      config
+    }
+    Err(e) => {
+      eprintln!(
+        "Error loading configuration from {}: {}",
+        final_config_path, e
+      );
+      std::process::exit(1);
     }
   };
 
@@ -138,9 +131,9 @@ async fn main() {
   .expect("Err creating client");
 
   // Start web server and Discord client concurrently
-  let web_server = web::start_server(config_path, web_port);
+  let web_server = web::start_server(final_config_path, web_port);
   let discord_client = client.start();
-  
+
   tokio::select! {
     result = web_server => {
       if let Err(why) = result {
