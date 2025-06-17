@@ -31,6 +31,7 @@ async-trait = "0.1.68"
 bollard = "0.19.1"
 anyhow = "1.0.86"
 axum = "0.7"
+clap = { version = "4.0", features = ["derive"] }
 toml = "0.8"
 tower = "0.4"
 tower-http = { version = "0.5", features = ["fs"] }

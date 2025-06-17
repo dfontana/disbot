@@ -14,16 +14,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `cargo test` - Run all tests
 - `cargo test test_name` - Run specific test
 - Tests should be co-located in the module being tested
-- Never delete dev.toml or prod.toml files. Testing config generation should use a custom config path ("testing.toml") 
+- Never delete dev.toml or prod.toml files. Testing config generation should use a custom config path ("testing.toml").
+- Only run the dev profile when testing, via `cargo run -- dev` 
 - Use timeout 10 when running the application to check startup
+
+### Stylistic Notes
+- After the tracing logger is initialized don't use print statements anymore. Favor the tracing macros for logging.
 
 ### Documentation for Crates
 - Use `docs.rs` for all external crate related documentation
-
-### Running Locally
-- Requires `prod.toml` or `dev.toml` file with Discord bot credentials
-- `cargo run -- prod` or `cargo run -- dev` after setting up environment
-- Only run dev, never prod
 
 ## Architecture
 

@@ -11,8 +11,9 @@ mod emoji;
 mod env;
 mod web;
 
-use std::str::FromStr;
+use std::{path::PathBuf, str::FromStr};
 
+use clap::Parser;
 use docker::Docker;
 use serenity::{
   client::Client,
@@ -25,6 +26,23 @@ use tracing_subscriber::{filter, prelude::*, reload, Registry};
 use cmd::Handler;
 use config::Config;
 use env::Environment;
+
+#[derive(Parser)]
+#[command(name = "disbot")]
+#[command(about = "Discord bot with admin web interface")]
+struct Cli {
+  /// Environment to run in
+  #[arg(value_enum, default_value = "dev")]
+  environment: Environment,
+
+  /// Custom configuration file path
+  #[arg(short, long)]
+  config: Option<PathBuf>,
+
+  /// Web server port
+  #[arg(short, long, default_value = "3450")]
+  port: u16,
+}
 
 // Global handle for runtime log level changes
 static LOG_RELOAD_HANDLE: once_cell::sync::Lazy<
@@ -52,60 +70,18 @@ impl TypeMapKey for HttpClient {
 
 #[tokio::main]
 async fn main() {
-  let args: Vec<String> = std::env::args().collect();
-
-  // Parse CLI arguments
-  let mut env = Environment::default();
-  let mut config_path: Option<String> = None;
-  let mut web_port = 3450u16;
-
-  let mut i = 1;
-  while i < args.len() {
-    match args[i].as_str() {
-      "--config" | "-c" => {
-        if i + 1 < args.len() {
-          config_path = Some(args[i + 1].clone());
-          i += 2;
-        } else {
-          eprintln!("Error: --config requires a file path");
-          std::process::exit(1);
-        }
-      }
-      "--port" | "-p" => {
-        if i + 1 < args.len() {
-          web_port = args[i + 1].parse().unwrap_or_else(|_| {
-            eprintln!("Error: Invalid port number");
-            std::process::exit(1);
-          });
-          i += 2;
-        } else {
-          eprintln!("Error: --port requires a port number");
-          std::process::exit(1);
-        }
-      }
-      "prod" | "dev" => {
-        env = Environment::from_str(&args[i]).unwrap_or_else(|_| {
-          eprintln!("Error: Invalid environment");
-          std::process::exit(1);
-        });
-        i += 1;
-      }
-      _ => {
-        // Check if it's an environment argument without flag
-        if let Ok(parsed_env) = Environment::from_str(&args[i]) {
-          env = parsed_env;
-        }
-        i += 1;
-      }
-    }
-  }
+  // Parse CLI arguments with clap
+  let cli = Cli::parse();
 
   // Determine config file path
-  let final_config_path = config_path.unwrap_or_else(|| env.as_toml_file());
+  let final_config_path = cli
+    .config
+    .map(|p| p.to_string_lossy().to_string())
+    .unwrap_or_else(|| cli.environment.as_toml_file());
 
   // Load configuration from TOML file
   println!("Loading configuration from {}", final_config_path);
-  let config = match Config::from_toml(&final_config_path, env) {
+  let config = match Config::from_toml(&final_config_path, cli.environment) {
     Ok(config) => {
       // Update global instance
       if let Ok(mut inst) = Config::global_instance().write() {
@@ -162,7 +138,7 @@ async fn main() {
   .expect("Err creating client");
 
   // Start web server and Discord client concurrently
-  let web_server = web::start_server(final_config_path, web_port);
+  let web_server = web::start_server(final_config_path, cli.port);
   let discord_client = client.start();
 
   tokio::select! {
