@@ -95,7 +95,7 @@ async fn wrapped_handle(
         .map_err(|e| anyhow!("Error joining voice channel").context(format!("{:?}", e)))?;
 
       // Register an event handler to listen for the duration of the call
-      DisconnectEventHandler::register(play.config.timeout, play.disconnect.clone(), &handler_lock)
+      DisconnectEventHandler::register(play.config.voice_channel_timeout_seconds, play.disconnect.clone(), &handler_lock)
         .await;
 
       // Inform disconnect of where to disconnect from

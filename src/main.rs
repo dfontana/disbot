@@ -10,6 +10,7 @@ mod config;
 mod docker;
 mod emoji;
 mod env;
+mod web;
 
 use std::str::FromStr;
 
@@ -32,15 +33,81 @@ impl TypeMapKey for HttpClient {
 
 #[tokio::main]
 async fn main() {
-  let env = std::env::args()
-    .nth(1)
-    .or_else(|| std::env::var("RUN_ENV").ok())
-    .map_or(Environment::default(), |v| {
-      println!("Given '{}' env to run", &v);
-      Environment::from_str(&v).unwrap()
-    });
-  dotenv::from_filename(env.as_file()).ok();
-  let config = Config::set(env).expect("Err parsing environment");
+  let args: Vec<String> = std::env::args().collect();
+  
+  // Parse CLI arguments
+  let mut env = Environment::default();
+  let mut config_path = "config.toml".to_string();
+  let mut web_port = 3450u16;
+  let mut use_env_file = false;
+  
+  let mut i = 1;
+  while i < args.len() {
+    match args[i].as_str() {
+      "--config" | "-c" => {
+        if i + 1 < args.len() {
+          config_path = args[i + 1].clone();
+          i += 2;
+        } else {
+          eprintln!("Error: --config requires a file path");
+          std::process::exit(1);
+        }
+      }
+      "--port" | "-p" => {
+        if i + 1 < args.len() {
+          web_port = args[i + 1].parse().unwrap_or_else(|_| {
+            eprintln!("Error: Invalid port number");
+            std::process::exit(1);
+          });
+          i += 2;
+        } else {
+          eprintln!("Error: --port requires a port number");
+          std::process::exit(1);
+        }
+      }
+      "prod" | "dev" => {
+        env = Environment::from_str(&args[i]).unwrap_or_else(|_| {
+          eprintln!("Error: Invalid environment");
+          std::process::exit(1);
+        });
+        use_env_file = true;
+        i += 1;
+      }
+      _ => {
+        // Check if it's an environment argument without flag
+        if let Ok(parsed_env) = Environment::from_str(&args[i]) {
+          env = parsed_env;
+          use_env_file = true;
+        }
+        i += 1;
+      }
+    }
+  }
+  
+  // Load configuration
+  let config = if use_env_file {
+    // Legacy mode: load from .env file
+    println!("Loading configuration from {} environment file", env.as_file());
+    dotenv::from_filename(env.as_file()).ok();
+    Config::set(env).expect("Error parsing environment")
+  } else {
+    // New mode: load from TOML file
+    println!("Loading configuration from {}", config_path);
+    match Config::from_toml(&config_path) {
+      Ok(config) => {
+        // Update global instance
+        if let Ok(mut inst) = Config::global_instance().write() {
+          *inst = config.clone();
+        }
+        config
+      }
+      Err(e) => {
+        eprintln!("Error loading configuration from {}: {}", config_path, e);
+        eprintln!("You can use 'prod' or 'dev' arguments to use legacy .env files");
+        std::process::exit(1);
+      }
+    }
+  };
 
   tracing_subscriber::fmt()
     .with_max_level(Level::from_str(&config.log_level).unwrap())
@@ -70,7 +137,20 @@ async fn main() {
   .await
   .expect("Err creating client");
 
-  if let Err(why) = client.start().await {
-    error!("Failed to start Discord Client {:?}", why);
+  // Start web server and Discord client concurrently
+  let web_server = web::start_server(config_path, web_port);
+  let discord_client = client.start();
+  
+  tokio::select! {
+    result = web_server => {
+      if let Err(why) = result {
+        error!("Failed to start web server: {:?}", why);
+      }
+    }
+    result = discord_client => {
+      if let Err(why) = result {
+        error!("Failed to start Discord Client: {:?}", why);
+      }
+    }
   }
 }
