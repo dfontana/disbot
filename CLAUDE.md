@@ -4,27 +4,23 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Commands
 
-### Building
-- `cargo build` - Standard build
-- `cargo build --release` - Release build for native architecture
-- `cross build --release --target armv7-unknown-linux-gnueabihf` - Cross-compile for Raspberry Pi (requires `cargo install cross`)
-- `./bin/build_for_arm` - Build for ARMv7 using native toolchain
-- `./bin/build_for_x86_64` - Build for x86_64 using native toolchain
-
-### Formatting
-- `cargo fmt`
+### Change lifecycle
+- Always run `cargo build` the application to ensure it compiles
+- When relevant, run the the unit tests
+- Always use `cargo fmt` when done with changes to ensure the repo is foramtted
 
 ### Testing
 - `cargo test` - Run all tests
 - `cargo test test_name` - Run specific test
-- Tests are primarily located in `cmd/check_in` and `cmd/reddit_prev` modules
+- Tests should be co-located in the module being tested
+- Never delete dev.toml or prod.toml files. Testing config generation should use a custom config path ("testing.toml") 
 
 ### Documentation for Crates
 - Use `docs.rs` for all external crate related documentation
 
 ### Running Locally
-- Requires `prod.env` or `dev.env` file with Discord bot credentials
-- `cargo run prod` or `cargo run dev` after setting up environment
+- Requires `prod.toml` or `dev.toml` file with Discord bot credentials
+- `cargo run -- prod` or `cargo run -- dev` after setting up environment
 - Only run dev, never prod
 
 ## Architecture
@@ -83,22 +79,6 @@ Custom actor implementation in `src/actor/mod.rs` handles asynchronous state man
 **Audio Dependencies:**
 - `symphonia` - Audio codec support
 - Requires system dependencies: `libopus-dev`, `ffmpeg`, `yt-dlp`
-
-### Environment Setup
-
-**Required Environment Variables:**
-```
-API_KEY=<Discord Bot Token>
-APP_ID=<Discord Application ID>
-EMOTE_NAME=<Custom emoji name>
-EMOTE_USERS=<Comma-separated user list>
-SERVER_MAC=<Game server MAC address>
-SERVER_IP=<Game server IP>
-SERVER_DOCKER_PORT=<Docker TCP port>
-SERVER_USER=<Game server SSH user>
-LOG_LEVEL=INFO
-TIMEOUT=600
-```
 
 ### Deployment Architecture
 

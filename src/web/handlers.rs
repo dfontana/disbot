@@ -6,7 +6,6 @@ use axum::{
 use std::collections::HashMap;
 
 use crate::config::{Config, FormData};
-use crate::env::Environment;
 use crate::web::templates;
 
 pub async fn get_admin(
@@ -96,12 +95,6 @@ fn parse_form_data(params: HashMap<String, String>) -> Result<FormData, String> 
 
   let emote_users = params.get("emote_users").unwrap_or(&String::new()).clone();
 
-  let env = params
-    .get("env")
-    .ok_or("Missing env")?
-    .parse::<Environment>()
-    .map_err(|e| format!("Invalid environment: {}", e))?;
-
   let log_level = params.get("log_level").ok_or("Missing log_level")?.clone();
 
   let voice_channel_timeout_seconds = params
@@ -113,7 +106,6 @@ fn parse_form_data(params: HashMap<String, String>) -> Result<FormData, String> 
   Ok(FormData {
     emote_name,
     emote_users,
-    env,
     log_level,
     voice_channel_timeout_seconds,
   })

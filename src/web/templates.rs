@@ -1,5 +1,4 @@
 use crate::config::Config;
-use crate::env::Environment;
 
 pub fn render_admin_page(config: &Config, error: Option<&str>, success: Option<&str>) -> String {
   let api_key_display = if config.api_key.is_empty() {
@@ -178,15 +177,6 @@ pub fn render_admin_page(config: &Config, error: Option<&str>, success: Option<&
                     <textarea id="emote_users" name="emote_users" rows="3" placeholder="User1, User2, User3">{emote_users_display}</textarea>
                     <div class="help-text">Comma-separated list of users for emote reactions</div>
                 </div>
-                
-                <div class="form-group">
-                    <label for="env">Environment</label>
-                    <select id="env" name="env" required>
-                        <option value="prod" {prod_selected}>Production</option>
-                        <option value="dev" {dev_selected}>Development</option>
-                    </select>
-                    <div class="help-text restart-indicator">⚠️ Requires service restart</div>
-                </div>
             </div>
             
             <div class="form-section">
@@ -222,16 +212,6 @@ pub fn render_admin_page(config: &Config, error: Option<&str>, success: Option<&
     app_id_display = html_escape(app_id_display),
     emote_name = html_escape(&config.emote_name),
     emote_users_display = html_escape(&emote_users_display),
-    prod_selected = if config.env == Environment::Prod {
-      "selected"
-    } else {
-      ""
-    },
-    dev_selected = if config.env == Environment::Dev {
-      "selected"
-    } else {
-      ""
-    },
     trace_selected = if config.log_level == "TRACE" {
       "selected"
     } else {

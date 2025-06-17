@@ -85,7 +85,7 @@ async fn main() {
 
   // Load configuration from TOML file
   println!("Loading configuration from {}", final_config_path);
-  let config = match Config::from_toml(&final_config_path) {
+  let config = match Config::from_toml(&final_config_path, env) {
     Ok(config) => {
       // Update global instance
       if let Ok(mut inst) = Config::global_instance().write() {

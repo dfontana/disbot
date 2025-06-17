@@ -13,6 +13,7 @@ pub struct Config {
   pub app_id: u64,
   pub emote_name: String,
   pub emote_users: Vec<String>,
+  #[serde(skip)]
   pub env: Environment,
   pub log_level: String,
   pub voice_channel_timeout_seconds: u64,
@@ -33,7 +34,10 @@ impl Default for Config {
 }
 
 impl Config {
-  pub fn from_toml<P: AsRef<Path>>(path: P) -> Result<Config, Box<dyn std::error::Error>> {
+  pub fn from_toml<P: AsRef<Path>>(
+    path: P,
+    env: Environment,
+  ) -> Result<Config, Box<dyn std::error::Error>> {
     let path_ref = path.as_ref();
 
     // If file doesn't exist, generate it with defaults
@@ -64,7 +68,7 @@ impl Config {
           "User2".to_string(),
           "User3".to_string(),
         ],
-        env,
+        env: env.clone(),
         log_level: "INFO".to_string(),
         voice_channel_timeout_seconds: 600,
       };
@@ -79,7 +83,8 @@ impl Config {
 
     // Load existing file
     let content = fs::read_to_string(path_ref)?;
-    let config: Config = toml::from_str(&content)?;
+    let mut config: Config = toml::from_str(&content)?;
+    config.env = env;
     Ok(config)
   }
 
@@ -101,7 +106,6 @@ impl Config {
       .map(|s| s.trim().to_string())
       .filter(|s| !s.is_empty())
       .collect();
-    self.env = form_data.env.clone();
     self.log_level = form_data.log_level.clone();
     self.voice_channel_timeout_seconds = form_data.voice_channel_timeout_seconds;
 
@@ -155,7 +159,6 @@ impl Config {
 pub struct FormData {
   pub emote_name: String,
   pub emote_users: String,
-  pub env: Environment,
   pub log_level: String,
   pub voice_channel_timeout_seconds: u64,
 }
