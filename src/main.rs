@@ -20,10 +20,30 @@ use serenity::{
 };
 use songbird::SerenityInit;
 use tracing::{error, Level};
+use tracing_subscriber::{filter, prelude::*, reload, Registry};
 
 use cmd::Handler;
 use config::Config;
 use env::Environment;
+
+// Global handle for runtime log level changes
+static LOG_RELOAD_HANDLE: once_cell::sync::Lazy<
+  std::sync::Mutex<Option<reload::Handle<filter::LevelFilter, Registry>>>,
+> = once_cell::sync::Lazy::new(|| std::sync::Mutex::new(None));
+
+pub fn set_log_level(level: Level) -> Result<(), String> {
+  let handle_guard = LOG_RELOAD_HANDLE
+    .lock()
+    .map_err(|e| format!("Lock error: {}", e))?;
+  if let Some(handle) = handle_guard.as_ref() {
+    handle
+      .modify(|filter| *filter = filter::LevelFilter::from_level(level))
+      .map_err(|e| format!("Failed to update log level: {}", e))?;
+    Ok(())
+  } else {
+    Err("Log reload handle not initialized".to_string())
+  }
+}
 
 pub struct HttpClient;
 impl TypeMapKey for HttpClient {
@@ -102,9 +122,20 @@ async fn main() {
     }
   };
 
-  tracing_subscriber::fmt()
-    .with_max_level(Level::from_str(&config.log_level).unwrap())
-    .with_target(false)
+  // Set up reloadable tracing subscriber
+  let initial_level = Level::from_str(&config.log_level).unwrap();
+  let (filter, reload_handle) = reload::Layer::new(filter::LevelFilter::from_level(initial_level));
+
+  // Store the reload handle globally
+  {
+    let mut handle_guard = LOG_RELOAD_HANDLE.lock().unwrap();
+    *handle_guard = Some(reload_handle);
+  }
+
+  // Initialize subscriber with reloadable filter
+  tracing_subscriber::Registry::default()
+    .with(filter)
+    .with(tracing_subscriber::fmt::Layer::default().with_target(false))
     .init();
   let emoji = emoji::EmojiLookup::new(&config);
   let http = reqwest::Client::new();

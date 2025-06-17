@@ -106,7 +106,18 @@ impl Config {
       .map(|s| s.trim().to_string())
       .filter(|s| !s.is_empty())
       .collect();
-    self.log_level = form_data.log_level.clone();
+
+    // Update log level and apply runtime change
+    if self.log_level != form_data.log_level {
+      self.log_level = form_data.log_level.clone();
+      // Apply log level change at runtime
+      if let Ok(level) = form_data.log_level.parse::<tracing::Level>() {
+        if let Err(e) = crate::set_log_level(level) {
+          eprintln!("Warning: Failed to update runtime log level: {}", e);
+        }
+      }
+    }
+
     self.voice_channel_timeout_seconds = form_data.voice_channel_timeout_seconds;
 
     Ok(())

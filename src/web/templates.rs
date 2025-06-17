@@ -190,7 +190,7 @@ pub fn render_admin_page(config: &Config, error: Option<&str>, success: Option<&
                         <option value="WARN" {warn_selected}>WARN</option>
                         <option value="ERROR" {error_selected}>ERROR</option>
                     </select>
-                    <div class="help-text restart-indicator">⚠️ Requires service restart</div>
+                    <div class="help-text">✅ Takes effect immediately</div>
                 </div>
                 
                 <div class="form-group">

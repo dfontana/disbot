@@ -7,13 +7,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ### Change lifecycle
 - Always run `cargo build` the application to ensure it compiles
 - When relevant, run the the unit tests
-- Always use `cargo fmt` when done with changes to ensure the repo is foramtted
+- Use `cargo clippy` to report any linting violations. Fix any warnings.
+- Use `cargo fmt` to run the formatter, always at the end of your changes
 
 ### Testing
 - `cargo test` - Run all tests
 - `cargo test test_name` - Run specific test
 - Tests should be co-located in the module being tested
 - Never delete dev.toml or prod.toml files. Testing config generation should use a custom config path ("testing.toml") 
+- Use timeout 10 when running the application to check startup
 
 ### Documentation for Crates
 - Use `docs.rs` for all external crate related documentation
