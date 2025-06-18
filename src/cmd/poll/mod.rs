@@ -6,4 +6,3 @@ pub mod pollstate;
 
 pub use actor::{PollActor, PollMessage};
 pub use command::*;
-pub use pollstate::PollState;

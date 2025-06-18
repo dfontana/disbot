@@ -96,9 +96,14 @@ impl Actor<PollMessage> for PollActor {
           warn!("Failed to reap poll on exp: {}", e);
         }
 
-        // Remove from persistence
+        // Remove from persistence with proper error handling
         if let Err(e) = self.persistence.remove_poll(&id) {
-          warn!("Failed to remove poll from persistence: {}", e);
+          error!(
+            "Failed to remove expired poll {} from persistence: {}",
+            id, e
+          );
+          // Continue execution as this is not critical for immediate functionality
+          // but log as error since persistence inconsistency is serious
         }
       }
       PollMessage::UpdateVote((id, voter, ctx, mtx)) => {
@@ -122,13 +127,15 @@ impl Actor<PollMessage> for PollActor {
               .invoke_mut(&id, |p| p.update_vote(votes, &voter))
           })
           .and_then(|_| {
-            // Save updated poll state to persistence
-            if let Err(e) = self
-              .states
-              .invoke(&id, |p| self.persistence.save_poll(&p.id, p))
-            {
-              warn!("Failed to persist vote update for poll {}: {}", id, e);
+            // Extract poll state for persistence outside the closure to avoid nested error handling
+            let poll_state = self.states.invoke(&id, |p| p.clone())?;
+
+            // Save updated poll state to persistence with proper error handling
+            if let Err(e) = self.persistence.save_poll(&poll_state.id, &poll_state) {
+              error!("Failed to persist vote update for poll {}: {}", id, e);
+              return Err(format!("Persistence failure for poll {}: {}", id, e));
             }
+
             self.states.invoke(&id, messages::build_poll_message)
           }) {
           Ok(v) => v,
@@ -159,9 +166,19 @@ impl Actor<PollMessage> for PollActor {
               // Restore the Http client that was skipped during serialization
               poll.ctx.http = http.clone();
 
-              // Check if poll has expired
+              // Check if poll has expired using checked duration calculation
               let now = std::time::SystemTime::now();
-              let elapsed = now.duration_since(poll.created_at).unwrap_or(poll.duration);
+              let elapsed = match now.duration_since(poll.created_at) {
+                Ok(duration) => duration,
+                Err(_) => {
+                  // Clock went backwards, assume poll is expired to be safe
+                  warn!(
+                    "Clock went backwards for poll {}, treating as expired",
+                    poll.id
+                  );
+                  poll.duration
+                }
+              };
 
               if elapsed >= poll.duration {
                 // Poll expired during shutdown, remove from persistence
@@ -171,14 +188,38 @@ impl Actor<PollMessage> for PollActor {
                 continue;
               }
 
-              // Restore to in-memory cache
+              // Restore to in-memory cache with proper cleanup on failure
+              let poll_id = poll.id;
               if let Err(e) = self.states.insert(poll.id, poll.clone()) {
-                error!("Failed to restore poll to cache: {}", e);
+                error!("Failed to restore poll {} to cache: {}", poll_id, e);
+                // Clean up from persistence since we couldn't restore to cache
+                if let Err(cleanup_err) = self.persistence.remove_poll(&poll_id) {
+                  error!(
+                    "Failed to clean up unrestorable poll {} from persistence: {}",
+                    poll_id, cleanup_err
+                  );
+                }
                 continue;
               }
 
-              // Set up expiry timer for remaining duration
-              let remaining_duration = poll.duration - elapsed;
+              // Set up expiry timer for remaining duration using checked arithmetic
+              let remaining_duration = match poll.duration.checked_sub(elapsed) {
+                Some(duration) => duration,
+                None => {
+                  // Duration calculation underflowed, poll should be expired
+                  warn!(
+                    "Poll {} remaining duration underflowed, treating as expired",
+                    poll.id
+                  );
+                  if let Err(e) = self.persistence.remove_poll(&poll.id) {
+                    warn!(
+                      "Failed to clean up underflowed poll from persistence: {}",
+                      e
+                    );
+                  }
+                  continue;
+                }
+              };
               let exp_key = poll.id;
               let hdl = self.self_ref.clone();
               tokio::spawn(async move {

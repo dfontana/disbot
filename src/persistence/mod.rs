@@ -1,6 +1,5 @@
 use anyhow::Result;
 use redb::{Database, ReadableTable, TableDefinition};
-use serde::{Deserialize, Serialize};
 use std::path::Path;
 use uuid::Uuid;
 

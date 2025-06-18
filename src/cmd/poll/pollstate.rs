@@ -28,8 +28,11 @@ pub struct CallContext {
 }
 
 fn default_http() -> Arc<Http> {
-  // This will be replaced with the actual Http instance during restoration
-  Arc::new(serenity::http::Http::new(""))
+  // Create Http client with placeholder token that will be replaced during restoration
+  // Using a non-empty token to avoid potential auth failures during serialization
+  Arc::new(serenity::http::Http::new(
+    "PLACEHOLDER_TOKEN_FOR_SERIALIZATION",
+  ))
 }
 
 #[derive(Clone, Serialize, Deserialize)]

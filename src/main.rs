@@ -153,13 +153,19 @@ async fn main() {
     std::process::exit(1);
   });
 
-  // TODO: Initialize persistence restoration after client is ready
-  // This would require access to the actor handles which are currently inside the Handler
-  // For now, restoration will happen when messages are received
+  // Persistence restoration happens in the ready event handler where actor handles are available
 
   // Start web server and Discord client concurrently
   let web_server = web::start_server(final_config_path, cli.port);
   let discord_client = client.start();
+
+  // Set up graceful shutdown handler
+  let shutdown_signal = async {
+    tokio::signal::ctrl_c()
+      .await
+      .expect("Failed to listen for shutdown signal");
+    info!("Shutdown signal received, cleaning up...");
+  };
 
   tokio::select! {
     result = web_server => {
@@ -171,6 +177,11 @@ async fn main() {
       if let Err(why) = result {
         error!("Failed to start Discord Client: {:?}", why);
       }
+    }
+    _ = shutdown_signal => {
+      info!("Graceful shutdown initiated");
+      // The persistence cleanup will happen automatically when actors are dropped
+      // as their Drop implementations will clean up any pending state
     }
   }
 }
