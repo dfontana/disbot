@@ -15,6 +15,14 @@ host=${2:-raspberrypi.local}
 on_github=${BUILD_GITHUB:-0}
 arch=${ARCH:-$ARM_ARCH}
 
+# SSH socket path for connection reuse
+SSH_SOCKET="~/.ssh/sockets/%r@%h-%p"
+cleanup_ssh() {  
+  # Close the SSH master connection if it exists
+  ssh -o ControlPath="$SSH_SOCKET" -O exit "$USER@$host" 2>/dev/null || true
+}
+trap cleanup_ssh EXIT
+
 echo "Building binary for $arch..."
 if [[ $on_github == 1 && $ARCH == "$ARM_ARCH" ]]; then
   echo "Using Github Release"
@@ -66,15 +74,17 @@ echo "Establishing SSH connection to $host..."
 #
 # This lets authentication happen once.
 mkdir -p ~/.ssh/sockets
-ssh -o ControlMaster=yes -o ControlPath=~/.ssh/sockets/%r@%h-%p -o ControlPersist=60 -fN "$USER@$host" 2>/dev/null || true
+ssh -o ControlMaster=yes -o ControlPath="$SSH_SOCKET" -o ControlPersist=60 -fN "$USER@$host" 2>/dev/null || true
 
 echo "Copying files to remote $host..."
-ssh -o ControlPath=~/.ssh/sockets/%r@%h-%p "$USER@$host" 'mkdir -p ~/deploy'
-scp -o ControlPath=~/.ssh/sockets/%r@%h-%p "$env.toml" "$USER@$host:~/deploy/"
+ssh -o ControlPath="$SSH_SOCKET" "$USER@$host" 'mkdir -p ~/deploy'
+scp -o ControlPath="$SSH_SOCKET" "$env.toml" "$USER@$host:~/deploy/"
 
 echo "Restarting disbot-$env service on $host"
-ssh -o ControlPath=~/.ssh/sockets/%r@%h-%p "$USER@$host" 'systemctl --user stop '"disbot-$env"
-scp -o ControlPath=~/.ssh/sockets/%r@%h-%p "$binary" "$USER@$host:~/deploy/disbot-$env"
-ssh -o ControlPath=~/.ssh/sockets/%r@%h-%p "$USER@$host" 'systemctl --user restart '"disbot-$env"
+ssh -o ControlPath="$SSH_SOCKET" "$USER@$host" 'systemctl --user stop '"disbot-$env"
+scp -o ControlPath="$SSH_SOCKET" "$binary" "$USER@$host:~/deploy/disbot-$env"
+ssh -o ControlPath="$SSH_SOCKET" "$USER@$host" 'systemctl --user restart '"disbot-$env"
 
+echo "Cleaning up SSH connection..."
+cleanup_ssh
 echo "Done."
