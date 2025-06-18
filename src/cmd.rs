@@ -3,7 +3,10 @@ use self::{
   check_in::{CheckInActor, CheckInMessage},
   poll::{PollActor, PollMessage},
 };
-use crate::{actor::ActorHandle, config::Config, docker::DockerClient, emoji::EmojiLookup};
+use crate::{
+  actor::ActorHandle, config::Config, docker::DockerClient, emoji::EmojiLookup,
+  persistence::PersistentStore,
+};
 use itertools::Itertools;
 use reqwest::Client;
 use serenity::{
@@ -14,11 +17,13 @@ use serenity::{
   model::{channel::Message, gateway::Ready},
   prelude::*,
 };
+use std::sync::Arc;
+use tracing::info;
 
 mod arg_util;
-mod check_in;
+pub mod check_in;
 mod dice_roll;
-mod poll;
+pub mod poll;
 mod ready;
 mod reddit_prev;
 mod server;
@@ -53,6 +58,8 @@ pub struct Handler {
   listeners: Vec<Box<dyn MessageListener>>,
   app_interactors: Vec<Box<dyn AppInteractor>>,
   ready: ready::ReadyHandler,
+  poll_handle: ActorHandle<PollMessage>,
+  checkin_handle: ActorHandle<CheckInMessage>,
 }
 
 impl Handler {
@@ -61,10 +68,17 @@ impl Handler {
     emoji: EmojiLookup,
     http: Client,
     docker: Box<dyn DockerClient>,
+    persistence: Arc<PersistentStore>,
   ) -> Self {
-    let poll_handle = ActorHandle::<PollMessage>::spawn(|r, h| PollActor::new(r, h));
+    let poll_handle =
+      ActorHandle::<PollMessage>::spawn(|r, h| PollActor::new(r, h, persistence.clone()));
     let chk_handle = ActorHandle::<CheckInMessage>::spawn(|r, h| {
-      Box::new(CheckInActor::new(h, r, poll_handle.clone()))
+      Box::new(CheckInActor::new(
+        h,
+        r,
+        poll_handle.clone(),
+        persistence.clone(),
+      ))
     });
     Handler {
       listeners: vec![
@@ -72,14 +86,24 @@ impl Handler {
         Box::new(reddit_prev::RedditPreviewHandler::new(http.clone())),
       ],
       app_interactors: vec![
-        Box::new(poll::Poll::new(emoji.clone(), poll_handle)),
-        Box::new(check_in::CheckIn::new(emoji.clone(), chk_handle)),
+        Box::new(poll::Poll::new(emoji.clone(), poll_handle.clone())),
+        Box::new(check_in::CheckIn::new(emoji.clone(), chk_handle.clone())),
         Box::new(dice_roll::DiceRoll::new(emoji.clone())),
         Box::new(voice::Voice::new(config, emoji.clone())),
         Box::new(server::GameServers::new(emoji, http, docker)),
       ],
       ready: ready::ReadyHandler::default(),
+      poll_handle,
+      checkin_handle: chk_handle,
     }
+  }
+
+  pub fn get_poll_handle(&self) -> &ActorHandle<PollMessage> {
+    &self.poll_handle
+  }
+
+  pub fn get_checkin_handle(&self) -> &ActorHandle<CheckInMessage> {
+    &self.checkin_handle
   }
 }
 
@@ -103,6 +127,26 @@ impl EventHandler for Handler {
         )
         .await
         .expect("Failed to Register Application Context");
+    }
+
+    // Restore persisted polls and check-in configurations
+    info!("Bot ready, restoring persistent state...");
+
+    // Restore polls
+    self
+      .poll_handle
+      .send(PollMessage::RestorePolls(ctx.http.clone()))
+      .await;
+
+    // Restore check-in configurations for each guild
+    for guild_id in ctx.cache.guilds() {
+      self
+        .checkin_handle
+        .send(CheckInMessage::RestoreConfig(
+          guild_id.into(),
+          ctx.http.clone(),
+        ))
+        .await;
     }
 
     self.ready.ready(&ctx, &rdy).await;

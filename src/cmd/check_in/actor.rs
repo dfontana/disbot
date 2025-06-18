@@ -1,11 +1,13 @@
 use crate::{
   actor::{Actor, ActorHandle},
   cmd::poll::PollMessage,
+  persistence::PersistentStore,
 };
 use async_trait::async_trait;
 use chrono::{DateTime, NaiveDateTime, NaiveTime, TimeZone, Utc};
 use chrono_tz::America;
 use derive_new::new;
+use serde::{Deserialize, Serialize};
 use serenity::{
   all::Role,
   http::Http,
@@ -13,23 +15,31 @@ use serenity::{
 };
 use std::{sync::Arc, time::Duration};
 use tokio::sync::mpsc::Receiver;
-use tracing::{info, instrument};
+use tracing::{error, info, instrument, warn};
 
 #[derive(Clone)]
 pub enum CheckInMessage {
   CheckIn(CheckInCtx),
   Sleep((Duration, CheckInCtx)),
   SetPoll(CheckInCtx),
+  RestoreConfig(u64, Arc<serenity::http::Http>), // guild_id, http
 }
 
-#[derive(new, Clone)]
+#[derive(new, Clone, Serialize, Deserialize)]
 pub struct CheckInCtx {
   pub poll_time: NaiveTime,
   pub poll_dur: Duration,
   pub at_group: Option<Role>,
   pub channel: ChannelId,
+  #[serde(skip, default = "default_http")]
   pub http: Arc<Http>,
   pub emoji: Emoji,
+  pub guild_id: u64,
+}
+
+fn default_http() -> Arc<Http> {
+  // This will be replaced with the actual Http instance during restoration
+  Arc::new(serenity::http::Http::new(""))
 }
 
 pub struct CheckInActor {
@@ -37,6 +47,7 @@ pub struct CheckInActor {
   receiver: Receiver<CheckInMessage>,
   poll_handle: ActorHandle<PollMessage>,
   configured: bool,
+  persistence: Arc<PersistentStore>,
 }
 
 impl CheckInActor {
@@ -44,12 +55,14 @@ impl CheckInActor {
     self_ref: ActorHandle<CheckInMessage>,
     receiver: Receiver<CheckInMessage>,
     poll_handle: ActorHandle<PollMessage>,
+    persistence: Arc<PersistentStore>,
   ) -> Self {
     CheckInActor {
       self_ref,
       receiver,
       poll_handle,
       configured: false,
+      persistence,
     }
   }
 }
@@ -63,6 +76,15 @@ impl Actor<CheckInMessage> for CheckInActor {
         if self.configured {
           return;
         }
+
+        // Persist the check-in configuration using the guild_id from context
+        if let Err(e) = self.persistence.save_checkin_config(ctx.guild_id, &ctx) {
+          error!(
+            "Failed to persist check-in configuration for guild {}: {}",
+            ctx.guild_id, e
+          );
+        }
+
         let sleep_until = time_until(Utc::now(), ctx.poll_time);
         self
           .self_ref
@@ -93,6 +115,33 @@ impl Actor<CheckInMessage> for CheckInActor {
           .self_ref
           .send(CheckInMessage::Sleep((sleep_until, nw_ctx)))
           .await;
+      }
+      CheckInMessage::RestoreConfig(guild_id, http) => {
+        match self.persistence.load_checkin_config(guild_id) {
+          Ok(Some(mut config)) => {
+            // Restore the Http client that was skipped during serialization
+            config.http = http;
+
+            // Set up the restored configuration
+            let sleep_until = time_until(Utc::now(), config.poll_time);
+            self
+              .self_ref
+              .send(CheckInMessage::Sleep((sleep_until, config)))
+              .await;
+            self.configured = true;
+
+            info!("Restored check-in configuration for guild {}", guild_id);
+          }
+          Ok(None) => {
+            info!("No check-in configuration found for guild {}", guild_id);
+          }
+          Err(e) => {
+            error!(
+              "Failed to restore check-in configuration for guild {}: {}",
+              guild_id, e
+            );
+          }
+        }
       }
     }
   }

@@ -9,6 +9,7 @@ mod config;
 mod docker;
 mod emoji;
 mod env;
+mod persistence;
 mod web;
 
 use std::{path::PathBuf, str::FromStr};
@@ -25,6 +26,8 @@ use tracing_subscriber::{filter::LevelFilter, prelude::*, reload, Registry};
 use cmd::Handler;
 use config::Config;
 use env::Environment;
+use persistence::PersistentStore;
+use std::sync::Arc;
 
 #[derive(Parser)]
 #[command(name = "disbot")]
@@ -112,6 +115,16 @@ async fn main() {
     .with(filter)
     .with(tracing_subscriber::fmt::Layer::default().with_target(false))
     .init();
+
+  // Initialize persistence store
+  let persistence = match PersistentStore::new("disbot.db") {
+    Ok(store) => Arc::new(store),
+    Err(e) => {
+      error!("Failed to initialize persistence store: {}", e);
+      std::process::exit(1);
+    }
+  };
+
   let emoji = emoji::EmojiLookup::new(&config);
   let http = reqwest::Client::new();
 
@@ -131,6 +144,7 @@ async fn main() {
     emoji,
     http,
     docker::create_docker_client(),
+    persistence,
   ))
   .application_id(config.app_id.into())
   .await
@@ -138,6 +152,10 @@ async fn main() {
     error!("Error creating Discord client: {:?}", e);
     std::process::exit(1);
   });
+
+  // TODO: Initialize persistence restoration after client is ready
+  // This would require access to the actor handles which are currently inside the Handler
+  // For now, restoration will happen when messages are received
 
   // Start web server and Discord client concurrently
   let web_server = web::start_server(final_config_path, cli.port);

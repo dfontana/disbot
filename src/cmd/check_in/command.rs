@@ -115,6 +115,7 @@ impl CheckIn {
         itx.channel_id,
         ctx.http.clone(),
         emoji.clone(),
+        guild_id.into(),
       )))
       .await;
     itx
