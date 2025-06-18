@@ -58,11 +58,23 @@ if [[ ! -f $binary || ! -f "$env.toml" ]]; then
 fi
 
 echo "Binary built."
-echo "Coping files to remote $host..."
-ssh "$USER@$host" 'mkdir -p ~/deploy'
-scp "$env.toml" "$USER@$host:~/deploy/"
+echo "Establishing SSH connection to $host..."
+
+# SSH Sockets allow a single connection to be re-used, by storing a file
+# at a specific location tracking the connection. The ControlPath is
+# describing the user,host,port being connected to and times out after 60s
+#
+# This lets authentication happen once.
+mkdir -p ~/.ssh/sockets
+ssh -o ControlMaster=yes -o ControlPath=~/.ssh/sockets/%r@%h-%p -o ControlPersist=60 -fN "$USER@$host" 2>/dev/null || true
+
+echo "Copying files to remote $host..."
+ssh -o ControlPath=~/.ssh/sockets/%r@%h-%p "$USER@$host" 'mkdir -p ~/deploy'
+scp -o ControlPath=~/.ssh/sockets/%r@%h-%p "$env.toml" "$USER@$host:~/deploy/"
+
 echo "Restarting disbot-$env service on $host"
-ssh -t "$USER@$host" 'systemctl --user stop '"disbot-$env"
-scp "$binary" "$USER@$host:~/deploy/disbot-$env"
-ssh -t "$USER@$host" 'systemctl --user restart '"disbot-$env"
+ssh -o ControlPath=~/.ssh/sockets/%r@%h-%p "$USER@$host" 'systemctl --user stop '"disbot-$env"
+scp -o ControlPath=~/.ssh/sockets/%r@%h-%p "$binary" "$USER@$host:~/deploy/disbot-$env"
+ssh -o ControlPath=~/.ssh/sockets/%r@%h-%p "$USER@$host" 'systemctl --user restart '"disbot-$env"
+
 echo "Done."
