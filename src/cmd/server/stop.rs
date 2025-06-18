@@ -1,12 +1,13 @@
 use crate::{
   cmd::{arg_util::Args, SubCommandHandler},
-  docker::Docker,
+  docker::DockerClient,
 };
 use anyhow::anyhow;
 use derive_new::new;
 use serenity::{
   all::CommandInteraction, async_trait, builder::EditInteractionResponse, prelude::Context,
 };
+use std::sync::Arc;
 
 // Helper function to send response
 async fn send_response(
@@ -22,7 +23,7 @@ async fn send_response(
 
 #[derive(new)]
 pub struct Stop {
-  docker: Docker,
+  docker: Arc<Box<dyn DockerClient>>,
 }
 
 #[async_trait]

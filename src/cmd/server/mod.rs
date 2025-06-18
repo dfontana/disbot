@@ -4,7 +4,7 @@ mod start;
 mod stop;
 
 use super::{arg_util::Args, AppInteractor, SubCommandHandler};
-use crate::{docker::Docker, emoji::EmojiLookup};
+use crate::{docker::DockerClient, emoji::EmojiLookup};
 use ip::*;
 use list::*;
 use reqwest::Client;
@@ -29,7 +29,9 @@ pub struct GameServers {
 }
 
 impl GameServers {
-  pub fn new(emoji: EmojiLookup, http: Client, docker: Docker) -> Self {
+  pub fn new(emoji: EmojiLookup, http: Client, docker: Box<dyn DockerClient>) -> Self {
+    use std::sync::Arc;
+    let docker = Arc::new(docker);
     GameServers {
       list: List::new(docker.clone()),
       start: Start::new(docker.clone()),

@@ -3,7 +3,7 @@ use self::{
   check_in::{CheckInActor, CheckInMessage},
   poll::{PollActor, PollMessage},
 };
-use crate::{actor::ActorHandle, config::Config, docker::Docker, emoji::EmojiLookup};
+use crate::{actor::ActorHandle, config::Config, docker::DockerClient, emoji::EmojiLookup};
 use itertools::Itertools;
 use reqwest::Client;
 use serenity::{
@@ -56,7 +56,12 @@ pub struct Handler {
 }
 
 impl Handler {
-  pub fn new(config: Config, emoji: EmojiLookup, http: Client, docker: Docker) -> Self {
+  pub fn new(
+    config: Config,
+    emoji: EmojiLookup,
+    http: Client,
+    docker: Box<dyn DockerClient>,
+  ) -> Self {
     let poll_handle = ActorHandle::<PollMessage>::spawn(|r, h| PollActor::new(r, h));
     let chk_handle = ActorHandle::<CheckInMessage>::spawn(|r, h| {
       Box::new(CheckInActor::new(h, r, poll_handle.clone()))

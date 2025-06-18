@@ -1,6 +1,6 @@
 use crate::{
   cmd::{arg_util::Args, SubCommandHandler},
-  docker::Docker,
+  docker::DockerClient,
 };
 use bollard::service::ContainerSummary;
 use derive_new::new;
@@ -9,10 +9,11 @@ use serenity::{
   all::CommandInteraction, async_trait, builder::EditInteractionResponse, client::Context,
   utils::MessageBuilder,
 };
+use std::sync::Arc;
 
 #[derive(new)]
 pub struct List {
-  docker: Docker,
+  docker: Arc<Box<dyn DockerClient>>,
 }
 
 #[async_trait]
@@ -23,7 +24,7 @@ impl SubCommandHandler for List {
     itx: &CommandInteraction,
     _args: &Args,
   ) -> Result<(), anyhow::Error> {
-    let msg = match build_list_msg(&self.docker).await {
+    let msg = match build_list_msg(&**self.docker).await {
       Ok(mut m) => m.build(),
       Err(e) => format!("Failed to list docker containers: {}", e),
     };
@@ -34,7 +35,7 @@ impl SubCommandHandler for List {
   }
 }
 
-async fn build_list_msg(docker: &Docker) -> Result<MessageBuilder, anyhow::Error> {
+async fn build_list_msg(docker: &dyn DockerClient) -> Result<MessageBuilder, anyhow::Error> {
   let mut bdy = MessageBuilder::new();
   let summaries = docker.list().await?;
   let stat_len = 10;

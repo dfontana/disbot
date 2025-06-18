@@ -1,6 +1,6 @@
 use crate::{
   cmd::{arg_util::Args, SubCommandHandler},
-  docker::Docker,
+  docker::DockerClient,
 };
 use anyhow::anyhow;
 use bollard::service::ContainerStateStatusEnum::{CREATED, EXITED};
@@ -8,6 +8,7 @@ use derive_new::new;
 use serenity::{
   all::CommandInteraction, async_trait, builder::EditInteractionResponse, client::Context,
 };
+use std::sync::Arc;
 
 // Helper function to send error response
 async fn send_error_response(
@@ -23,7 +24,7 @@ async fn send_error_response(
 
 #[derive(new)]
 pub struct Start {
-  docker: Docker,
+  docker: Arc<Box<dyn DockerClient>>,
 }
 
 #[async_trait]

@@ -14,7 +14,6 @@ mod web;
 use std::{path::PathBuf, str::FromStr};
 
 use clap::Parser;
-use docker::Docker;
 use serenity::{
   client::Client,
   prelude::{GatewayIntents, TypeMapKey},
@@ -131,7 +130,7 @@ async fn main() {
     config.clone(),
     emoji,
     http,
-    Docker::new().unwrap(),
+    docker::create_docker_client(),
   ))
   .application_id(config.app_id.into())
   .await
