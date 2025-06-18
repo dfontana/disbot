@@ -53,7 +53,7 @@ else
 fi
 
 if [[ ! -f $binary || ! -f "$env.toml" ]]; then
-  echo "Missing necessary files, not touching server";
+  echo "Missing necessary files, not touching server: $binary OR $env.toml";
   exit 1
 fi
 
