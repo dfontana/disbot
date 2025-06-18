@@ -56,9 +56,10 @@ voice_channel_timeout_seconds = 600
 # You can repeat this for dev.toml as well
 ```
 
-1. `ARCH={armv7-unknown-linux-gnueabihf|x86_64-unknown-linux-gnu} ./deploy.sh {dev|prod} {server.local|raspberrypi.local}`
+1. `ARCH={armv7-unknown-linux-gnueabihf|x86_64-unknown-linux-gnu} ./bin/deploy {dev|prod} {server.local|raspberrypi.local}`
   - You can use github to download a release made in CI with `BUILD_GITHUB=1`
   - Otherwise this will detect the correct way to build from your host system
+  - Uses user services (no sudo password prompts during deployment)
 
 
 ### (First time Deploy Setup on Remote Host)
@@ -73,9 +74,14 @@ sudo chmod a+rx /usr/local/bin/yt-dlp
 
 (If you need to update `yt-dlp` use the `-U` flag)
 
-1. Create a systemd service file like so (you might repeat for dev):
+1. Create a user systemd service directory and file:
 
-```
+```bash
+# Create user systemd directory
+mkdir -p ~/.config/systemd/user
+
+# Create service file (you might repeat for dev)
+cat > ~/.config/systemd/user/disbot-prod.service << 'EOF'
 [Unit]
 Description=Disbot Service File
 After=network.target
@@ -84,17 +90,27 @@ After=network.target
 Type=simple
 Restart=always
 RestartSec=1
-User=<user>
-ExecStart=/home/<user>/deploy/disbot-prod prod
-WorkingDirectory=/home/<user>/deploy
+ExecStart=/home/%i/deploy/disbot-prod prod
+WorkingDirectory=/home/%i/deploy
 
 [Install]
-WantedBy=multi-user.target
+WantedBy=default.target
+EOF
 ```
 
-1. `systemctl start disbot`
-1. `systemctl enable disbot`
-1. logs: `journalctl -u disbot -b -f` (`-b` is current boot filter)
+1. Enable lingering so the service starts at boot (without requiring user login):
+   ```bash
+   sudo loginctl enable-linger $USER
+   ```
+
+1. Enable and start the user service:
+   ```bash
+   systemctl --user daemon-reload
+   systemctl --user enable disbot-prod.service
+   systemctl --user start disbot-prod.service
+   ```
+
+1. View logs: `journalctl --user -u disbot-prod -f`
 
 ### (First time admin UI setup)
 

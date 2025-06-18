@@ -15,54 +15,76 @@ host=${2:-raspberrypi.local}
 on_github=${BUILD_GITHUB:-0}
 arch=${ARCH:-$ARM_ARCH}
 
+# SSH socket path for connection reuse
+SSH_SOCKET="~/.ssh/sockets/%r@%h-%p"
+cleanup_ssh() {  
+  # Close the SSH master connection if it exists
+  ssh -o ControlPath="$SSH_SOCKET" -O exit "$USER@$host" 2>/dev/null || true
+}
+trap cleanup_ssh EXIT
+
 echo "Building binary for $arch..."
-if [[ on_github == 1 && $ARCH == $ARM_ARCH ]]; then
+if [[ $on_github == 1 && $ARCH == "$ARM_ARCH" ]]; then
   echo "Using Github Release"
   echo "Downloading release..."
   tmp=$(mktemp -d -t tmp)
   wrk=$(pwd)
-  cd $tmp
+  cd "$tmp"
   curl -s https://api.github.com/repos/dfontana/disbot/releases/latest \
     | jq -r '.assets[].browser_download_url | select(test("tar.gz$"))' \
     | xargs curl -LJO
   tar -xvzf *
-  cd $wrk
+  cd "$wrk"
   mkdir -p target/armv7-unknown-linux-gnueabihf/release
-  mv $tmp/disbot target/armv7-unknown-linux-gnueabihf/release/disbot
-  rm -r $tmp 
+  mv "$tmp/disbot" target/armv7-unknown-linux-gnueabihf/release/disbot
+  rm -r "$tmp" 
 elif [[ $(uname -p) == 'arm' ]]; then
   echo "Building with Native Toolchains..."
-  if [[ $ARCH == $ARM_ARCH ]]; then
+  if [[ $ARCH == "$ARM_ARCH" ]]; then
     source ./bin/build_for_arm
   else
     source ./bin/build_for_x86_64
   fi
-elif [[ $ARCH == $ARM_ARCH ]]; then
+elif [[ $ARCH == "$ARM_ARCH" ]]; then
   echo "Cross Compiling..."
-  cross build --release --target $ARCH
+  cross build --release --target "$ARCH"
 else 
   echo "Compiling Natively..."
   RUSTFLAGS=-Awarnings cargo build --quiet --release
 fi
 
 host_arch=$(rustc -vV | grep "host:" | cut -d' ' -f2)
-if [[ $host_arch == $ARCH ]]; then
+if [[ $host_arch == "$ARCH" ]]; then
   binary="target/release/disbot"
 else
   binary="target/$ARCH/release/disbot"
 fi
 
 if [[ ! -f $binary || ! -f "$env.toml" ]]; then
-  echo "Missing necessary files, not touching server";
+  echo "Missing necessary files, not touching server: $binary OR $env.toml";
   exit 1
 fi
 
 echo "Binary built."
-echo "Coping files to remote $host..."
-ssh $USER@$host 'mkdir -p ~/deploy'
-scp "$env.toml" $USER@$host:~/deploy/
+echo "Establishing SSH connection to $host..."
+
+# SSH Sockets allow a single connection to be re-used, by storing a file
+# at a specific location tracking the connection. The ControlPath is
+# describing the user,host,port being connected to and times out after 60s
+#
+# This lets authentication happen once.
+mkdir -p ~/.ssh/sockets
+ssh -o ControlMaster=yes -o ControlPath="$SSH_SOCKET" -o ControlPersist=60 -fN "$USER@$host" 2>/dev/null || true
+
+echo "Copying files to remote $host..."
+ssh -o ControlPath="$SSH_SOCKET" "$USER@$host" 'mkdir -p ~/deploy'
+scp -o ControlPath="$SSH_SOCKET" "$env.toml" "$USER@$host:~/deploy/"
+
 echo "Restarting disbot-$env service on $host"
-ssh -t $USER@$host 'sudo systemctl stop '"disbot-$env"
-scp $binary $USER@$host:~/deploy/"disbot-$env"
-ssh -t $USER@$host 'sudo systemctl restart '"disbot-$env"
+ssh -o ControlPath="$SSH_SOCKET" "$USER@$host" 'systemctl --user stop '"disbot-$env"
+scp -o ControlPath="$SSH_SOCKET" "$binary" "$USER@$host:~/deploy/disbot-$env"
+ssh -o ControlPath="$SSH_SOCKET" "$USER@$host" 'systemctl --user restart '"disbot-$env"
+
+echo "Cleaning up SSH connection..."
+cleanup_ssh
 echo "Done."
