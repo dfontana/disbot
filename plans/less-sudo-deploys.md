@@ -189,3 +189,66 @@ DEPLOY_USER=${DEPLOY_USER:-deploy}
 ```
 
 This plan provides multiple approaches with security analysis to eliminate sudo password prompts during deployment.
+
+## IMPLEMENTED SOLUTION: User Services
+
+**Status:** ✅ Deploy script updated to use `systemctl --user`
+
+### One-Time Server Setup Required
+
+Run these commands on your Fedora server to complete the migration:
+
+```bash
+# 1. Create user systemd directory
+mkdir -p ~/.config/systemd/user
+
+# 2. Move service file from system to user location
+sudo mv /etc/systemd/system/disbot-prod.service ~/.config/systemd/user/
+sudo chown $USER:$USER ~/.config/systemd/user/disbot-prod.service
+
+# 3. Enable lingering so service starts at boot (without user login)
+sudo loginctl enable-linger $USER
+
+# 4. Reload user systemd and enable the service
+systemctl --user daemon-reload
+systemctl --user enable disbot-prod.service
+systemctl --user start disbot-prod.service
+
+# 5. Verify the service is running
+systemctl --user status disbot-prod.service
+```
+
+### Verification Steps
+
+After setup, test that deployments work without sudo prompts:
+
+```bash
+# From your local machine, run a deployment
+./bin/deploy prod your-server-hostname
+
+# Should complete without any password prompts
+```
+
+### Service Management Commands (for reference)
+
+```bash
+# Check service status
+systemctl --user status disbot-prod
+
+# View logs
+journalctl --user -u disbot-prod -f
+
+# Manual restart
+systemctl --user restart disbot-prod
+
+# Stop service
+systemctl --user stop disbot-prod
+```
+
+### Benefits of This Implementation
+
+- ✅ **No sudo required** - Eliminates password prompts during deployment
+- ✅ **Auto-start at boot** - Lingering ensures service starts without user login
+- ✅ **Same systemd functionality** - All systemd features still available
+- ✅ **Better security** - Service runs in user scope, not system-wide
+- ✅ **No additional dependencies** - Pure systemd solution
