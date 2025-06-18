@@ -8,4 +8,5 @@ export CXX_x86_64_unknown_linux_gnu=$TARGET-g++
 export AR_x86_64_unknown_linux_gnu=$TARGET-ar
 export CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER=$TARGET-gcc
 export CMAKE_TOOLCHAIN_FILE_x86_64_unknown_linux_gnu=$(pwd)/bin/x86_64.cmake
+export CMAKE_x86_64_unknown_linux_gnu=$(pwd)/bin/cmake-wrapper
 RUSTFLAGS="-Awarnings -C link-args=-fstack-protector-all -lssp" cargo build --quiet --release --target $TARGET
