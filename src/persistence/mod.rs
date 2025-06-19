@@ -112,6 +112,35 @@ impl PersistentStore {
     write_txn.commit()?;
     Ok(())
   }
+
+  pub fn load_all_checkin_configs(&self) -> Result<Vec<(u64, CheckInCtx)>> {
+    let read_txn = self.db.begin_read()?;
+    let table = read_txn.open_table(CHECKIN_TABLE)?;
+
+    let mut configs = Vec::new();
+    for entry in table.iter()? {
+      let (key, value) = entry?;
+      let guild_id: u64 = key
+        .value()
+        .parse()
+        .map_err(|e| anyhow::anyhow!("Failed to parse guild_id from key {}: {}", key.value(), e))?;
+      let config: CheckInCtx = serde_json::from_slice(value.value())?;
+      configs.push((guild_id, config));
+    }
+
+    Ok(configs)
+  }
+
+  pub fn remove_checkin_config(&self, guild_id: u64) -> Result<()> {
+    let guild_id_str = guild_id.to_string();
+    let write_txn = self.db.begin_write()?;
+    {
+      let mut table = write_txn.open_table(CHECKIN_TABLE)?;
+      table.remove(guild_id_str.as_str())?;
+    }
+    write_txn.commit()?;
+    Ok(())
+  }
 }
 
 #[cfg(test)]
@@ -341,6 +370,41 @@ mod tests {
   }
 
   #[test]
+  fn test_load_all_checkin_configs() {
+    let temp_dir = tempdir().unwrap();
+    let db_path = temp_dir.path().join("test.db");
+    let store = PersistentStore::new(db_path).unwrap();
+
+    let mut checkin_1 = create_test_checkin_ctx();
+    checkin_1.guild_id = 111111111;
+    let mut checkin_2 = create_test_checkin_ctx();
+    checkin_2.guild_id = 222222222;
+    let mut checkin_3 = create_test_checkin_ctx();
+    checkin_3.guild_id = 333333333;
+
+    // Save multiple checkin configs
+    store
+      .save_checkin_config(checkin_1.guild_id, &checkin_1)
+      .unwrap();
+    store
+      .save_checkin_config(checkin_2.guild_id, &checkin_2)
+      .unwrap();
+    store
+      .save_checkin_config(checkin_3.guild_id, &checkin_3)
+      .unwrap();
+
+    // Load all checkin configs
+    let all_configs = store.load_all_checkin_configs().unwrap();
+
+    assert_eq!(all_configs.len(), 3);
+
+    let guild_ids: HashSet<u64> = all_configs.iter().map(|(guild_id, _)| *guild_id).collect();
+    assert!(guild_ids.contains(&checkin_1.guild_id));
+    assert!(guild_ids.contains(&checkin_2.guild_id));
+    assert!(guild_ids.contains(&checkin_3.guild_id));
+  }
+
+  #[test]
   fn test_multiple_operations() {
     let temp_dir = tempdir().unwrap();
     let db_path = temp_dir.path().join("test.db");
@@ -369,7 +433,7 @@ mod tests {
 
     // Remove both
     store.remove_poll(&poll_state.id).unwrap();
-    store._remove_checkin_config(checkin_ctx.guild_id).unwrap();
+    store.remove_checkin_config(checkin_ctx.guild_id).unwrap();
 
     // Verify both are gone
     assert!(store._load_poll(&poll_state.id).unwrap().is_none());

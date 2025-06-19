@@ -3,6 +3,8 @@
 ## Project Overview
 ✅ **COMPLETED**: Added a static admin web interface to the Rust-based Discord bot "disbot" for managing configuration at runtime over the local network. Successfully migrated from environment variables to TOML-based configuration with enhanced CLI.
 
+✅ **ENHANCED**: Updated admin interface with two-column responsive layout and integrated CheckIn Admin functionality with real-time countdown timers and ISO timestamps.
+
 ## Final Implementation
 
 ### Technical Stack
@@ -158,8 +160,43 @@ src/
 - **Security**: Sensitive fields properly protected
 - **Robustness**: Auto-config generation, comprehensive validation
 
+## Enhanced CheckIn Admin Integration (2025-06-19)
+
+### New Two-Column Layout
+- **Main Page Width**: Expanded from 600px to 70% of viewport width  
+- **Desktop Layout**: 40% left column (configuration forms) + 60% right column (CheckIn admin)
+- **Mobile Layout**: Stacked vertically on screens < 768px width
+- **Save Button**: Positioned at bottom of left column (bottom of page when stacked)
+
+### CheckIn Admin Features
+- **Consolidated Interface**: No separate `/admin/checkins` page needed
+- **Enhanced Table Columns**:
+  - Guild ID
+  - **Scheduled Time** (ISO format: `2025-06-18T13:30:00Z`)
+  - **Time Until** (Human-readable countdown: `23h 45m 12s`)
+  - Channel ID
+  - Duration (seconds)
+  - Role (@mention or "None")
+  - Actions (Delete button with confirmation)
+
+### Technical Implementation Details
+- **Handler Changes**: Main admin handler (`get_admin`) now loads CheckIn configs via `persistence.load_all_checkin_configs()`
+- **Template Updates**: `render_admin_page()` function signature updated to include `checkin_configs` parameter
+- **Delete Functionality**: Integrated into main admin POST handler with `action=delete_checkin`
+- **Timezone Handling**: Uses America/New_York timezone with proper next-day scheduling logic
+- **Real-time Calculations**: Countdown timers calculated server-side using `time_until` logic from `check_in/actor.rs`
+
+### User Experience Improvements
+- **Higher Information Density**: Configuration and CheckIn management on single page
+- **Professional Styling**: Consistent design language with existing admin interface
+- **Mobile Responsive**: Adaptive layout for all screen sizes
+- **Live Data**: Server-side calculated countdowns and ISO timestamps
+
 ## Access
 
 - **Web Interface**: `http://localhost:3450/admin` (or custom port)
-- **Features**: Form-based configuration management with immediate feedback
+- **Features**: 
+  - Form-based configuration management with immediate feedback
+  - Integrated CheckIn administration with real-time countdowns
+  - Two-column responsive layout with enhanced information density
 - **Security**: Network-isolated, no authentication required

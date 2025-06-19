@@ -9,6 +9,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - When relevant, run the the unit tests
 - Use `cargo clippy` to report any linting violations. Fix any warnings at the end of your changes.
 - Use `cargo fmt` to run the formatter, always at the end of your changes
+- Run unit tests with "cargo test" after formatting, linting, and building
 
 ### Testing
 - `cargo test` - Run all tests

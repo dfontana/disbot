@@ -157,7 +157,7 @@ async fn main() {
     emoji,
     http,
     docker::create_docker_client(),
-    persistence,
+    persistence.clone(),
   ))
   .application_id(config.app_id.into())
   .await
@@ -169,7 +169,7 @@ async fn main() {
   // Persistence restoration happens in the ready event handler where actor handles are available
 
   // Start web server and Discord client concurrently
-  let web_server = web::start_server(final_config_path, cli.port);
+  let web_server = web::start_server(final_config_path, persistence.clone(), cli.port);
   let discord_client = client.start();
 
   tokio::select! {

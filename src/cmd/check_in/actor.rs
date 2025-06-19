@@ -71,6 +71,12 @@ impl Actor<CheckInMessage> for CheckInActor {
   async fn handle_msg(&mut self, msg: CheckInMessage) {
     match msg {
       CheckInMessage::SetPoll(ctx) => {
+        // TODO: SetPoll being triggered more than once does not properly cancel the Sleep action
+        //       the prior one created for the same guild_id. It does correctly overwrite the
+        //       persistence, but it does not cancel the spawned tokio sleep routine if
+        //       one is still sleeping. That would currently require an application
+        //       restart to clear out, but ideally this would cancel it.
+
         // Persist the check-in configuration using the guild_id from context
         if let Err(e) = self.persistence.save_checkin_config(ctx.guild_id, &ctx) {
           error!(
@@ -140,7 +146,7 @@ impl Actor<CheckInMessage> for CheckInActor {
   }
 }
 
-fn time_until(now_ref: DateTime<Utc>, time: NaiveTime) -> Duration {
+pub fn time_until(now_ref: DateTime<Utc>, time: NaiveTime) -> Duration {
   let now_local = now_ref.with_timezone(&America::New_York);
   let target_local = America::New_York
     .from_local_datetime(&NaiveDateTime::new(now_local.date_naive(), time))
