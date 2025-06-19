@@ -18,7 +18,6 @@ use serenity::{
   prelude::*,
 };
 use std::sync::Arc;
-use tracing::info;
 
 mod arg_util;
 pub mod check_in;
@@ -58,8 +57,6 @@ pub struct Handler {
   listeners: Vec<Box<dyn MessageListener>>,
   app_interactors: Vec<Box<dyn AppInteractor>>,
   ready: ready::ReadyHandler,
-  poll_handle: ActorHandle<PollMessage>,
-  checkin_handle: ActorHandle<CheckInMessage>,
 }
 
 impl Handler {
@@ -92,18 +89,8 @@ impl Handler {
         Box::new(voice::Voice::new(config, emoji.clone())),
         Box::new(server::GameServers::new(emoji, http, docker)),
       ],
-      ready: ready::ReadyHandler::default(),
-      poll_handle,
-      checkin_handle: chk_handle,
+      ready: ready::ReadyHandler::new(poll_handle, chk_handle),
     }
-  }
-
-  pub fn get_poll_handle(&self) -> &ActorHandle<PollMessage> {
-    &self.poll_handle
-  }
-
-  pub fn get_checkin_handle(&self) -> &ActorHandle<CheckInMessage> {
-    &self.checkin_handle
   }
 }
 
@@ -128,27 +115,6 @@ impl EventHandler for Handler {
         .await
         .expect("Failed to Register Application Context");
     }
-
-    // Restore persisted polls and check-in configurations
-    info!("Bot ready, restoring persistent state...");
-
-    // Restore polls
-    self
-      .poll_handle
-      .send(PollMessage::RestorePolls(ctx.http.clone()))
-      .await;
-
-    // Restore check-in configurations for each guild
-    for guild_id in ctx.cache.guilds() {
-      self
-        .checkin_handle
-        .send(CheckInMessage::RestoreConfig(
-          guild_id.into(),
-          ctx.http.clone(),
-        ))
-        .await;
-    }
-
     self.ready.ready(&ctx, &rdy).await;
   }
 

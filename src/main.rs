@@ -12,16 +12,23 @@ mod env;
 mod persistence;
 mod web;
 
-use std::{path::PathBuf, str::FromStr};
+use std::{path::PathBuf, str::FromStr, sync::Mutex};
 
 use clap::Parser;
+use once_cell::sync::Lazy;
 use serenity::{
   client::Client,
   prelude::{GatewayIntents, TypeMapKey},
 };
 use songbird::SerenityInit;
 use tracing::{error, info, Level};
-use tracing_subscriber::{filter::LevelFilter, prelude::*, reload, Registry};
+use tracing_subscriber::{
+  filter::LevelFilter,
+  fmt::Layer,
+  prelude::*,
+  reload::{self, Handle},
+  Registry,
+};
 
 use cmd::Handler;
 use config::Config;
@@ -47,9 +54,8 @@ struct Cli {
 }
 
 // Global handle for runtime log level changes
-static LOG_RELOAD_HANDLE: once_cell::sync::Lazy<
-  std::sync::Mutex<Option<reload::Handle<LevelFilter, Registry>>>,
-> = once_cell::sync::Lazy::new(|| std::sync::Mutex::new(None));
+static LOG_RELOAD_HANDLE: Lazy<Mutex<Option<Handle<LevelFilter, Registry>>>> =
+  Lazy::new(|| Mutex::new(None));
 
 pub fn set_log_level(level: Level) -> Result<(), String> {
   let handle_guard = LOG_RELOAD_HANDLE
@@ -65,6 +71,18 @@ pub fn set_log_level(level: Level) -> Result<(), String> {
   }
 }
 
+fn initalize_logging() {
+  let (filter, reload_handle) = reload::Layer::new(LevelFilter::from_level(Level::INFO));
+  {
+    let mut handle_guard = LOG_RELOAD_HANDLE.lock().unwrap();
+    *handle_guard = Some(reload_handle);
+  }
+  tracing_subscriber::Registry::default()
+    .with(filter)
+    .with(Layer::default().with_target(false))
+    .init();
+}
+
 pub struct HttpClient;
 impl TypeMapKey for HttpClient {
   type Value = reqwest::Client;
@@ -72,6 +90,8 @@ impl TypeMapKey for HttpClient {
 
 #[tokio::main]
 async fn main() {
+  initalize_logging();
+
   // Parse CLI arguments with clap
   let cli = Cli::parse();
 
@@ -100,24 +120,17 @@ async fn main() {
     }
   };
 
-  // Set up reloadable tracing subscriber
-  let initial_level = Level::from_str(&config.log_level).unwrap();
-  let (filter, reload_handle) = reload::Layer::new(LevelFilter::from_level(initial_level));
-
-  // Store the reload handle globally
-  {
-    let mut handle_guard = LOG_RELOAD_HANDLE.lock().unwrap();
-    *handle_guard = Some(reload_handle);
+  // Upgrade logger after bootstrap
+  if let Err(e) = set_log_level(Level::from_str(&config.log_level).unwrap()) {
+    error!(
+      "Failed to update logger level from config {}: {}",
+      &config.log_level, e
+    );
+    std::process::exit(1);
   }
 
-  // Initialize subscriber with reloadable filter
-  tracing_subscriber::Registry::default()
-    .with(filter)
-    .with(tracing_subscriber::fmt::Layer::default().with_target(false))
-    .init();
-
   // Initialize persistence store
-  let persistence = match PersistentStore::new("disbot.db") {
+  let persistence = match PersistentStore::new(&config.db_path) {
     Ok(store) => Arc::new(store),
     Err(e) => {
       error!("Failed to initialize persistence store: {}", e);
@@ -159,14 +172,6 @@ async fn main() {
   let web_server = web::start_server(final_config_path, cli.port);
   let discord_client = client.start();
 
-  // Set up graceful shutdown handler
-  let shutdown_signal = async {
-    tokio::signal::ctrl_c()
-      .await
-      .expect("Failed to listen for shutdown signal");
-    info!("Shutdown signal received, cleaning up...");
-  };
-
   tokio::select! {
     result = web_server => {
       if let Err(why) = result {
@@ -177,11 +182,6 @@ async fn main() {
       if let Err(why) = result {
         error!("Failed to start Discord Client: {:?}", why);
       }
-    }
-    _ = shutdown_signal => {
-      info!("Graceful shutdown initiated");
-      // The persistence cleanup will happen automatically when actors are dropped
-      // as their Drop implementations will clean up any pending state
     }
   }
 }

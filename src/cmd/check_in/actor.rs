@@ -13,7 +13,7 @@ use serenity::{
   http::Http,
   model::prelude::{ChannelId, Emoji},
 };
-use std::{collections::HashMap, sync::Arc, time::Duration};
+use std::{sync::Arc, time::Duration};
 use tokio::sync::mpsc::Receiver;
 use tracing::{error, info, instrument};
 
@@ -38,18 +38,14 @@ pub struct CheckInCtx {
 }
 
 fn default_http() -> Arc<Http> {
-  // Create Http client with placeholder token that will be replaced during restoration
-  // Using a non-empty token to avoid potential auth failures during serialization
-  Arc::new(serenity::http::Http::new(
-    "PLACEHOLDER_TOKEN_FOR_SERIALIZATION",
-  ))
+  // Gets replaced after serialization, during startup
+  Arc::new(serenity::http::Http::new(""))
 }
 
 pub struct CheckInActor {
   self_ref: ActorHandle<CheckInMessage>,
   receiver: Receiver<CheckInMessage>,
   poll_handle: ActorHandle<PollMessage>,
-  configured_guilds: HashMap<u64, bool>,
   persistence: Arc<PersistentStore>,
 }
 
@@ -64,7 +60,6 @@ impl CheckInActor {
       self_ref,
       receiver,
       poll_handle,
-      configured_guilds: HashMap::new(),
       persistence,
     }
   }
@@ -76,15 +71,6 @@ impl Actor<CheckInMessage> for CheckInActor {
   async fn handle_msg(&mut self, msg: CheckInMessage) {
     match msg {
       CheckInMessage::SetPoll(ctx) => {
-        // Check if this guild is already configured
-        if *self.configured_guilds.get(&ctx.guild_id).unwrap_or(&false) {
-          info!(
-            "Guild {} already has check-in configured, ignoring",
-            ctx.guild_id
-          );
-          return;
-        }
-
         // Persist the check-in configuration using the guild_id from context
         if let Err(e) = self.persistence.save_checkin_config(ctx.guild_id, &ctx) {
           error!(
@@ -98,7 +84,6 @@ impl Actor<CheckInMessage> for CheckInActor {
           .self_ref
           .send(CheckInMessage::Sleep((sleep_until, ctx.clone())))
           .await;
-        self.configured_guilds.insert(ctx.guild_id, true);
       }
       CheckInMessage::Sleep((sleep_until, ctx)) => {
         let hdl = self.self_ref.clone();
@@ -129,15 +114,11 @@ impl Actor<CheckInMessage> for CheckInActor {
           Ok(Some(mut config)) => {
             // Restore the Http client that was skipped during serialization
             config.http = http;
-
-            // Set up the restored configuration
             let sleep_until = time_until(Utc::now(), config.poll_time);
             self
               .self_ref
               .send(CheckInMessage::Sleep((sleep_until, config.clone())))
               .await;
-            self.configured_guilds.insert(guild_id, true);
-
             info!("Restored check-in configuration for guild {}", guild_id);
           }
           Ok(None) => {
