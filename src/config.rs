@@ -2,7 +2,7 @@ use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use tracing::{info, warn};
 
-use crate::Environment;
+use crate::env::Environment;
 use std::sync::RwLock;
 use std::{fs, path::Path};
 
@@ -18,6 +18,7 @@ pub struct Config {
   pub env: Environment,
   pub log_level: String,
   pub voice_channel_timeout_seconds: u64,
+  pub persistence_db_path: String,
 }
 
 impl Default for Config {
@@ -30,6 +31,7 @@ impl Default for Config {
       env: Environment::Dev,
       log_level: "INFO".to_string(),
       voice_channel_timeout_seconds: 10,
+      persistence_db_path: "disbot.db".to_string(),
     }
   }
 }
@@ -68,6 +70,7 @@ impl Config {
         env: env.clone(),
         log_level: "INFO".to_string(),
         voice_channel_timeout_seconds: 600,
+        persistence_db_path: "disbot.db".to_string(),
       };
 
       default_config.to_toml(path_ref)?;

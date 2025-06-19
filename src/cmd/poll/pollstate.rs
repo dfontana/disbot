@@ -27,12 +27,12 @@ pub struct CallContext {
   pub emoji: Emoji,
 }
 
+const PLACEHOLDER_TOKEN: &str = "PLACEHOLDER_TOKEN_FOR_SERIALIZATION";
+
 fn default_http() -> Arc<Http> {
   // Create Http client with placeholder token that will be replaced during restoration
   // Using a non-empty token to avoid potential auth failures during serialization
-  Arc::new(serenity::http::Http::new(
-    "PLACEHOLDER_TOKEN_FOR_SERIALIZATION",
-  ))
+  Arc::new(serenity::http::Http::new(PLACEHOLDER_TOKEN))
 }
 
 #[derive(Clone, Serialize, Deserialize)]
