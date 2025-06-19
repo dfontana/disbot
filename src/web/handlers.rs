@@ -3,10 +3,13 @@ use axum::{
   http::{header, StatusCode},
   response::{Html, IntoResponse, Redirect, Response},
 };
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::Arc};
 
-use crate::config::{Config, FormData};
 use crate::web::templates;
+use crate::{
+  config::{Config, FormData},
+  persistence::PersistentStore,
+};
 
 // Helper function to get config or return default
 fn get_config_or_default() -> Config {
@@ -17,29 +20,70 @@ fn get_config_or_default() -> Config {
 }
 
 // Helper function to render error response
-fn render_error_response(error: &str) -> Html<String> {
+fn render_error_response(error: &str, persistence: Option<&Arc<PersistentStore>>) -> Html<String> {
   let config = get_config_or_default();
-  Html(templates::render_admin_page(&config, Some(error), None))
+  let checkin_configs = match persistence {
+    Some(p) => p.load_all_checkin_configs().unwrap_or_default(),
+    None => vec![],
+  };
+  Html(templates::render_admin_page(
+    &config,
+    Some(error),
+    None,
+    checkin_configs,
+  ))
 }
 
 pub async fn get_admin(
+  Extension(persistence): Extension<Arc<PersistentStore>>,
   Query(params): Query<HashMap<String, String>>,
 ) -> Result<Html<String>, StatusCode> {
   let config = get_config_or_default();
   let success = params
     .get("success")
     .map(|_| "Configuration saved successfully!");
-  Ok(Html(templates::render_admin_page(&config, None, success)))
+
+  let checkin_configs = persistence.load_all_checkin_configs().unwrap_or_default();
+
+  Ok(Html(templates::render_admin_page(
+    &config,
+    None,
+    success,
+    checkin_configs,
+  )))
 }
 
 pub async fn post_admin(
   Extension(config_path): Extension<String>,
+  Extension(persistence): Extension<Arc<PersistentStore>>,
   Form(params): Form<HashMap<String, String>>,
 ) -> Response {
-  // Parse form data
+  // Check if this is a CheckIn delete action
+  if let Some(action) = params.get("action") {
+    if action == "delete_checkin" {
+      let empty_guild_id = String::new();
+      let guild_id_str = params.get("guild_id").unwrap_or(&empty_guild_id);
+      let guild_id: u64 = match guild_id_str.parse() {
+        Ok(id) => id,
+        Err(_) => {
+          return render_error_response("Invalid guild ID", Some(&persistence)).into_response();
+        }
+      };
+
+      match persistence.remove_checkin_config(guild_id) {
+        Ok(_) => return Redirect::to("/admin?success=1").into_response(),
+        Err(e) => {
+          let error_msg = format!("Failed to delete check-in configuration: {}", e);
+          return render_error_response(&error_msg, Some(&persistence)).into_response();
+        }
+      }
+    }
+  }
+
+  // Parse form data for regular config update
   let form_data = match parse_form_data(params) {
     Ok(data) => data,
-    Err(error) => return render_error_response(&error).into_response(),
+    Err(error) => return render_error_response(&error, Some(&persistence)).into_response(),
   };
 
   // Update configuration
@@ -47,7 +91,8 @@ pub async fn post_admin(
     let mut config = match Config::global_instance().write() {
       Ok(config) => config,
       Err(_) => {
-        return render_error_response("Failed to acquire configuration lock").into_response()
+        return render_error_response("Failed to acquire configuration lock", Some(&persistence))
+          .into_response()
       }
     };
 
@@ -72,7 +117,7 @@ pub async fn post_admin(
       // Redirect to show success
       Redirect::to("/admin?success=1").into_response()
     }
-    Err(error) => render_error_response(&error).into_response(),
+    Err(error) => render_error_response(&error, Some(&persistence)).into_response(),
   }
 }
 
@@ -107,4 +152,66 @@ pub async fn get_favicon() -> Result<impl IntoResponse, StatusCode> {
     [(header::CONTENT_TYPE, "image/png")],
     favicon_data.as_slice(),
   ))
+}
+
+pub async fn get_checkin_admin(
+  Extension(persistence): Extension<Arc<PersistentStore>>,
+  Query(params): Query<HashMap<String, String>>,
+) -> Result<Html<String>, StatusCode> {
+  let success = params
+    .get("success")
+    .map(|_| "Check-in configuration deleted successfully!");
+
+  let error = params.get("error").map(|e| e.as_str());
+
+  let checkin_configs = match persistence.load_all_checkin_configs() {
+    Ok(configs) => configs,
+    Err(e) => {
+      return Ok(Html(templates::render_checkin_admin_page(
+        vec![],
+        Some(&format!("Failed to load check-in configurations: {}", e)),
+        None,
+      )));
+    }
+  };
+
+  Ok(Html(templates::render_checkin_admin_page(
+    checkin_configs,
+    error,
+    success,
+  )))
+}
+
+pub async fn post_checkin_admin(
+  Extension(persistence): Extension<Arc<PersistentStore>>,
+  Form(params): Form<HashMap<String, String>>,
+) -> Response {
+  let empty_string = String::new();
+  let action = params.get("action").unwrap_or(&empty_string);
+
+  match action.as_str() {
+    "delete" => {
+      let empty_guild_id = String::new();
+      let guild_id_str = params.get("guild_id").unwrap_or(&empty_guild_id);
+      let guild_id: u64 = match guild_id_str.parse() {
+        Ok(id) => id,
+        Err(_) => {
+          return Redirect::to("/admin/checkins?error=Invalid guild ID").into_response();
+        }
+      };
+
+      match persistence.remove_checkin_config(guild_id) {
+        Ok(_) => Redirect::to("/admin/checkins?success=1").into_response(),
+        Err(e) => {
+          let error_msg = format!("Failed to delete check-in configuration: {}", e);
+          Redirect::to(&format!(
+            "/admin/checkins?error={}",
+            urlencoding::encode(&error_msg)
+          ))
+          .into_response()
+        }
+      }
+    }
+    _ => Redirect::to("/admin/checkins?error=Invalid action").into_response(),
+  }
 }
