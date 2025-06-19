@@ -29,7 +29,7 @@ For ArmV7 (eg Raspberry Pi) or `x86_64` Linux (eg Linux Server).
   - Uses [`messense/homebrew-macos-cross-toolchains`](https://github.com/messense/homebrew-macos-cross-toolchains)
   ```
   brew tap messense/macos-cross-toolchains
-  brew install armv7-unknown-linux-gnueabihf x86_64-unknown-linux-gnu
+  brew install armv7-unknown-linux-gnueabihf x86_64-unknown-linux-musl
   ./bin/build_for_arm
   ./bin/build_for_x86_64
   ```
@@ -56,7 +56,7 @@ voice_channel_timeout_seconds = 600
 # You can repeat this for dev.toml as well
 ```
 
-1. `ARCH={armv7-unknown-linux-gnueabihf|x86_64-unknown-linux-gnu} ./bin/deploy {dev|prod} {server.local|raspberrypi.local}`
+1. `ARCH={armv7-unknown-linux-gnueabihf|x86_64-unknown-linux-musl} ./bin/deploy {dev|prod} {server.local|raspberrypi.local}`
   - You can use github to download a release made in CI with `BUILD_GITHUB=1`
   - Otherwise this will detect the correct way to build from your host system
   - Uses user services (no sudo password prompts during deployment)

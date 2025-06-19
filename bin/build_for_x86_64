@@ -1,12 +1,16 @@
 #!/bin/bash
 # Cross compile to linux x86_64; should run from root of repo
-TARGET=x86_64-unknown-linux-gnu
+TARGET=x86_64-unknown-linux-musl
 export TARGET_CC=$TARGET-gcc
 export TARGET_AR=$TARGET-ar
-export CC_x86_64_unknown_linux_gnu=$TARGET-gcc
-export CXX_x86_64_unknown_linux_gnu=$TARGET-g++
-export AR_x86_64_unknown_linux_gnu=$TARGET-ar
-export CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER=$TARGET-gcc
-export CMAKE_TOOLCHAIN_FILE_x86_64_unknown_linux_gnu=$(pwd)/bin/x86_64.cmake
-export CMAKE_x86_64_unknown_linux_gnu=$(pwd)/bin/cmake-wrapper
-RUSTFLAGS="-Awarnings -C link-args=-fstack-protector-all -lssp" cargo build --quiet --release --target $TARGET
+export CC_x86_64_unknown_linux_musl=$TARGET-gcc
+export CXX_x86_64_unknown_linux_musl=$TARGET-g++
+export AR_x86_64_unknown_linux_musl=$TARGET-ar
+export CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_LINKER=$TARGET-gcc
+export CMAKE_TOOLCHAIN_FILE_x86_64_unknown_linux_musl=$(pwd)/bin/x86_64.cmake
+export CMAKE_x86_64_unknown_linux_musl=$(pwd)/bin/cmake-wrapper
+
+# Static linking setup for musl
+export RUSTFLAGS="-C target-feature=+crt-static"
+
+cargo build --quiet --release --target $TARGET
