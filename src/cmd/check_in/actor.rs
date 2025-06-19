@@ -13,8 +13,8 @@ use serenity::{
   http::Http,
   model::prelude::{ChannelId, Emoji},
 };
-use std::{sync::Arc, time::Duration};
-use tokio::sync::mpsc::Receiver;
+use std::{collections::HashMap, sync::Arc, time::Duration};
+use tokio::{sync::mpsc::Receiver, task::JoinHandle};
 use tracing::{error, info, instrument};
 
 #[derive(Clone)]
@@ -47,6 +47,7 @@ pub struct CheckInActor {
   receiver: Receiver<CheckInMessage>,
   poll_handle: ActorHandle<PollMessage>,
   persistence: Arc<PersistentStore>,
+  active_tasks: HashMap<u64, JoinHandle<()>>,
 }
 
 impl CheckInActor {
@@ -61,6 +62,7 @@ impl CheckInActor {
       receiver,
       poll_handle,
       persistence,
+      active_tasks: HashMap::new(),
     }
   }
 }
@@ -71,11 +73,14 @@ impl Actor<CheckInMessage> for CheckInActor {
   async fn handle_msg(&mut self, msg: CheckInMessage) {
     match msg {
       CheckInMessage::SetPoll(ctx) => {
-        // TODO: SetPoll being triggered more than once does not properly cancel the Sleep action
-        //       the prior one created for the same guild_id. It does correctly overwrite the
-        //       persistence, but it does not cancel the spawned tokio sleep routine if
-        //       one is still sleeping. That would currently require an application
-        //       restart to clear out, but ideally this would cancel it.
+        // Cancel any existing sleep task for this guild
+        if let Some(existing_task) = self.active_tasks.remove(&ctx.guild_id) {
+          existing_task.abort();
+          info!(
+            "Cancelled existing check-in task for guild {}",
+            ctx.guild_id
+          );
+        }
 
         // Persist the check-in configuration using the guild_id from context
         if let Err(e) = self.persistence.save_checkin_config(ctx.guild_id, &ctx) {
@@ -93,16 +98,24 @@ impl Actor<CheckInMessage> for CheckInActor {
       }
       CheckInMessage::Sleep((sleep_until, ctx)) => {
         let hdl = self.self_ref.clone();
+        let guild_id = ctx.guild_id;
         info!(
           "Sleep scheduled until {}",
           Utc::now() + chrono::Duration::from_std(sleep_until).unwrap()
         );
-        tokio::spawn(async move {
+
+        let task = tokio::spawn(async move {
           tokio::time::sleep(sleep_until).await;
           hdl.send(CheckInMessage::CheckIn(ctx)).await
         });
+
+        // Store the task handle for potential cancellation
+        self.active_tasks.insert(guild_id, task);
       }
       CheckInMessage::CheckIn(ctx) => {
+        // Remove the completed task from active tasks
+        self.active_tasks.remove(&ctx.guild_id);
+
         let chan = ctx.channel;
         let nw_ctx = ctx.clone();
         self
