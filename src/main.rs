@@ -117,7 +117,7 @@ async fn main() {
     .init();
 
   // Initialize persistence store
-  let persistence = match PersistentStore::new(&config.persistence_db_path) {
+  let persistence = match PersistentStore::new("disbot.db") {
     Ok(store) => Arc::new(store),
     Err(e) => {
       error!("Failed to initialize persistence store: {}", e);

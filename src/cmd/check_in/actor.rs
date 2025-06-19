@@ -37,12 +37,12 @@ pub struct CheckInCtx {
   pub guild_id: u64,
 }
 
-const PLACEHOLDER_TOKEN: &str = "PLACEHOLDER_TOKEN_FOR_SERIALIZATION";
-
 fn default_http() -> Arc<Http> {
   // Create Http client with placeholder token that will be replaced during restoration
   // Using a non-empty token to avoid potential auth failures during serialization
-  Arc::new(serenity::http::Http::new(PLACEHOLDER_TOKEN))
+  Arc::new(serenity::http::Http::new(
+    "PLACEHOLDER_TOKEN_FOR_SERIALIZATION",
+  ))
 }
 
 pub struct CheckInActor {

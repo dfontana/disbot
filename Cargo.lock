@@ -889,7 +889,6 @@ dependencies = [
  "serenity",
  "songbird",
  "symphonia",
- "tempfile",
  "test-case",
  "tokio",
  "toml",
