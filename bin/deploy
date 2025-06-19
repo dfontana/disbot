@@ -5,7 +5,7 @@
 #     For RPi on ARM Machine: ./bin/deploy prod           (Cross compiles with native tools & sends to raspberrypi.local)
 #     For RPi CI Machine BUILD_GITHUB=1 ./bin/deploy prod (Cross compiles on Github Action & sends to raspberrypi.local)
 #   x86 Linux Deploy:
-#     ARCH=x86_64-unknown-linux-gnu ./bin/deploy prod server.local
+#     ARCH=x86_64-unknown-linux-musl ./bin/deploy prod server.local
 #
 set -e
 
