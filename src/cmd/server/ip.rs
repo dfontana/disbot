@@ -53,7 +53,8 @@ impl SubCommandHandler for Ip {
       itx
         .edit_response(
           &ctx.http,
-          EditInteractionResponse::new().content("Could not resolve IP of server, Shibba is death"),
+          EditInteractionResponse::new()
+            .content("Could not resolve IP of server, Binkies is death"),
         )
         .await?;
       return Ok(());

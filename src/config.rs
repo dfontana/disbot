@@ -26,7 +26,7 @@ impl Default for Config {
     Config {
       api_key: "TOKEN".to_string(),
       app_id: 0,
-      emote_name: "shrug_dog".to_string(),
+      emote_name: "shrug_cat".to_string(),
       emote_users: vec!["User1".to_string()],
       env: Environment::Dev,
       log_level: "INFO".to_string(),

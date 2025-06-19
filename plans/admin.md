@@ -66,7 +66,7 @@ pub enum Environment {
 # dev.toml / prod.toml (no env field)
 api_key = "your_discord_bot_token_here"
 app_id = 123456789012345678
-emote_name = "shrug_dog"
+emote_name = "shrug_cat"
 emote_users = ["User1", "User2", "User3"]
 log_level = "INFO"
 voice_channel_timeout_seconds = 600

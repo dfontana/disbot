@@ -54,7 +54,7 @@ impl AppInteractor for Voice {
   #[instrument(name = "Voice", level = "INFO", skip(self))]
   fn commands(&self) -> Vec<CreateCommand> {
     vec![CreateCommand::new(NAME)
-      .description("Sheebs Givith Loud Noises")
+      .description("Binkies Givith Loud Noises")
       .kind(CommandType::ChatInput)
       .add_option(
         CreateCommandOption::new(CommandOptionType::SubCommand, "yt", "Play sound from YT")
@@ -70,22 +70,22 @@ impl AppInteractor for Voice {
       .add_option(CreateCommandOption::new(
         CommandOptionType::SubCommand,
         "stop",
-        "Kindly ask Shibba to stop screaming",
+        "Kindly ask Binkies to stop screaming",
       ))
       .add_option(CreateCommandOption::new(
         CommandOptionType::SubCommand,
         "skip",
-        "Demand Shibba scream the next tune",
+        "Demand Binkies scream the next tune",
       ))
       .add_option(CreateCommandOption::new(
         CommandOptionType::SubCommand,
         "list",
-        "Shibba will reveal his inner secrets",
+        "Binkies will reveal his inner secrets",
       ))
       .add_option(CreateCommandOption::new(
         CommandOptionType::SubCommand,
         "shuffle",
-        "Shibba will throw the queue on the ground",
+        "Binkies will throw the queue on the ground",
       ))
       .add_option(
         CreateCommandOption::new(

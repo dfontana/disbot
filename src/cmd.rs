@@ -101,7 +101,7 @@ impl EventHandler for Handler {
   }
 
   async fn ready(&self, ctx: Context, rdy: Ready) {
-    // Register Slash commands with each guild that Shibba is connected to
+    // Register Slash commands with each guild the bot is connected to
     for guild_id in ctx.cache.guilds() {
       guild_id
         .set_commands(

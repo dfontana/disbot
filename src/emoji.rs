@@ -13,7 +13,7 @@ use tracing::info;
 static EMOJI_IMAGE: Lazy<String> = Lazy::new(|| {
   format!(
     "data:image/png;base64,{}",
-    general_purpose::STANDARD.encode(include_bytes!("img/shrug-dog.png"))
+    general_purpose::STANDARD.encode(include_bytes!("img/shrug-cat.png"))
   )
 });
 

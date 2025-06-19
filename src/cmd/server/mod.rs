@@ -46,23 +46,23 @@ impl AppInteractor for GameServers {
   #[instrument(name = "Servers", level = "INFO", skip(self))]
   fn commands(&self) -> Vec<CreateCommand> {
     vec![CreateCommand::new(NAME)
-      .description("Sheebs Thinks He's IT")
+      .description("Binkies trying out IT")
       .kind(CommandType::ChatInput)
       .add_option(CreateCommandOption::new(
         CommandOptionType::SubCommand,
         "ip",
-        "Shibba knows where he is, do you?",
+        "Binkies knows where she is, do you?",
       ))
       .add_option(CreateCommandOption::new(
         CommandOptionType::SubCommand,
         "list",
-        "Shibba will take a guess at what servers exist",
+        "Binkies will take a guess at what servers exist",
       ))
       .add_option(
         CreateCommandOption::new(
           CommandOptionType::SubCommand,
           "stop",
-          "Make Shibba stop a server",
+          "Make Binkies stop a server",
         )
         .add_sub_option(
           CreateCommandOption::new(
@@ -77,7 +77,7 @@ impl AppInteractor for GameServers {
         CreateCommandOption::new(
           CommandOptionType::SubCommand,
           "start",
-          "Make Shibba start a server",
+          "Make Binkies start a server",
         )
         .add_sub_option(
           CreateCommandOption::new(

@@ -124,7 +124,7 @@ fn parse_form_data(params: HashMap<String, String>) -> Result<FormData, String> 
 }
 
 pub async fn get_favicon() -> Result<impl IntoResponse, StatusCode> {
-  let favicon_data = include_bytes!("../img/shrug-dog.png");
+  let favicon_data = include_bytes!("../img/shrug-cat.png");
 
   Ok((
     [(header::CONTENT_TYPE, "image/png")],

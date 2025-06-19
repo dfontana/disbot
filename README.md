@@ -6,7 +6,7 @@ A Discord Bot, that I'm not sure what it'll do yet - but I wanted to have someth
 - Deployed via Systemctl 
 - To a locally running Raspberry Pi
 
-The rest I don't really care about at the moment :shrug-dog:
+The rest I don't really care about at the moment :shrug-cat:
 
 ## Building (Optional Before Deploying)
 
@@ -44,7 +44,7 @@ For ArmV7 (eg Raspberry Pi) or `x86_64` Linux (eg Linux Server).
 # prod.toml
 api_key = "<Your Bot's Token Here>"
 app_id = <Your Bot's Application Id Here>
-emote_name = "<your-emote || shrug_dog>"
+emote_name = "<your-emote || shrug_cat>"
 emote_users = ["User1", "User2", "User3"]
 server_mac = "<game-server-mac>"
 server_ip = "<game-server-ip>"
@@ -146,7 +146,7 @@ Validate: `curl http://localhost:2375/v1.40/containers/json`. This will need to 
 - Ensure the `SERVER_USER` has sudo-er privileged to run `shutdown` without a password. (Eg: `sudo visudo -> [user]\tALL=NOPASSWD:[pathToBin1],[pathtoBin2],...`)
 - Equally, ensure the bot's host can run `ssh` without a password (eg setup it's SSH keys).
 
-## Invite Shruggin' Shiba to Your Server
+## Invite Binkies to Your Server
 
 [Invite Link](https://discord.com/api/oauth2/authorize?client_id=764937518570536990&permissions=545430961264&scope=bot%20applications.commands)
 
