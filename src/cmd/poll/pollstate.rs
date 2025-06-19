@@ -1,5 +1,6 @@
 use anyhow::anyhow;
 use humantime::parse_duration;
+use serde::{Deserialize, Serialize};
 use serenity::{
   all::CommandInteraction,
   http::Http,
@@ -9,7 +10,7 @@ use serenity::{
 use std::{
   collections::{HashMap, HashSet},
   sync::Arc,
-  time::Duration,
+  time::{Duration, SystemTime},
 };
 use tracing::{info, instrument, warn};
 use uuid::Uuid;
@@ -18,14 +19,20 @@ use crate::cmd::{arg_util::Args, check_in::CheckInCtx};
 
 use super::cache::Expiring;
 
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct CallContext {
   pub channel: ChannelId,
+  #[serde(skip, default = "default_http")]
   pub http: Arc<Http>,
   pub emoji: Emoji,
 }
 
-#[derive(Clone)]
+fn default_http() -> Arc<Http> {
+  // Gets replaced after serialization, during startup
+  Arc::new(serenity::http::Http::new(""))
+}
+
+#[derive(Clone, Serialize, Deserialize)]
 pub struct PollState {
   pub id: Uuid,
   pub duration: Duration,
@@ -34,6 +41,7 @@ pub struct PollState {
   pub most_votes: usize,
   pub votes: HashMap<String, (String, usize, HashSet<String>)>,
   pub ctx: CallContext,
+  pub created_at: SystemTime,
 }
 
 impl Expiring for PollState {
@@ -62,6 +70,7 @@ impl From<CheckInCtx> for PollState {
         http: c.http,
         emoji: c.emoji,
       },
+      created_at: SystemTime::now(),
     }
   }
 }
@@ -113,6 +122,7 @@ impl PollState {
         http: ctx.http.clone(),
         emoji,
       },
+      created_at: SystemTime::now(),
     })
   }
 

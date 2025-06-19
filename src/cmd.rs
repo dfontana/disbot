@@ -3,7 +3,10 @@ use self::{
   check_in::{CheckInActor, CheckInMessage},
   poll::{PollActor, PollMessage},
 };
-use crate::{actor::ActorHandle, config::Config, docker::DockerClient, emoji::EmojiLookup};
+use crate::{
+  actor::ActorHandle, config::Config, docker::DockerClient, emoji::EmojiLookup,
+  persistence::PersistentStore,
+};
 use itertools::Itertools;
 use reqwest::Client;
 use serenity::{
@@ -14,11 +17,12 @@ use serenity::{
   model::{channel::Message, gateway::Ready},
   prelude::*,
 };
+use std::sync::Arc;
 
 mod arg_util;
-mod check_in;
+pub mod check_in;
 mod dice_roll;
-mod poll;
+pub mod poll;
 mod ready;
 mod reddit_prev;
 mod server;
@@ -61,10 +65,17 @@ impl Handler {
     emoji: EmojiLookup,
     http: Client,
     docker: Box<dyn DockerClient>,
+    persistence: Arc<PersistentStore>,
   ) -> Self {
-    let poll_handle = ActorHandle::<PollMessage>::spawn(|r, h| PollActor::new(r, h));
+    let poll_handle =
+      ActorHandle::<PollMessage>::spawn(|r, h| PollActor::new(r, h, persistence.clone()));
     let chk_handle = ActorHandle::<CheckInMessage>::spawn(|r, h| {
-      Box::new(CheckInActor::new(h, r, poll_handle.clone()))
+      Box::new(CheckInActor::new(
+        h,
+        r,
+        poll_handle.clone(),
+        persistence.clone(),
+      ))
     });
     Handler {
       listeners: vec![
@@ -72,13 +83,13 @@ impl Handler {
         Box::new(reddit_prev::RedditPreviewHandler::new(http.clone())),
       ],
       app_interactors: vec![
-        Box::new(poll::Poll::new(emoji.clone(), poll_handle)),
-        Box::new(check_in::CheckIn::new(emoji.clone(), chk_handle)),
+        Box::new(poll::Poll::new(emoji.clone(), poll_handle.clone())),
+        Box::new(check_in::CheckIn::new(emoji.clone(), chk_handle.clone())),
         Box::new(dice_roll::DiceRoll::new(emoji.clone())),
         Box::new(voice::Voice::new(config, emoji.clone())),
         Box::new(server::GameServers::new(emoji, http, docker)),
       ],
-      ready: ready::ReadyHandler::default(),
+      ready: ready::ReadyHandler::new(poll_handle, chk_handle),
     }
   }
 }
@@ -104,7 +115,6 @@ impl EventHandler for Handler {
         .await
         .expect("Failed to Register Application Context");
     }
-
     self.ready.ready(&ctx, &rdy).await;
   }
 

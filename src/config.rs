@@ -18,18 +18,20 @@ pub struct Config {
   pub env: Environment,
   pub log_level: String,
   pub voice_channel_timeout_seconds: u64,
+  pub db_path: String,
 }
 
 impl Default for Config {
   fn default() -> Self {
     Config {
-      api_key: "".to_owned(),
+      api_key: "TOKEN".to_string(),
       app_id: 0,
-      emote_name: "".to_owned(),
-      emote_users: Vec::new(),
+      emote_name: "shrug_dog".to_string(),
+      emote_users: vec!["User1".to_string()],
       env: Environment::Dev,
       log_level: "INFO".to_string(),
-      voice_channel_timeout_seconds: 10,
+      voice_channel_timeout_seconds: 600,
+      db_path: "disbot.db".to_string(),
     }
   }
 }
@@ -57,17 +59,8 @@ impl Config {
         .unwrap_or(Environment::Dev);
 
       let default_config = Config {
-        api_key: "your_discord_bot_token_here".to_string(),
-        app_id: 123456789012345678,
-        emote_name: "shrug_dog".to_string(),
-        emote_users: vec![
-          "User1".to_string(),
-          "User2".to_string(),
-          "User3".to_string(),
-        ],
         env: env.clone(),
-        log_level: "INFO".to_string(),
-        voice_channel_timeout_seconds: 600,
+        ..Default::default()
       };
 
       default_config.to_toml(path_ref)?;

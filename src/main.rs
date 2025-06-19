@@ -9,22 +9,32 @@ mod config;
 mod docker;
 mod emoji;
 mod env;
+mod persistence;
 mod web;
 
-use std::{path::PathBuf, str::FromStr};
+use std::{path::PathBuf, str::FromStr, sync::Mutex};
 
 use clap::Parser;
+use once_cell::sync::Lazy;
 use serenity::{
   client::Client,
   prelude::{GatewayIntents, TypeMapKey},
 };
 use songbird::SerenityInit;
 use tracing::{error, info, Level};
-use tracing_subscriber::{filter::LevelFilter, prelude::*, reload, Registry};
+use tracing_subscriber::{
+  filter::LevelFilter,
+  fmt::Layer,
+  prelude::*,
+  reload::{self, Handle},
+  Registry,
+};
 
 use cmd::Handler;
 use config::Config;
 use env::Environment;
+use persistence::PersistentStore;
+use std::sync::Arc;
 
 #[derive(Parser)]
 #[command(name = "disbot")]
@@ -44,9 +54,8 @@ struct Cli {
 }
 
 // Global handle for runtime log level changes
-static LOG_RELOAD_HANDLE: once_cell::sync::Lazy<
-  std::sync::Mutex<Option<reload::Handle<LevelFilter, Registry>>>,
-> = once_cell::sync::Lazy::new(|| std::sync::Mutex::new(None));
+static LOG_RELOAD_HANDLE: Lazy<Mutex<Option<Handle<LevelFilter, Registry>>>> =
+  Lazy::new(|| Mutex::new(None));
 
 pub fn set_log_level(level: Level) -> Result<(), String> {
   let handle_guard = LOG_RELOAD_HANDLE
@@ -62,6 +71,18 @@ pub fn set_log_level(level: Level) -> Result<(), String> {
   }
 }
 
+fn initalize_logging() {
+  let (filter, reload_handle) = reload::Layer::new(LevelFilter::from_level(Level::INFO));
+  {
+    let mut handle_guard = LOG_RELOAD_HANDLE.lock().unwrap();
+    *handle_guard = Some(reload_handle);
+  }
+  tracing_subscriber::Registry::default()
+    .with(filter)
+    .with(Layer::default().with_target(false))
+    .init();
+}
+
 pub struct HttpClient;
 impl TypeMapKey for HttpClient {
   type Value = reqwest::Client;
@@ -69,6 +90,8 @@ impl TypeMapKey for HttpClient {
 
 #[tokio::main]
 async fn main() {
+  initalize_logging();
+
   // Parse CLI arguments with clap
   let cli = Cli::parse();
 
@@ -97,21 +120,24 @@ async fn main() {
     }
   };
 
-  // Set up reloadable tracing subscriber
-  let initial_level = Level::from_str(&config.log_level).unwrap();
-  let (filter, reload_handle) = reload::Layer::new(LevelFilter::from_level(initial_level));
-
-  // Store the reload handle globally
-  {
-    let mut handle_guard = LOG_RELOAD_HANDLE.lock().unwrap();
-    *handle_guard = Some(reload_handle);
+  // Upgrade logger after bootstrap
+  if let Err(e) = set_log_level(Level::from_str(&config.log_level).unwrap()) {
+    error!(
+      "Failed to update logger level from config {}: {}",
+      &config.log_level, e
+    );
+    std::process::exit(1);
   }
 
-  // Initialize subscriber with reloadable filter
-  tracing_subscriber::Registry::default()
-    .with(filter)
-    .with(tracing_subscriber::fmt::Layer::default().with_target(false))
-    .init();
+  // Initialize persistence store
+  let persistence = match PersistentStore::new(&config.db_path) {
+    Ok(store) => Arc::new(store),
+    Err(e) => {
+      error!("Failed to initialize persistence store: {}", e);
+      std::process::exit(1);
+    }
+  };
+
   let emoji = emoji::EmojiLookup::new(&config);
   let http = reqwest::Client::new();
 
@@ -131,6 +157,7 @@ async fn main() {
     emoji,
     http,
     docker::create_docker_client(),
+    persistence,
   ))
   .application_id(config.app_id.into())
   .await
@@ -138,6 +165,8 @@ async fn main() {
     error!("Error creating Discord client: {:?}", e);
     std::process::exit(1);
   });
+
+  // Persistence restoration happens in the ready event handler where actor handles are available
 
   // Start web server and Discord client concurrently
   let web_server = web::start_server(final_config_path, cli.port);
