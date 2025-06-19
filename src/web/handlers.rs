@@ -58,28 +58,6 @@ pub async fn post_admin(
   Extension(persistence): Extension<Arc<PersistentStore>>,
   Form(params): Form<HashMap<String, String>>,
 ) -> Response {
-  // Check if this is a CheckIn delete action
-  if let Some(action) = params.get("action") {
-    if action == "delete_checkin" {
-      let empty_guild_id = String::new();
-      let guild_id_str = params.get("guild_id").unwrap_or(&empty_guild_id);
-      let guild_id: u64 = match guild_id_str.parse() {
-        Ok(id) => id,
-        Err(_) => {
-          return render_error_response("Invalid guild ID", Some(&persistence)).into_response();
-        }
-      };
-
-      match persistence.remove_checkin_config(guild_id) {
-        Ok(_) => return Redirect::to("/admin?success=1").into_response(),
-        Err(e) => {
-          let error_msg = format!("Failed to delete check-in configuration: {}", e);
-          return render_error_response(&error_msg, Some(&persistence)).into_response();
-        }
-      }
-    }
-  }
-
   // Parse form data for regular config update
   let form_data = match parse_form_data(params) {
     Ok(data) => data,

@@ -1,41 +1,32 @@
-use crate::{cmd::check_in::CheckInCtx, config::Config};
+use crate::{
+  cmd::check_in::{time_until, CheckInCtx},
+  config::Config,
+};
 use chrono::{DateTime, NaiveDateTime, TimeZone, Utc};
 use chrono_tz::America;
 use std::time::Duration;
 
-// Helper function to calculate time until next occurrence (matches check_in/actor.rs logic)
-fn time_until_checkin(now_ref: DateTime<Utc>, time: chrono::NaiveTime) -> Duration {
-  let now_local = now_ref.with_timezone(&America::New_York);
-  let target_local = America::New_York
-    .from_local_datetime(&NaiveDateTime::new(now_local.date_naive(), time))
-    .unwrap();
-
-  let diff = now_local.signed_duration_since(target_local);
-  match diff.cmp(&chrono::Duration::zero()) {
-    std::cmp::Ordering::Less => (target_local - now_local).to_std().unwrap(),
-    std::cmp::Ordering::Equal => std::time::Duration::default(),
-    std::cmp::Ordering::Greater => {
-      // Time has passed, schedule for tomorrow
-      (target_local + chrono::Duration::days(1) - now_local)
-        .to_std()
-        .unwrap()
-    }
-  }
-}
-
-// Helper function to format duration as human-readable string
-fn format_duration(duration: Duration) -> String {
+// Helper function to format duration in a user-friendly way (without microseconds)
+fn format_duration_clean(duration: Duration) -> String {
   let total_seconds = duration.as_secs();
   let hours = total_seconds / 3600;
   let minutes = (total_seconds % 3600) / 60;
   let seconds = total_seconds % 60;
+  match (hours, minutes, seconds) {
+    (h, m, s) if h > 0 && s > 0 => format!("{}h {}m {}s", h, m, s),
+    (h, m, _) if h > 0 => format!("{}h {}m", h, m),
+    (_, m, s) if m > 0 && s > 0 => format!("{}m {}s", m, s),
+    (_, m, _) if m > 0 => format!("{}m", m),
+    (_, _, s) => format!("{}s", s),
+  }
+}
 
-  if hours > 0 {
-    format!("{}h {}m {}s", hours, minutes, seconds)
-  } else if minutes > 0 {
-    format!("{}m {}s", minutes, seconds)
+// Helper function to truncate long IDs for display
+fn truncate_id(id: &str, max_len: usize) -> String {
+  if id.len() > max_len {
+    format!("{}...", &id[..max_len])
   } else {
-    format!("{}s", seconds)
+    id.to_string()
   }
 }
 
@@ -86,14 +77,19 @@ pub fn render_admin_page(
   // Generate CheckIn table data
   let now = Utc::now();
   let checkin_table_rows = if checkin_configs.is_empty() {
-    r#"<tr><td colspan="7" class="no-data">No check-in configurations found</td></tr>"#.to_string()
+    r#"<tr><td colspan="6" class="no-data">No check-in configurations found</td></tr>"#.to_string()
   } else {
     checkin_configs
       .iter()
       .map(|(guild_id, config)| {
         let iso_timestamp = generate_iso_timestamp(now, config.poll_time);
-        let time_until = time_until_checkin(now, config.poll_time);
-        let countdown = format_duration(time_until);
+        let time_until_duration = time_until(now, config.poll_time);
+        let countdown = format_duration_clean(time_until_duration);
+
+        // Truncate long IDs for better display
+        let guild_id_display = truncate_id(&guild_id.to_string(), 10);
+        let channel_id_display = truncate_id(&config.channel.to_string(), 10);
+
         let role_display = config
           .at_group
           .as_ref()
@@ -104,27 +100,21 @@ pub fn render_admin_page(
 
         format!(
           r#"<tr>
+            <td title="{}">{}</td>
             <td>{}</td>
             <td>{}</td>
+            <td title="{}">{}</td>
             <td>{}</td>
             <td>{}</td>
-            <td>{}</td>
-            <td>{}</td>
-            <td>
-              <form method="post" style="margin: 0; display: inline;">
-                <input type="hidden" name="action" value="delete_checkin">
-                <input type="hidden" name="guild_id" value="{}">
-                <button type="submit" class="delete-btn" onclick="return confirm('Are you sure you want to delete this check-in configuration?');">Delete</button>
-              </form>
-            </td>
           </tr>"#,
-          html_escape(&guild_id.to_string()),
+          html_escape(&guild_id.to_string()), // Full ID in tooltip
+          html_escape(&guild_id_display),     // Truncated display
           html_escape(&iso_timestamp),
           html_escape(&countdown),
-          html_escape(&config.channel.to_string()),
+          html_escape(&config.channel.to_string()), // Full channel ID in tooltip
+          html_escape(&channel_id_display),         // Truncated display
           html_escape(&duration_display),
-          role_display,
-          guild_id
+          role_display
         )
       })
       .collect::<Vec<String>>()
@@ -354,6 +344,7 @@ pub fn render_admin_page(
             border-radius: 6px;
             padding: 12px;
             margin-bottom: 15px;
+            margin-right: 20px;
         }}
         
         .checkin-section h3 {{
@@ -395,18 +386,8 @@ pub fn render_admin_page(
             padding: 20px;
         }}
         
-        .delete-btn {{
-            background-color: #dc3545;
-            color: white;
-            padding: 4px 8px;
-            border: none;
-            border-radius: 4px;
-            font-size: 11px;
-            cursor: pointer;
-        }}
-        
-        .delete-btn:hover {{
-            background-color: #c82333;
+        .admin-table td[title] {{
+            cursor: help;
         }}
         
         .section-info {{
@@ -509,7 +490,7 @@ pub fn render_admin_page(
                 <div class="checkin-section">
                     <h3>📋 Check-In Configurations</h3>
                     <div class="section-info">
-                        ℹ️ Scheduled polls for Discord guilds. Use <code>/checkin</code> slash command to create new check-ins.
+                        ℹ️ Scheduled check-ins for Discord guilds. Use <code>/checkin</code> to create new ones.
                     </div>
                     
                     <table class="admin-table">
@@ -521,7 +502,6 @@ pub fn render_admin_page(
                                 <th>Channel</th>
                                 <th>Duration</th>
                                 <th>Role</th>
-                                <th>Actions</th>
                             </tr>
                         </thead>
                         <tbody>
