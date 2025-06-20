@@ -1,7 +1,7 @@
 pub mod handlers;
 pub mod templates;
 
-use crate::persistence::PersistentStore;
+use crate::{persistence::PersistentStore, WebBindAddress};
 use axum::{routing::get, Extension, Router};
 use std::sync::Arc;
 
@@ -23,25 +23,15 @@ pub fn create_router(config_path: String, persistence: Arc<PersistentStore>) -> 
 pub async fn start_server(
   config_path: String,
   persistence: Arc<PersistentStore>,
-  bind_address: String,
+  bind_address: WebBindAddress,
   port: u16,
 ) -> Result<(), Box<dyn std::error::Error>> {
   let app = create_router(config_path, persistence);
 
   // Resolve bind address
-  let resolved_address = if bind_address == "lan" {
-    match local_ip_address::local_ip() {
-      Ok(ip) => ip.to_string(),
-      Err(e) => {
-        eprintln!(
-          "Failed to detect LAN IP address: {}. Falling back to 127.0.0.1",
-          e
-        );
-        "127.0.0.1".to_string()
-      }
-    }
-  } else {
-    bind_address
+  let resolved_address = match bind_address {
+    WebBindAddress::Lan => local_ip_address::local_ip()?.to_string(),
+    WebBindAddress::Ip(ip) => ip,
   };
 
   let listener = tokio::net::TcpListener::bind(format!("{}:{}", resolved_address, port)).await?;

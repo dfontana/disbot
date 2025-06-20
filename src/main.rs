@@ -36,6 +36,23 @@ use env::Environment;
 use persistence::PersistentStore;
 use std::sync::Arc;
 
+#[derive(Debug, Clone)]
+pub enum WebBindAddress {
+  Lan,
+  Ip(String),
+}
+
+impl std::str::FromStr for WebBindAddress {
+  type Err = String;
+
+  fn from_str(s: &str) -> Result<Self, Self::Err> {
+    match s {
+      "lan" => Ok(WebBindAddress::Lan),
+      ip => Ok(WebBindAddress::Ip(ip.to_string())),
+    }
+  }
+}
+
 #[derive(Parser)]
 #[command(name = "disbot")]
 #[command(about = "Discord bot with admin web interface")]
@@ -54,7 +71,7 @@ struct Cli {
 
   /// Web server bind address (IP address, "lan" for LAN IP, or "0.0.0.0" for all interfaces)
   #[arg(long, default_value = "0.0.0.0")]
-  web_bind_address: String,
+  web_bind_address: WebBindAddress,
 }
 
 // Global handle for runtime log level changes
