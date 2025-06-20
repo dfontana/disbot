@@ -23,12 +23,32 @@ pub fn create_router(config_path: String, persistence: Arc<PersistentStore>) -> 
 pub async fn start_server(
   config_path: String,
   persistence: Arc<PersistentStore>,
+  bind_address: String,
   port: u16,
 ) -> Result<(), Box<dyn std::error::Error>> {
   let app = create_router(config_path, persistence);
 
-  let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{}", port)).await?;
-  println!("Admin web server running on http://0.0.0.0:{}/admin", port);
+  // Resolve bind address
+  let resolved_address = if bind_address == "lan" {
+    match local_ip_address::local_ip() {
+      Ok(ip) => ip.to_string(),
+      Err(e) => {
+        eprintln!(
+          "Failed to detect LAN IP address: {}. Falling back to 127.0.0.1",
+          e
+        );
+        "127.0.0.1".to_string()
+      }
+    }
+  } else {
+    bind_address
+  };
+
+  let listener = tokio::net::TcpListener::bind(format!("{}:{}", resolved_address, port)).await?;
+  println!(
+    "Admin web server running on http://{}:{}/admin",
+    resolved_address, port
+  );
 
   axum::serve(listener, app).await?;
   Ok(())
