@@ -36,6 +36,23 @@ use env::Environment;
 use persistence::PersistentStore;
 use std::sync::Arc;
 
+#[derive(Debug, Clone)]
+pub enum WebBindAddress {
+  Lan,
+  Ip(String),
+}
+
+impl std::str::FromStr for WebBindAddress {
+  type Err = String;
+
+  fn from_str(s: &str) -> Result<Self, Self::Err> {
+    match s {
+      "lan" => Ok(WebBindAddress::Lan),
+      ip => Ok(WebBindAddress::Ip(ip.to_string())),
+    }
+  }
+}
+
 #[derive(Parser)]
 #[command(name = "disbot")]
 #[command(about = "Discord bot with admin web interface")]
@@ -51,6 +68,10 @@ struct Cli {
   /// Web server port
   #[arg(short, long, default_value = "3450")]
   port: u16,
+
+  /// Web server bind address (IP address, "lan" for LAN IP, or "0.0.0.0" for all interfaces)
+  #[arg(long, default_value = "0.0.0.0")]
+  web_bind_address: WebBindAddress,
 }
 
 // Global handle for runtime log level changes
@@ -169,7 +190,12 @@ async fn main() {
   // Persistence restoration happens in the ready event handler where actor handles are available
 
   // Start web server and Discord client concurrently
-  let web_server = web::start_server(final_config_path, persistence.clone(), cli.port);
+  let web_server = web::start_server(
+    final_config_path,
+    persistence.clone(),
+    cli.web_bind_address,
+    cli.port,
+  );
   let discord_client = client.start();
 
   tokio::select! {

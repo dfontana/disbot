@@ -1,7 +1,7 @@
 pub mod handlers;
 pub mod templates;
 
-use crate::persistence::PersistentStore;
+use crate::{persistence::PersistentStore, WebBindAddress};
 use axum::{routing::get, Extension, Router};
 use std::sync::Arc;
 
@@ -23,12 +23,22 @@ pub fn create_router(config_path: String, persistence: Arc<PersistentStore>) -> 
 pub async fn start_server(
   config_path: String,
   persistence: Arc<PersistentStore>,
+  bind_address: WebBindAddress,
   port: u16,
 ) -> Result<(), Box<dyn std::error::Error>> {
   let app = create_router(config_path, persistence);
 
-  let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{}", port)).await?;
-  println!("Admin web server running on http://0.0.0.0:{}/admin", port);
+  // Resolve bind address
+  let resolved_address = match bind_address {
+    WebBindAddress::Lan => local_ip_address::local_ip()?.to_string(),
+    WebBindAddress::Ip(ip) => ip,
+  };
+
+  let listener = tokio::net::TcpListener::bind(format!("{}:{}", resolved_address, port)).await?;
+  println!(
+    "Admin web server running on http://{}:{}/admin",
+    resolved_address, port
+  );
 
   axum::serve(listener, app).await?;
   Ok(())
