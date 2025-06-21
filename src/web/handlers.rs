@@ -20,16 +20,10 @@ fn get_config_or_default() -> Config {
 }
 
 // Helper function to render error response
-fn render_error_response(error: &str, persistence: Option<&Arc<PersistentStore>>) -> Html<String> {
+fn render_error_response(error: &str, persistence: &Arc<PersistentStore>) -> Html<String> {
   let config = get_config_or_default();
-  let checkin_configs = match persistence {
-    Some(p) => p.load_all_checkin_configs().unwrap_or_default(),
-    None => vec![],
-  };
-  let active_polls = match persistence {
-    Some(p) => p.load_all_polls().unwrap_or_default(),
-    None => vec![],
-  };
+  let checkin_configs = persistence.load_all_checkin_configs().unwrap_or_default();
+  let active_polls = persistence.load_all_polls().unwrap_or_default();
   Html(templates::render_admin_page(
     &config,
     Some(error),
@@ -68,7 +62,7 @@ pub async fn post_admin(
   // Parse form data for regular config update
   let form_data = match parse_form_data(params) {
     Ok(data) => data,
-    Err(error) => return render_error_response(&error, Some(&persistence)).into_response(),
+    Err(error) => return render_error_response(&error, &persistence).into_response(),
   };
 
   // Update configuration
@@ -76,7 +70,7 @@ pub async fn post_admin(
     let mut config = match Config::global_instance().write() {
       Ok(config) => config,
       Err(_) => {
-        return render_error_response("Failed to acquire configuration lock", Some(&persistence))
+        return render_error_response("Failed to acquire configuration lock", &persistence)
           .into_response()
       }
     };
@@ -102,7 +96,7 @@ pub async fn post_admin(
       // Redirect to show success
       Redirect::to("/admin?success=1").into_response()
     }
-    Err(error) => render_error_response(&error, Some(&persistence)).into_response(),
+    Err(error) => render_error_response(&error, &persistence).into_response(),
   }
 }
 
