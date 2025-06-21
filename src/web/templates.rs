@@ -1,5 +1,6 @@
 use crate::{
   cmd::check_in::{time_until, CheckInCtx},
+  cmd::poll::pollstate::PollState,
   config::Config,
 };
 use chrono::{DateTime, NaiveDateTime, TimeZone, Utc};
@@ -57,6 +58,7 @@ pub fn render_admin_page(
   error: Option<&str>,
   success: Option<&str>,
   checkin_configs: Vec<(u64, CheckInCtx)>,
+  active_polls: Vec<PollState>,
 ) -> String {
   let api_key_display = if config.api_key.is_empty() {
     ""
@@ -115,6 +117,86 @@ pub fn render_admin_page(
           html_escape(&channel_id_display),         // Truncated display
           html_escape(&duration_display),
           role_display
+        )
+      })
+      .collect::<Vec<String>>()
+      .join("")
+  };
+
+  // Generate Active Polls table data
+  let polls_table_rows = if active_polls.is_empty() {
+    r#"<tr><td colspan="4" class="no-data">No active polls found</td></tr>"#.to_string()
+  } else {
+    active_polls
+      .iter()
+      .map(|poll| {
+        let end_time = poll.created_at + poll.duration;
+        let end_time_formatted = DateTime::<Utc>::from(end_time)
+          .format("%Y-%m-%d %H:%M:%S UTC")
+          .to_string();
+
+        let duration_display = format_duration_clean(poll.duration);
+        let _total_votes: usize = poll.votes.values().map(|(_, count, _)| count).sum();
+        let poll_id_display = truncate_id(&poll.id.to_string(), 12);
+
+        // Generate voting details for the expandable section
+        let voting_details = poll
+          .votes
+          .iter()
+          .map(|(_option_key, (option_name, vote_count, voters))| {
+            let voters_list = if voters.is_empty() {
+              "No voters".to_string()
+            } else {
+              voters.iter().cloned().collect::<Vec<String>>().join(", ")
+            };
+            format!(
+              r#"<tr>
+                <td>{}</td>
+                <td>{}</td>
+                <td>{}</td>
+              </tr>"#,
+              html_escape(option_name),
+              vote_count,
+              html_escape(&voters_list)
+            )
+          })
+          .collect::<Vec<String>>()
+          .join("");
+
+        format!(
+          r#"<tr>
+            <td title="{}">{}</td>
+            <td>{}</td>
+            <td>{}</td>
+            <td>{}</td>
+          </tr>
+          <tr class="poll-details">
+            <td colspan="4">
+              <details>
+                <summary>View Voting Details</summary>
+                <div class="poll-detail-content">
+                  <table class="poll-detail-table">
+                    <thead>
+                      <tr>
+                        <th>Option</th>
+                        <th>Votes</th>
+                        <th>Voters</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {}
+                    </tbody>
+                  </table>
+                </div>
+              </details>
+            </td>
+          </tr>"#,
+          html_escape(&poll.id.to_string()), // Full ID in tooltip
+          html_escape(&poll_id_display),     // Truncated display
+          html_escape(&poll.topic),
+          html_escape(&duration_display),
+          html_escape(&end_time_formatted),
+          voting_details
         )
       })
       .collect::<Vec<String>>()
@@ -400,6 +482,55 @@ pub fn render_admin_page(
             font-size: 13px;
         }}
         
+        .poll-details {{
+            background-color: #f8f9fa;
+        }}
+        
+        .poll-details:hover {{
+            background-color: #f8f9fa;
+        }}
+        
+        .poll-detail-content {{
+            padding: 15px;
+            background-color: white;
+            border-radius: 4px;
+            margin-top: 10px;
+        }}
+        
+        .poll-detail-table {{
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+        }}
+        
+        .poll-detail-table th,
+        .poll-detail-table td {{
+            padding: 8px 12px;
+            text-align: left;
+            border-bottom: 1px solid #e9ecef;
+        }}
+        
+        .poll-detail-table th {{
+            background-color: #f1f3f4;
+            font-weight: 600;
+            color: #495057;
+        }}
+        
+        details {{
+            cursor: pointer;
+        }}
+        
+        summary {{
+            font-weight: 600;
+            color: #007bff;
+            padding: 8px 0;
+            outline: none;
+        }}
+        
+        summary:hover {{
+            color: #0056b3;
+        }}
+        
         @media (max-width: 768px) {{
             .admin-table {{
                 font-size: 12px;
@@ -509,6 +640,27 @@ pub fn render_admin_page(
                         </tbody>
                     </table>
                 </div>
+                
+                <div class="checkin-section">
+                    <h3>🗳️ Active Polls</h3>
+                    <div class="section-info">
+                        ℹ️ Currently active polls across Discord guilds. Expand rows to see voting details.
+                    </div>
+                    
+                    <table class="admin-table">
+                        <thead>
+                            <tr>
+                                <th>Poll ID</th>
+                                <th>Topic</th>
+                                <th>Duration</th>
+                                <th>End Time</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {polls_table_rows}
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
     </div>
@@ -547,6 +699,7 @@ pub fn render_admin_page(
     },
     timeout = config.voice_channel_timeout_seconds,
     checkin_table_rows = checkin_table_rows,
+    polls_table_rows = polls_table_rows,
   )
 }
 

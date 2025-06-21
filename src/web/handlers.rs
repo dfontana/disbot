@@ -26,11 +26,16 @@ fn render_error_response(error: &str, persistence: Option<&Arc<PersistentStore>>
     Some(p) => p.load_all_checkin_configs().unwrap_or_default(),
     None => vec![],
   };
+  let active_polls = match persistence {
+    Some(p) => p.load_all_polls().unwrap_or_default(),
+    None => vec![],
+  };
   Html(templates::render_admin_page(
     &config,
     Some(error),
     None,
     checkin_configs,
+    active_polls,
   ))
 }
 
@@ -44,12 +49,14 @@ pub async fn get_admin(
     .map(|_| "Configuration saved successfully!");
 
   let checkin_configs = persistence.load_all_checkin_configs().unwrap_or_default();
+  let active_polls = persistence.load_all_polls().unwrap_or_default();
 
   Ok(Html(templates::render_admin_page(
     &config,
     None,
     success,
     checkin_configs,
+    active_polls,
   )))
 }
 
