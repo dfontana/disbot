@@ -119,7 +119,7 @@ impl Poll {
       .get(&ctx.http, &ctx.cache, guild_id)
       .await
       .and_then(|emoji| PollState::from_args(ctx, emoji, itx))
-      .map(|ps| PollMessage::CreatePoll((ps, itx.channel_id)))?;
+      .map(|ps| PollMessage::CreatePoll(Box::new((ps, itx.channel_id))))?;
     self.actor.send(pm).await;
     let _ = itx
       .create_response(
@@ -145,12 +145,12 @@ impl Poll {
 
     self
       .actor
-      .send(PollMessage::UpdateVote((
+      .send(PollMessage::UpdateVote(Box::new((
         poll_id,
         user,
         ctx.clone(),
         itx.clone(),
-      )))
+      ))))
       .await;
     Ok(())
   }
