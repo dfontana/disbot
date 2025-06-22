@@ -120,7 +120,7 @@ impl Actor<CheckInMessage> for CheckInActor {
         let nw_ctx = ctx.clone();
         self
           .poll_handle
-          .send(PollMessage::CreatePoll((ctx.into(), chan)))
+          .send(PollMessage::CreatePoll(Box::new((ctx.into(), chan))))
           .await;
         let sleep_until = time_until(Utc::now(), nw_ctx.poll_time);
         self

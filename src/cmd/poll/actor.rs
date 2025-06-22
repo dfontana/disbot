@@ -18,8 +18,8 @@ use super::{cache::Cache, messages, pollstate::PollState};
 
 #[derive(Clone)]
 pub enum PollMessage {
-  UpdateVote((Uuid, String, Context, ComponentInteraction)),
-  CreatePoll((PollState, ChannelId)),
+  UpdateVote(Box<(Uuid, String, Context, ComponentInteraction)>),
+  CreatePoll(Box<(PollState, ChannelId)>),
   ExpirePoll(Uuid),
   RestorePolls(Arc<serenity::http::Http>),
 }
@@ -54,7 +54,8 @@ impl Actor<PollMessage> for PollActor {
 
   async fn handle_msg(&mut self, msg: PollMessage) {
     match msg {
-      PollMessage::CreatePoll((ps, itx)) => {
+      PollMessage::CreatePoll(boxed_data) => {
+        let (ps, itx) = *boxed_data;
         let exp = ps.duration;
         let exp_key = ps.id;
 
@@ -103,7 +104,8 @@ impl Actor<PollMessage> for PollActor {
           );
         }
       }
-      PollMessage::UpdateVote((id, voter, ctx, mtx)) => {
+      PollMessage::UpdateVote(boxed_data) => {
+        let (id, voter, ctx, mtx) = *boxed_data;
         let votes = match mtx.data.kind {
           ComponentInteractionDataKind::StringSelect { ref values } => values,
           _ => {
