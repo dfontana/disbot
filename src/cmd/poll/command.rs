@@ -68,7 +68,7 @@ impl AppInteractor for Poll {
           format!("option_{}", i),
           format!("Option to add to poll #{}", i),
         )
-        .required(true),
+        .required(false),
       );
     }
     vec![command]
