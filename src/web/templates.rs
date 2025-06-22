@@ -136,7 +136,6 @@ pub fn render_admin_page(
           .to_string();
 
         let duration_display = format_duration_clean(poll.duration);
-        let _total_votes: usize = poll.votes.values().map(|(_, count, _)| count).sum();
         let poll_id_display = truncate_id(&poll.id.to_string(), 12);
 
         // Generate voting details for the expandable section
