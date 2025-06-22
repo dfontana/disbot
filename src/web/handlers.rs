@@ -3,6 +3,7 @@ use axum::{
   http::{header, StatusCode},
   response::{Html, IntoResponse, Redirect, Response},
 };
+use humantime::parse_duration;
 use std::{collections::HashMap, sync::Arc};
 
 use crate::web::templates;
@@ -110,17 +111,17 @@ fn parse_form_data(params: HashMap<String, String>) -> Result<FormData, String> 
 
   let log_level = params.get("log_level").ok_or("Missing log_level")?.clone();
 
-  let voice_channel_timeout_seconds = params
-    .get("voice_channel_timeout_seconds")
-    .ok_or("Missing voice_channel_timeout_seconds")?
-    .parse::<u64>()
-    .map_err(|_| "Invalid timeout value")?;
+  let voice_channel_timeout_str = params
+    .get("voice_channel_timeout")
+    .ok_or("Missing voice_channel_timeout")?;
+  let voice_channel_timeout =
+    parse_duration(voice_channel_timeout_str).map_err(|_| "Invalid timeout value")?;
 
   Ok(FormData {
     emote_name,
     emote_users,
     log_level,
-    voice_channel_timeout_seconds,
+    voice_channel_timeout,
   })
 }
 

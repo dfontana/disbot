@@ -5,6 +5,7 @@ use crate::{
 };
 use chrono::{DateTime, NaiveDateTime, TimeZone, Utc};
 use chrono_tz::America;
+use humantime::format_duration;
 use std::time::Duration;
 
 // Helper function to format duration in a user-friendly way (without microseconds)
@@ -604,10 +605,10 @@ pub fn render_admin_page(
                     </div>
                     
                     <div class="form-group">
-                        <label for="voice_channel_timeout_seconds">Voice Channel Timeout (seconds)</label>
-                        <input type="number" id="voice_channel_timeout_seconds" name="voice_channel_timeout_seconds" 
-                               value="{timeout}" min="10" max="3600" required>
-                        <div class="help-text">Time before bot leaves voice channel when inactive (10-3600 seconds)</div>
+                        <label for="voice_channel_timeout">Voice Channel Timeout</label>
+                        <input type="text" id="voice_channel_timeout" name="voice_channel_timeout" 
+                               value="{timeout}" required>
+                        <div class="help-text">Time before bot leaves voice channel when inactive</div>
                     </div>
                 </div>
             </div>
@@ -696,7 +697,7 @@ pub fn render_admin_page(
     } else {
       ""
     },
-    timeout = config.voice_channel_timeout_seconds,
+    timeout = format_duration(config.voice_channel_timeout),
     checkin_table_rows = checkin_table_rows,
     polls_table_rows = polls_table_rows,
   )

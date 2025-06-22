@@ -4,6 +4,7 @@ use tracing::{info, warn};
 
 use crate::Environment;
 use std::sync::RwLock;
+use std::time::Duration;
 use std::{fs, path::Path};
 
 static INSTANCE: Lazy<RwLock<Config>> = Lazy::new(|| RwLock::new(Config::default()));
@@ -17,7 +18,8 @@ pub struct Config {
   #[serde(skip)]
   pub env: Environment,
   pub log_level: String,
-  pub voice_channel_timeout_seconds: u64,
+  #[serde(with = "humantime_serde")]
+  pub voice_channel_timeout: Duration,
   pub db_path: String,
 }
 
@@ -30,7 +32,7 @@ impl Default for Config {
       emote_users: vec!["User1".to_string()],
       env: Environment::Dev,
       log_level: "INFO".to_string(),
-      voice_channel_timeout_seconds: 600,
+      voice_channel_timeout: Duration::from_secs(600),
       db_path: "disbot.db".to_string(),
     }
   }
@@ -115,7 +117,7 @@ impl Config {
         .unwrap_or_else(|_| warn!("Failed to update runtime log level"));
     }
 
-    self.voice_channel_timeout_seconds = form_data.voice_channel_timeout_seconds;
+    self.voice_channel_timeout = form_data.voice_channel_timeout;
 
     Ok(())
   }
@@ -147,11 +149,11 @@ impl Config {
     }
 
     // Validate timeout
-    if form_data.voice_channel_timeout_seconds < 10
-      || form_data.voice_channel_timeout_seconds > 3600
+    if form_data.voice_channel_timeout < Duration::from_secs(10)
+      || form_data.voice_channel_timeout > Duration::from_secs(3600)
     {
       return Err(ValidationError::Timeout(
-        "Voice channel timeout must be between 10 and 3600 seconds".to_string(),
+        "Voice channel timeout must be between 10sec and 1hr".to_string(),
       ));
     }
 
@@ -168,7 +170,7 @@ pub struct FormData {
   pub emote_name: String,
   pub emote_users: String,
   pub log_level: String,
-  pub voice_channel_timeout_seconds: u64,
+  pub voice_channel_timeout: Duration,
 }
 
 #[derive(Debug)]
