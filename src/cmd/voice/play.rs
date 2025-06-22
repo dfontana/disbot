@@ -92,7 +92,7 @@ async fn wrapped_handle(
 
       // Register an event handler to listen for the duration of the call
       DisconnectEventHandler::register(
-        play.config.voice_channel_timeout_seconds,
+        play.config.voice_channel_timeout.as_secs(),
         play.disconnect.clone(),
         &handler_lock,
       )
