@@ -21,6 +21,7 @@ use std::sync::Arc;
 use tracing::error;
 
 mod arg_util;
+mod chat_mode;
 pub mod check_in;
 mod dice_roll;
 pub mod poll;
@@ -87,6 +88,10 @@ impl Handler {
       listeners: vec![
         Box::new(shrug::ShrugHandler::new(config.clone(), emoji.clone())),
         Box::new(reddit_prev::RedditPreviewHandler::new(http.clone())),
+        Box::new(chat_mode::ChatModeHandler::new(
+          &config,
+          persistence.clone(),
+        )),
       ],
       app_interactors: vec![
         Box::new(poll::Poll::new(emoji.clone(), poll_handle.clone())),
