@@ -37,6 +37,7 @@ fn render_error_response(error: &str, persistence: &Arc<PersistentStore>) -> Htm
     None,
     checkin_configs,
     active_polls,
+    Vec::new(),
   ))
 }
 
@@ -64,6 +65,7 @@ pub async fn get_admin(
     success,
     checkin_configs,
     active_polls,
+    Vec::new(),
   )))
 }
 
@@ -129,11 +131,14 @@ fn parse_form_data(params: HashMap<String, String>) -> Result<FormData, String> 
   let voice_channel_timeout =
     parse_duration(voice_channel_timeout_str).map_err(|_| "Invalid timeout value")?;
 
+  let chat_mode_enabled = params.contains_key("chat_mode_enabled");
+
   Ok(FormData {
     emote_name,
     emote_users,
     log_level,
     voice_channel_timeout,
+    chat_mode_enabled,
   })
 }
 

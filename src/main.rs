@@ -4,6 +4,7 @@ extern crate regex;
 extern crate reqwest;
 
 mod actor;
+mod claude_client;
 mod cmd;
 mod config;
 mod docker;
