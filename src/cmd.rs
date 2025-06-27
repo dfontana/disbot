@@ -4,9 +4,10 @@ use self::{
   poll::{PollActor, PollMessage},
 };
 use crate::{
-  actor::ActorHandle, chat_client::AnyClient, config::Config, docker::DockerClient,
-  emoji::EmojiLookup, persistence::PersistentStore, shutdown::ShutdownCoordinator,
+  actor::ActorHandle, config::Config, docker::DockerClient, emoji::EmojiLookup,
+  persistence::PersistentStore, shutdown::ShutdownCoordinator,
 };
+use chat_mode::LocalClient;
 use itertools::Itertools;
 use reqwest::Client;
 use serenity::{
@@ -21,7 +22,7 @@ use std::sync::Arc;
 use tracing::error;
 
 mod arg_util;
-mod chat_mode;
+pub mod chat_mode;
 pub mod check_in;
 mod dice_roll;
 pub mod poll;
@@ -69,7 +70,7 @@ impl Handler {
     docker: Box<dyn DockerClient>,
     persistence: Arc<PersistentStore>,
     shutdown: &mut ShutdownCoordinator,
-    chat_client: AnyClient,
+    chat_client: LocalClient,
   ) -> Self {
     let poll_handle =
       ActorHandle::<PollMessage>::spawn(|r, h| PollActor::new(r, h, persistence.clone()), shutdown);

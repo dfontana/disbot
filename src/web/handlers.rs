@@ -31,13 +31,14 @@ fn render_error_response(error: &str, persistence: &Arc<PersistentStore>) -> Htm
     .into_iter()
     .map(|(_, p)| p)
     .collect();
+  let chat_sessions = persistence.sessions().load_all().unwrap_or_default();
   Html(templates::render_admin_page(
     &config,
     Some(error),
     None,
     checkin_configs,
     active_polls,
-    Vec::new(),
+    chat_sessions,
   ))
 }
 
@@ -58,6 +59,7 @@ pub async fn get_admin(
     .into_iter()
     .map(|(_, p)| p)
     .collect();
+  let chat_sessions = persistence.sessions().load_all().unwrap_or_default();
 
   Ok(Html(templates::render_admin_page(
     &config,
@@ -65,7 +67,7 @@ pub async fn get_admin(
     success,
     checkin_configs,
     active_polls,
-    Vec::new(),
+    chat_sessions,
   )))
 }
 
