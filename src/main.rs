@@ -4,18 +4,21 @@ extern crate regex;
 extern crate reqwest;
 
 mod actor;
+mod chat_client;
 mod claude_client;
 mod cmd;
 mod config;
 mod docker;
 mod emoji;
 mod env;
+mod local_client;
 mod logging;
 mod persistence;
 mod shutdown;
 mod web;
 
-use clap::Parser;
+use chat_client::create_chat_client;
+use clap::{Parser, ValueEnum};
 use cmd::Handler;
 use config::Config;
 use env::Environment;
@@ -47,6 +50,12 @@ impl std::str::FromStr for WebBindAddress {
   }
 }
 
+#[derive(ValueEnum, Clone, Debug)]
+pub enum ChatClientType {
+  Claude,
+  Local,
+}
+
 #[derive(Parser)]
 #[command(name = "disbot")]
 #[command(about = "Discord bot with admin web interface")]
@@ -66,6 +75,10 @@ struct Cli {
   /// Web server bind address (IP address, "lan" for LAN IP, or "0.0.0.0" for all interfaces)
   #[arg(long, default_value = "0.0.0.0")]
   web_bind_address: WebBindAddress,
+
+  /// Chat client backend to use
+  #[arg(long, value_enum, default_value = "claude")]
+  chat_client: ChatClientType,
 }
 
 pub struct HttpClient;
@@ -101,6 +114,15 @@ async fn main() -> Result<(), anyhow::Error> {
   // Persistence restoration happens in the ready event handler where actor handles are available
   let persistence = Arc::new(PersistentStore::new(&config.db_path)?);
 
+  // Create chat client based on CLI flag
+  let chat_client = match create_chat_client(cli.chat_client, &config, persistence.clone()).await {
+    Ok(client) => client,
+    Err(e) => {
+      error!("Failed to create chat client: {}", e);
+      std::process::exit(1);
+    }
+  };
+
   let emoji = emoji::EmojiLookup::new(&config);
   let http = reqwest::Client::new();
 
@@ -122,6 +144,7 @@ async fn main() -> Result<(), anyhow::Error> {
     docker::create_docker_client(),
     persistence.clone(),
     &mut shutdown,
+    chat_client,
   ))
   .application_id(config.app_id.into())
   .await?;
