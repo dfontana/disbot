@@ -1,8 +1,4 @@
-use crate::{
-  claude_client::{ClaudeClient, ConversationId},
-  config::Config,
-  persistence::PersistentStore,
-};
+use crate::{chat_client::AnyClient, claude_client::ConversationId, config::Config};
 use serenity::{async_trait, model::channel::Message, prelude::Context};
 use std::sync::Arc;
 use tokio::sync::Mutex;
@@ -11,16 +7,14 @@ use tracing::{error, info, instrument, warn};
 use super::MessageListener;
 
 pub struct ChatModeHandler {
-  claude_client: Arc<Mutex<ClaudeClient>>,
+  chat_client: Arc<Mutex<AnyClient>>,
 }
 
 impl ChatModeHandler {
-  pub fn new(config: &Config, persistence: Arc<PersistentStore>) -> Self {
-    let claude_client = Arc::new(Mutex::new(ClaudeClient::new(config, persistence).expect(
-      "Failed to create Claude client - check configuration and Claude CLI availability",
-    )));
-
-    Self { claude_client }
+  pub fn new(chat_client: AnyClient) -> Self {
+    Self {
+      chat_client: Arc::new(Mutex::new(chat_client)),
+    }
   }
 
   fn extract_user_message(&self, ctx: &Context, msg: &Message) -> Option<String> {
@@ -172,9 +166,9 @@ impl MessageListener for ChatModeHandler {
       warn!("Failed to send typing indicator: {}", e);
     }
 
-    // Process with Claude using Discord conversation history
+    // Process with chat client using Discord conversation history
     let response = {
-      let mut client = self.claude_client.lock().await;
+      let mut client = self.chat_client.lock().await;
 
       match client
         .send_message_with_discord_history(&conversation_key, &discord_history, &user_message)
@@ -182,7 +176,7 @@ impl MessageListener for ChatModeHandler {
       {
         Ok(response) => response,
         Err(e) => {
-          error!("Failed to get response from Claude: {}", e);
+          error!("Failed to get response from chat client: {}", e);
           "Sorry, I encountered an error while processing your message. Please try again later."
             .to_string()
         }

@@ -129,57 +129,18 @@ impl ClaudeClient {
       .or_insert_with(|| ConversationContext::new(conversation_key.clone()))
   }
 
-  pub async fn send_message(
-    &mut self,
-    conversation_key: &ConversationId,
-    user_message: &str,
-  ) -> Result<String> {
-    // First, get the context and add the user message
-    {
-      let context = self.get_or_create_conversation(conversation_key);
-      context.add_message("user", user_message);
-    }
-
-    // Clone the context data for the Claude call to avoid borrowing issues
-    let context_data = {
-      let context = self.get_or_create_conversation(conversation_key);
-      context.clone()
-    };
-
-    let response = self.call_claude_cli(&context_data).await?;
-
-    // Finally, add the assistant response
-    {
-      let context = self.get_or_create_conversation(conversation_key);
-      let result = response.result.as_ref().unwrap(); // Safe due to validation above
-      context.add_message("assistant", result);
-    }
-
-    // Save the updated conversation to persistence
-    self.save_conversation_to_persistence(conversation_key);
-
-    Ok(response.result.unwrap()) // Safe due to validation above
-  }
-
   pub async fn send_message_with_discord_history(
     &mut self,
     conversation_key: &ConversationId,
     discord_messages: &[(String, String)], // (author_name, content) pairs
     current_user_message: &str,
   ) -> Result<String> {
-    // If no Discord history, use the simple send_message method
-    if discord_messages.is_empty() {
-      return self
-        .send_message(conversation_key, current_user_message)
-        .await;
-    }
-
     // Get or create conversation context and initialize with Discord history if new
     {
       let context = self.get_or_create_conversation(conversation_key);
 
-      // If this is a new conversation, initialize it with Discord history
-      if context.messages.is_empty() {
+      // If this is a new conversation and we have Discord history, initialize it
+      if !discord_messages.is_empty() && context.messages.is_empty() {
         for (author_name, content) in discord_messages {
           if author_name.starts_with("bot:") {
             context.add_message("assistant", content);

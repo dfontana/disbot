@@ -4,8 +4,8 @@ use self::{
   poll::{PollActor, PollMessage},
 };
 use crate::{
-  actor::ActorHandle, config::Config, docker::DockerClient, emoji::EmojiLookup,
-  persistence::PersistentStore, shutdown::ShutdownCoordinator,
+  actor::ActorHandle, chat_client::AnyClient, config::Config, docker::DockerClient,
+  emoji::EmojiLookup, persistence::PersistentStore, shutdown::ShutdownCoordinator,
 };
 use itertools::Itertools;
 use reqwest::Client;
@@ -69,6 +69,7 @@ impl Handler {
     docker: Box<dyn DockerClient>,
     persistence: Arc<PersistentStore>,
     shutdown: &mut ShutdownCoordinator,
+    chat_client: AnyClient,
   ) -> Self {
     let poll_handle =
       ActorHandle::<PollMessage>::spawn(|r, h| PollActor::new(r, h, persistence.clone()), shutdown);
@@ -88,10 +89,7 @@ impl Handler {
       listeners: vec![
         Box::new(shrug::ShrugHandler::new(config.clone(), emoji.clone())),
         Box::new(reddit_prev::RedditPreviewHandler::new(http.clone())),
-        Box::new(chat_mode::ChatModeHandler::new(
-          &config,
-          persistence.clone(),
-        )),
+        Box::new(chat_mode::ChatModeHandler::new(chat_client)),
       ],
       app_interactors: vec![
         Box::new(poll::Poll::new(emoji.clone(), poll_handle.clone())),
