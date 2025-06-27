@@ -1,12 +1,15 @@
 use crate::{
-  claude_client::ConversationContext,
-  cmd::check_in::{time_until, CheckInCtx},
-  cmd::poll::pollstate::PollState,
+  cmd::{
+    chat_mode::LocalSessionContext,
+    check_in::{time_until, CheckInCtx},
+    poll::pollstate::PollState,
+  },
   config::Config,
 };
 use chrono::{DateTime, NaiveDateTime, TimeZone, Utc};
 use chrono_tz::America;
 use humantime::format_duration;
+use kalosm::language::ChatSession;
 use std::time::Duration;
 
 // Helper function to format duration in a user-friendly way (without microseconds)
@@ -61,7 +64,7 @@ pub fn render_admin_page(
   success: Option<&str>,
   checkin_configs: Vec<(u64, CheckInCtx)>,
   active_polls: Vec<PollState>,
-  chat_conversations: Vec<(String, ConversationContext)>,
+  chat_sessions: Vec<(String, LocalSessionContext)>,
 ) -> String {
   let api_key_display = if config.api_key.is_empty() {
     ""
@@ -205,23 +208,20 @@ pub fn render_admin_page(
       .join("")
   };
 
-  // Generate Chat Conversations table data
-  let chat_conversations_table_rows = if chat_conversations.is_empty() {
-    r#"<tr><td colspan="4" class="no-data">No active chat conversations found</td></tr>"#
-      .to_string()
+  // Generate Chat Sessions table data
+  let chat_conversations_table_rows = if chat_sessions.is_empty() {
+    r#"<tr><td colspan="4" class="no-data">No active chat sessions found</td></tr>"#.to_string()
   } else {
-    chat_conversations
+    chat_sessions
       .iter()
       .map(|(key, context)| {
-        let conversation_key_display = truncate_id(key, 12);
-        let message_count = context.messages.len();
+        let session_size = context.session.history().len();
 
         // Calculate expiration time
         let timeout_duration = config.chat_mode_conversation_timeout;
         let expiration_time =
           context.last_activity + chrono::Duration::from_std(timeout_duration).unwrap_or_default();
         let now = chrono::Utc::now();
-
         let (expiration_display, time_remaining) = if expiration_time > now {
           let remaining = (expiration_time - now).to_std().unwrap_or_default();
           let remaining_formatted = format_duration_clean(remaining);
@@ -237,9 +237,9 @@ pub fn render_admin_page(
             <td>{}</td>
             <td>{}</td>
           </tr>"#,
-          html_escape(key),                       // Full key in tooltip
-          html_escape(&conversation_key_display), // Truncated display
-          message_count,
+          html_escape(key),
+          html_escape(key),
+          html_escape(&session_size.to_string()),
           html_escape(&time_remaining),
           html_escape(&expiration_display)
         )
