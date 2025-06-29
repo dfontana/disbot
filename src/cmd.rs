@@ -70,7 +70,7 @@ impl Handler {
     docker: Box<dyn DockerClient>,
     persistence: Arc<PersistentStore>,
     shutdown: &mut ShutdownCoordinator,
-    chat_client: LocalClient,
+    chat_client: Arc<tokio::sync::Mutex<LocalClient>>,
   ) -> Self {
     let poll_handle =
       ActorHandle::<PollMessage>::spawn(|r, h| PollActor::new(r, h, persistence.clone()), shutdown);

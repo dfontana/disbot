@@ -3,22 +3,16 @@ mod local_client;
 use super::MessageListener;
 use crate::config::Config;
 use anyhow::anyhow;
+use derive_new::new;
 pub use local_client::*;
 use serenity::{async_trait, model::channel::Message, prelude::Context};
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use tracing::{error, info, instrument, warn};
 
+#[derive(new)]
 pub struct ChatModeHandler {
   chat_client: Arc<Mutex<LocalClient>>,
-}
-
-impl ChatModeHandler {
-  pub fn new(chat_client: LocalClient) -> Self {
-    Self {
-      chat_client: Arc::new(Mutex::new(chat_client)),
-    }
-  }
 }
 
 fn extract_user_message(ctx: &Context, msg: &Message) -> Option<String> {
