@@ -106,4 +106,33 @@ impl<K: Eq + Hash + Clone, V: Expiring> Cache<K, V> {
       },
     }
   }
+
+  pub fn len(&self) -> Result<usize, String> {
+    match self.cache.read() {
+      Err(e) => Err(format!("Failed to acquire lock - {}", e)),
+      Ok(lock) => Ok(lock.len()),
+    }
+  }
+
+  pub fn keys(&self) -> Result<Vec<K>, String> {
+    match self.cache.read() {
+      Err(e) => Err(format!("Failed to acquire lock - {}", e)),
+      Ok(lock) => Ok(lock.keys().cloned().collect()),
+    }
+  }
+
+  pub fn iter<F, R>(&self, apply: F) -> Result<Vec<R>, String>
+  where
+    F: Fn(&K, &V) -> R,
+  {
+    match self.cache.read() {
+      Err(e) => Err(format!("Failed to acquire lock - {}", e)),
+      Ok(lock) => Ok(
+        lock
+          .iter()
+          .map(|(k, timestamped)| apply(k, &timestamped.val))
+          .collect(),
+      ),
+    }
+  }
 }

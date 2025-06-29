@@ -18,6 +18,7 @@ use serenity::{
   prelude::*,
 };
 use std::sync::Arc;
+use tokio_util::sync::CancellationToken;
 use tracing::error;
 
 mod arg_util;
@@ -67,17 +68,24 @@ impl Handler {
     http: Client,
     docker: Box<dyn DockerClient>,
     persistence: Arc<PersistentStore>,
+    shutdown_token: CancellationToken,
   ) -> Self {
-    let poll_handle =
-      ActorHandle::<PollMessage>::spawn(|r, h| PollActor::new(r, h, persistence.clone()));
-    let chk_handle = ActorHandle::<CheckInMessage>::spawn(|r, h| {
-      Box::new(CheckInActor::new(
-        h,
-        r,
-        poll_handle.clone(),
-        persistence.clone(),
-      ))
-    });
+    let poll_handle = ActorHandle::<PollMessage>::spawn_with_shutdown(
+      |r, h| PollActor::new(r, h, persistence.clone(), shutdown_token.clone()),
+      shutdown_token.clone(),
+    );
+
+    let chk_handle = ActorHandle::<CheckInMessage>::spawn_with_shutdown(
+      |r, h| {
+        Box::new(CheckInActor::new(
+          h,
+          r,
+          poll_handle.clone(),
+          persistence.clone(),
+        ))
+      },
+      shutdown_token.clone(),
+    );
     Handler {
       listeners: vec![
         Box::new(shrug::ShrugHandler::new(config.clone(), emoji.clone())),

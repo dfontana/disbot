@@ -11,6 +11,7 @@ mod emoji;
 mod env;
 mod logging;
 mod persistence;
+mod shutdown;
 mod web;
 
 use clap::Parser;
@@ -22,6 +23,7 @@ use serenity::{
   client::Client,
   prelude::{GatewayIntents, TypeMapKey},
 };
+use shutdown::ShutdownCoordinator;
 use songbird::SerenityInit;
 use std::sync::Arc;
 use std::{path::PathBuf, str::FromStr};
@@ -97,6 +99,33 @@ async fn main() -> Result<(), anyhow::Error> {
   // Persistence restoration happens in the ready event handler where actor handles are available
   let persistence = Arc::new(PersistentStore::new(&config.db_path)?);
 
+  // Create shutdown coordinator
+  let mut shutdown_coordinator = ShutdownCoordinator::new();
+  let shutdown_token = shutdown_coordinator.token();
+
+  // Create local chat client
+  let chat_client = LocalClient::new(&config, persistence.clone(), shutdown_token.clone()).await?;
+
+  // Create a wrapper for the shutdown hook since LocalClient is not Clone
+  struct LocalClientShutdownHook {
+    persistence: Arc<PersistentStore>,
+  }
+
+  #[async_trait::async_trait]
+  impl shutdown::ShutdownHook for LocalClientShutdownHook {
+    async fn shutdown(&self) -> anyhow::Result<()> {
+      info!("Shutting down LocalClient via shutdown hook");
+      // The actual LocalClient shutdown happens in the Discord client shutdown
+      // This is just a placeholder for any additional cleanup needed
+      Ok(())
+    }
+  }
+
+  // Register the shutdown hook
+  shutdown_coordinator.register_hook(Arc::new(LocalClientShutdownHook {
+    persistence: persistence.clone(),
+  }));
+
   let emoji = emoji::EmojiLookup::new(&config);
   let http = reqwest::Client::new();
 
@@ -117,6 +146,7 @@ async fn main() -> Result<(), anyhow::Error> {
     http,
     docker::create_docker_client(),
     persistence.clone(),
+    shutdown_token.clone(),
   ))
   .application_id(config.app_id.into())
   .await?;
@@ -127,8 +157,10 @@ async fn main() -> Result<(), anyhow::Error> {
     persistence.clone(),
     cli.web_bind_address,
     cli.port,
+    Some(shutdown_token.clone()),
   );
   let discord_client = client.start();
+  let shutdown_listener = shutdown_coordinator.wait_for_shutdown();
 
   tokio::select! {
     result = web_server => {
@@ -141,6 +173,11 @@ async fn main() -> Result<(), anyhow::Error> {
         error!("Failed to start Discord Client: {:?}", why);
       }
     }
+    _ = shutdown_listener => {
+      info!("Shutdown signal received, stopping services");
+    }
   };
+
+  info!("Application shutdown complete");
   Ok(())
 }
