@@ -15,7 +15,7 @@ use std::{
 use tracing::{info, instrument, warn};
 use uuid::Uuid;
 
-use crate::cmd::{arg_util::Args, check_in::CheckInCtx};
+use crate::cmd::{arg_util::Args, check_in::CheckInCtx, poll::NAME};
 
 use super::cache::Expiring;
 
@@ -126,7 +126,7 @@ impl PollState {
     })
   }
 
-  #[instrument(name = "PollState", level = "INFO", skip(self))]
+  #[instrument(name = NAME, level = "INFO", skip(self))]
   pub fn update_vote(&mut self, votes: &[String], voter: &String) {
     info!("Casting vote");
     for (option, (_, count, voters)) in self.votes.iter_mut() {

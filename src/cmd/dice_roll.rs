@@ -25,7 +25,7 @@ pub struct DiceRoll {
 
 #[async_trait]
 impl AppInteractor for DiceRoll {
-  #[instrument(name = "Roll", level = "INFO", skip(self))]
+  #[instrument(name = NAME, level = "INFO", skip(self))]
   fn commands(&self) -> Vec<CreateCommand> {
     vec![CreateCommand::new(NAME)
       .description("Roll a die, optionally between the given bounds")
@@ -44,7 +44,7 @@ impl AppInteractor for DiceRoll {
       )]
   }
 
-  #[instrument(name = "Roll", level = "INFO", skip(self, ctx, itx))]
+  #[instrument(name = NAME, level = "INFO", skip(self, ctx, itx))]
   async fn app_interact(&self, ctx: &Context, itx: &CommandInteraction) {
     let mut err = false;
     if let Err(e) = self._handle_app(ctx, itx).await {

@@ -9,6 +9,7 @@ mod stop;
 use self::connect_util::{DisconnectActor, DisconnectMessage};
 use super::arg_util::Args;
 use super::{AppInteractor, SubCommandHandler};
+use crate::shutdown::ShutdownCoordinator;
 use crate::{actor::ActorHandle, config::Config, emoji::EmojiLookup};
 use list::*;
 use play::*;
@@ -35,9 +36,9 @@ pub struct Voice {
 }
 
 impl Voice {
-  pub fn new(config: Config, emoji: EmojiLookup) -> Self {
+  pub fn new(config: Config, emoji: EmojiLookup, shutdown: &mut ShutdownCoordinator) -> Self {
     let disconnect =
-      ActorHandle::<DisconnectMessage>::spawn(|r, _| Box::new(DisconnectActor::new(r)));
+      ActorHandle::<DisconnectMessage>::spawn(|r, _| Box::new(DisconnectActor::new(r)), shutdown);
     Self {
       play: Play::new(config, emoji.clone(), disconnect.clone()),
       stop: Stop::new(disconnect),

@@ -1,7 +1,8 @@
 use crate::{
   actor::{Actor, ActorHandle},
-  cmd::poll::PollMessage,
+  cmd::{check_in::NAME, poll::PollMessage},
   persistence::PersistentStore,
+  shutdown::ShutdownHook,
 };
 use async_trait::async_trait;
 use chrono::{DateTime, NaiveDateTime, NaiveTime, TimeZone, Utc};
@@ -67,9 +68,11 @@ impl CheckInActor {
   }
 }
 
+impl ShutdownHook for CheckInActor {}
+
 #[async_trait]
 impl Actor<CheckInMessage> for CheckInActor {
-  #[instrument(name = "CheckIn", level = "INFO", skip(self, msg))]
+  #[instrument(name = NAME, level = "INFO", skip(self, msg))]
   async fn handle_msg(&mut self, msg: CheckInMessage) {
     match msg {
       CheckInMessage::SetPoll(ctx) => {

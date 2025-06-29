@@ -1,25 +1,27 @@
 use anyhow::Result;
 use async_trait::async_trait;
-use std::sync::Arc;
-use tokio::signal;
+use serenity::futures::future;
+use tokio::{signal, task::JoinHandle};
 use tokio_util::sync::CancellationToken;
-use tracing::{error, info};
+use tracing::{error, info, instrument};
 
 #[async_trait]
 pub trait ShutdownHook: Send + Sync {
-  async fn shutdown(&self) -> Result<()>;
+  async fn shutdown(&self) -> Result<()> {
+    Ok(())
+  }
 }
 
 pub struct ShutdownCoordinator {
   token: CancellationToken,
-  hooks: Vec<Arc<dyn ShutdownHook>>,
+  tasks: Vec<JoinHandle<()>>,
 }
 
 impl ShutdownCoordinator {
   pub fn new() -> Self {
     Self {
       token: CancellationToken::new(),
-      hooks: Vec::new(),
+      tasks: Vec::new(),
     }
   }
 
@@ -27,11 +29,12 @@ impl ShutdownCoordinator {
     self.token.clone()
   }
 
-  pub fn register_hook(&mut self, hook: Arc<dyn ShutdownHook>) {
-    self.hooks.push(hook);
+  pub fn register_task(&mut self, task: JoinHandle<()>) {
+    self.tasks.push(task);
   }
 
-  pub async fn wait_for_shutdown(&self) {
+  #[instrument(name = "Shutdown", level = "INFO", skip(self))]
+  pub async fn wait_for_shutdown(self) {
     #[cfg(unix)]
     {
       let mut sigint = signal::unix::signal(signal::unix::SignalKind::interrupt())
@@ -64,33 +67,16 @@ impl ShutdownCoordinator {
       }
     }
 
-    self.trigger_shutdown().await;
-  }
-
-  pub async fn trigger_shutdown(&self) {
     info!("Starting graceful shutdown sequence");
 
-    // Cancel the token to signal all tasks to shutdown
+    // Cancel the token to signal all tasks to shutdown and wait for them to do so
     self.token.cancel();
-
-    // Execute all shutdown hooks
-    for (i, hook) in self.hooks.iter().enumerate() {
-      match hook.shutdown().await {
-        Ok(_) => info!("Shutdown hook {} completed successfully", i),
-        Err(e) => error!("Shutdown hook {} failed: {}", i, e),
+    for res in future::join_all(self.tasks).await {
+      if let Err(e) = res {
+        error!("Shutdown hook failed: {}", e);
       }
     }
 
     info!("Graceful shutdown sequence completed");
-  }
-
-  pub fn shutdown_signal(&self) -> CancellationToken {
-    self.token.clone()
-  }
-}
-
-impl Default for ShutdownCoordinator {
-  fn default() -> Self {
-    Self::new()
   }
 }

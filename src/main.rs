@@ -100,31 +100,7 @@ async fn main() -> Result<(), anyhow::Error> {
   let persistence = Arc::new(PersistentStore::new(&config.db_path)?);
 
   // Create shutdown coordinator
-  let mut shutdown_coordinator = ShutdownCoordinator::new();
-  let shutdown_token = shutdown_coordinator.token();
-
-  // Create local chat client
-  let chat_client = LocalClient::new(&config, persistence.clone(), shutdown_token.clone()).await?;
-
-  // Create a wrapper for the shutdown hook since LocalClient is not Clone
-  struct LocalClientShutdownHook {
-    persistence: Arc<PersistentStore>,
-  }
-
-  #[async_trait::async_trait]
-  impl shutdown::ShutdownHook for LocalClientShutdownHook {
-    async fn shutdown(&self) -> anyhow::Result<()> {
-      info!("Shutting down LocalClient via shutdown hook");
-      // The actual LocalClient shutdown happens in the Discord client shutdown
-      // This is just a placeholder for any additional cleanup needed
-      Ok(())
-    }
-  }
-
-  // Register the shutdown hook
-  shutdown_coordinator.register_hook(Arc::new(LocalClientShutdownHook {
-    persistence: persistence.clone(),
-  }));
+  let mut shutdown = ShutdownCoordinator::new();
 
   let emoji = emoji::EmojiLookup::new(&config);
   let http = reqwest::Client::new();
@@ -146,7 +122,7 @@ async fn main() -> Result<(), anyhow::Error> {
     http,
     docker::create_docker_client(),
     persistence.clone(),
-    shutdown_token.clone(),
+    &mut shutdown,
   ))
   .application_id(config.app_id.into())
   .await?;
@@ -157,10 +133,10 @@ async fn main() -> Result<(), anyhow::Error> {
     persistence.clone(),
     cli.web_bind_address,
     cli.port,
-    Some(shutdown_token.clone()),
+    shutdown.token(),
   );
   let discord_client = client.start();
-  let shutdown_listener = shutdown_coordinator.wait_for_shutdown();
+  let shutdown_listener = shutdown.wait_for_shutdown();
 
   tokio::select! {
     result = web_server => {

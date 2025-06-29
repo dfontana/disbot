@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use serenity::{
   all::{ChannelId, ComponentInteraction, ComponentInteractionDataKind},
@@ -7,13 +7,14 @@ use serenity::{
 };
 use std::{sync::Arc, time::SystemTime};
 use tokio::sync::mpsc::Receiver;
-use tokio_util::sync::CancellationToken;
-use tracing::{error, info, warn};
+use tracing::{error, info, instrument, warn};
 use uuid::Uuid;
 
 use crate::{
   actor::{Actor, ActorHandle},
+  cmd::poll::NAME,
   persistence::PersistentStore,
+  shutdown::ShutdownHook,
 };
 
 use super::{cache::Cache, messages, pollstate::PollState};
@@ -31,7 +32,6 @@ pub struct PollActor {
   receiver: Receiver<PollMessage>,
   states: Cache<Uuid, PollState>,
   persistence: Arc<PersistentStore>,
-  shutdown_token: CancellationToken,
 }
 
 impl PollActor {
@@ -39,14 +39,12 @@ impl PollActor {
     receiver: Receiver<PollMessage>,
     self_ref: ActorHandle<PollMessage>,
     persistence: Arc<PersistentStore>,
-    shutdown_token: CancellationToken,
   ) -> Box<Self> {
     Box::new(Self {
       self_ref,
       receiver,
       states: Cache::new(),
       persistence,
-      shutdown_token,
     })
   }
 }
@@ -57,6 +55,7 @@ impl Actor<PollMessage> for PollActor {
     &mut self.receiver
   }
 
+  #[instrument(name=NAME, level="INFO", skip(self, msg))]
   async fn handle_msg(&mut self, msg: PollMessage) {
     match msg {
       PollMessage::CreatePoll(boxed_data) => {
@@ -76,7 +75,7 @@ impl Actor<PollMessage> for PollActor {
 
         if let Err(e) = messages::send_poll_message(&ps, &itx)
           .await
-          .map_err(|e| format!("{}", e))
+          .map_err(|e| anyhow!("{}", e))
           .and_then(|_| self.states.insert(ps.id, ps))
         {
           error!("Failed to launch poll {}", e);
@@ -128,7 +127,7 @@ impl Actor<PollMessage> for PollActor {
           .contains_key(&id)
           .and_then(|ext| match ext {
             true => Ok(()),
-            false => Err(format!("Poll expired, dead interaction: {}", id)),
+            false => Err(anyhow!("Poll expired, dead interaction: {}", id)),
           })
           .and_then(|_| {
             self
@@ -220,38 +219,19 @@ impl Actor<PollMessage> for PollActor {
       }
     }
   }
+}
 
-  async fn shutdown(&mut self) -> Result<()> {
-    let poll_count = self.states.len().unwrap_or(0);
-    info!(
-      "Shutting down PollActor - saving {} active polls",
-      poll_count
-    );
-
-    // Get all active poll IDs and save each one to persistence
-    match self.states.keys() {
-      Ok(poll_ids) => {
-        for poll_id in poll_ids {
-          if let Err(e) = self.states.invoke(&poll_id, |poll| {
-            if let Err(save_err) = self.persistence.polls().save(&poll.id, poll) {
-              error!(
-                "Failed to save poll {} during shutdown: {}",
-                poll.id, save_err
-              );
-            } else {
-              info!("Saved poll {} to persistence during shutdown", poll.id);
-            }
-          }) {
-            error!("Failed to access poll {} during shutdown: {}", poll_id, e);
-          }
-        }
+#[async_trait]
+impl ShutdownHook for PollActor {
+  #[instrument(name=NAME, level="INFO", skip(self))]
+  async fn shutdown(&self) -> Result<()> {
+    info!("Shutting down");
+    self.states.iter(|id, poll| {
+      if let Err(e) = self.persistence.polls().save(id, poll) {
+        error!("Failed to save poll {} during shutdown: {}", id, e)
       }
-      Err(e) => {
-        error!("Failed to get poll keys during shutdown: {}", e);
-      }
-    }
-
-    info!("PollActor shutdown completed");
+    })?;
+    info!("Shutdown complete");
     Ok(())
   }
 }

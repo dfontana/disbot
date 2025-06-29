@@ -27,8 +27,8 @@ pub async fn start_server(
   persistence: Arc<PersistentStore>,
   bind_address: WebBindAddress,
   port: u16,
-  shutdown_token: Option<CancellationToken>,
-) -> Result<(), Box<dyn std::error::Error>> {
+  token: CancellationToken,
+) -> Result<(), anyhow::Error> {
   let app = create_router(config_path, persistence);
 
   // Resolve bind address
@@ -43,20 +43,11 @@ pub async fn start_server(
     resolved_address, port
   );
 
-  let server = axum::serve(listener, app);
-
-  match shutdown_token {
-    Some(token) => {
-      let server_with_shutdown = server.with_graceful_shutdown(async move {
-        token.cancelled().await;
-        info!("Web server shutdown signal received");
-      });
-      server_with_shutdown.await?;
-    }
-    None => {
-      server.await?;
-    }
-  }
-
+  axum::serve(listener, app)
+    .with_graceful_shutdown(async move {
+      token.cancelled().await;
+      info!("Web server shutdown signal received");
+    })
+    .await?;
   Ok(())
 }

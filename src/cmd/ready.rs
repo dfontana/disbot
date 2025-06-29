@@ -11,7 +11,7 @@ pub struct ReadyHandler {
 }
 
 impl ReadyHandler {
-  #[instrument(name = "Ready", level = "INFO", skip(self, ready))]
+  #[instrument(name = "ready", level = "INFO", skip(self, ready))]
   pub async fn ready(&self, ctx: &Context, ready: &Ready) {
     info!("{} is connected!", ready.user.name);
 
