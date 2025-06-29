@@ -4,6 +4,8 @@ pub mod templates;
 use crate::{persistence::PersistentStore, WebBindAddress};
 use axum::{routing::get, Extension, Router};
 use std::sync::Arc;
+use tokio_util::sync::CancellationToken;
+use tracing::info;
 
 pub fn create_router(config_path: String, persistence: Arc<PersistentStore>) -> Router {
   Router::new()
@@ -25,7 +27,8 @@ pub async fn start_server(
   persistence: Arc<PersistentStore>,
   bind_address: WebBindAddress,
   port: u16,
-) -> Result<(), Box<dyn std::error::Error>> {
+  token: CancellationToken,
+) -> Result<(), anyhow::Error> {
   let app = create_router(config_path, persistence);
 
   // Resolve bind address
@@ -40,6 +43,11 @@ pub async fn start_server(
     resolved_address, port
   );
 
-  axum::serve(listener, app).await?;
+  axum::serve(listener, app)
+    .with_graceful_shutdown(async move {
+      token.cancelled().await;
+      info!("Web server shutdown signal received");
+    })
+    .await?;
   Ok(())
 }

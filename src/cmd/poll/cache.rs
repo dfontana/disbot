@@ -1,3 +1,4 @@
+use anyhow::anyhow;
 use std::{
   collections::HashMap,
   hash::Hash,
@@ -38,16 +39,16 @@ impl<K: Eq + Hash + Clone, V: Expiring> Cache<K, V> {
     }
   }
 
-  pub fn contains_key(&self, key: &K) -> Result<bool, String> {
+  pub fn contains_key(&self, key: &K) -> Result<bool, anyhow::Error> {
     match self.cache.read() {
-      Err(e) => Err(format!("Failed to aquire lock - {}", e)),
+      Err(e) => Err(anyhow!("Failed to aquire lock - {}", e)),
       Ok(lock) => Ok(lock.contains_key(key)),
     }
   }
 
-  pub fn insert(&self, key: K, value: V) -> Result<(), String> {
+  pub fn insert(&self, key: K, value: V) -> Result<(), anyhow::Error> {
     match self.cache.write() {
-      Err(e) => Err(format!("Failed to aquire lock - {}", e)),
+      Err(e) => Err(anyhow!("Failed to aquire lock - {}", e)),
       Ok(mut lock) => {
         let exp = &value.duration().clone();
         lock.insert(key, Timestamped::new(value));
@@ -68,9 +69,9 @@ impl<K: Eq + Hash + Clone, V: Expiring> Cache<K, V> {
     }
   }
 
-  pub fn remove(&self, key: &K) -> Result<(), String> {
+  pub fn remove(&self, key: &K) -> Result<(), anyhow::Error> {
     match self.cache.write() {
-      Err(e) => Err(format!("Failed to aquire lock - {}", e)),
+      Err(e) => Err(anyhow!("Failed to aquire lock - {}", e)),
       Ok(mut lock) => {
         lock.remove(key);
         Ok(())
@@ -78,32 +79,47 @@ impl<K: Eq + Hash + Clone, V: Expiring> Cache<K, V> {
     }
   }
 
-  pub fn invoke<F, T>(&self, id: &K, apply: F) -> Result<T, String>
+  pub fn invoke<F, T>(&self, id: &K, apply: F) -> Result<T, anyhow::Error>
   where
     F: FnOnce(&V) -> T,
   {
     match self.cache.read() {
-      Err(e) => Err(format!("Failed to aquire lock - {}", e)),
+      Err(e) => Err(anyhow!("Failed to aquire lock - {}", e)),
       Ok(lock) => match lock.get(id) {
-        None => Err("Key does not exist in cache to invoke".into()),
+        None => Err(anyhow!("Key does not exist in cache to invoke")),
         Some(v) => Ok(apply(&v.val)),
       },
     }
   }
 
-  pub fn invoke_mut<F>(&self, key: &K, mut apply: F) -> Result<(), String>
+  pub fn invoke_mut<F>(&self, key: &K, mut apply: F) -> Result<(), anyhow::Error>
   where
     F: FnMut(&mut V),
   {
     match self.cache.write() {
-      Err(e) => Err(format!("Failed to aquire lock - {}", e)),
+      Err(e) => Err(anyhow!("Failed to aquire lock - {}", e)),
       Ok(mut lock) => match lock.get_mut(key) {
-        None => Err("Key does not exist in cache to invoke".into()),
+        None => Err(anyhow!("Key does not exist in cache to invoke")),
         Some(v) => {
           apply(&mut v.val);
           Ok(())
         }
       },
+    }
+  }
+
+  pub fn iter<F, R>(&self, apply: F) -> Result<Vec<R>, anyhow::Error>
+  where
+    F: Fn(&K, &V) -> R,
+  {
+    match self.cache.read() {
+      Err(e) => Err(anyhow!("Failed to acquire lock - {}", e)),
+      Ok(lock) => Ok(
+        lock
+          .iter()
+          .map(|(k, timestamped)| apply(k, &timestamped.val))
+          .collect(),
+      ),
     }
   }
 }

@@ -19,7 +19,7 @@ use std::error::Error;
 use tracing::{error, instrument, warn};
 use uuid::Uuid;
 
-const NAME: &str = "poll";
+pub const NAME: &str = "poll";
 
 #[derive(new)]
 pub struct Poll {
@@ -29,7 +29,7 @@ pub struct Poll {
 
 #[async_trait]
 impl AppInteractor for Poll {
-  #[instrument(name = "Poller", level = "INFO", skip(self))]
+  #[instrument(name = NAME, level = "INFO", skip(self))]
   fn commands(&self) -> Vec<CreateCommand> {
     let mut command = CreateCommand::new(NAME)
       .description("Create a Poll with up to 9 Options")
@@ -74,7 +74,7 @@ impl AppInteractor for Poll {
     vec![command]
   }
 
-  #[instrument(name = "Poller", level = "INFO", skip(self, ctx, itx))]
+  #[instrument(name = NAME, level = "INFO", skip(self, ctx, itx))]
   async fn app_interact(&self, ctx: &Context, itx: &CommandInteraction) {
     if !itx.data.name.as_str().eq(NAME) {
       return;
@@ -90,7 +90,7 @@ impl AppInteractor for Poll {
     }
   }
 
-  #[instrument(name = "Poller", level = "INFO", skip(self, ctx, itx))]
+  #[instrument(name = NAME, level = "INFO", skip(self, ctx, itx))]
   async fn msg_interact(&self, ctx: &Context, itx: &ComponentInteraction) {
     let mut err = false;
     if let Err(e) = self._handle_msg(ctx, itx).await {

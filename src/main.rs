@@ -11,6 +11,7 @@ mod emoji;
 mod env;
 mod logging;
 mod persistence;
+mod shutdown;
 mod web;
 
 use clap::Parser;
@@ -22,6 +23,7 @@ use serenity::{
   client::Client,
   prelude::{GatewayIntents, TypeMapKey},
 };
+use shutdown::ShutdownCoordinator;
 use songbird::SerenityInit;
 use std::sync::Arc;
 use std::{path::PathBuf, str::FromStr};
@@ -73,6 +75,7 @@ impl TypeMapKey for HttpClient {
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
   logging::initalize_logging();
+  let mut shutdown = ShutdownCoordinator::new();
 
   // Parse CLI arguments with clap
   let cli = Cli::parse();
@@ -117,6 +120,7 @@ async fn main() -> Result<(), anyhow::Error> {
     http,
     docker::create_docker_client(),
     persistence.clone(),
+    &mut shutdown,
   ))
   .application_id(config.app_id.into())
   .await?;
@@ -127,8 +131,10 @@ async fn main() -> Result<(), anyhow::Error> {
     persistence.clone(),
     cli.web_bind_address,
     cli.port,
+    shutdown.token(),
   );
   let discord_client = client.start();
+  let shutdown_listener = shutdown.wait_for_shutdown();
 
   tokio::select! {
     result = web_server => {
@@ -141,6 +147,11 @@ async fn main() -> Result<(), anyhow::Error> {
         error!("Failed to start Discord Client: {:?}", why);
       }
     }
+    _ = shutdown_listener => {
+      info!("Shutdown signal received, stopping services");
+    }
   };
+
+  info!("Application shutdown complete");
   Ok(())
 }

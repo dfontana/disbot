@@ -11,7 +11,10 @@ use std::{sync::Arc, time::Duration};
 use tokio::sync::mpsc::Receiver;
 use tracing::{info, instrument};
 
-use crate::actor::{Actor, ActorHandle};
+use crate::{
+  actor::{Actor, ActorHandle},
+  shutdown::ShutdownHook,
+};
 
 #[derive(Clone)]
 pub enum DisconnectMessage {
@@ -33,6 +36,8 @@ pub struct DisconnectActor {
   in_progress_count: usize,
   disconnect_details: Mutex<Option<DisconnectDetails>>,
 }
+
+impl ShutdownHook for DisconnectActor {}
 
 #[async_trait]
 impl Actor<DisconnectMessage> for DisconnectActor {

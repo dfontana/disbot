@@ -5,7 +5,7 @@ use self::{
 };
 use crate::{
   actor::ActorHandle, config::Config, docker::DockerClient, emoji::EmojiLookup,
-  persistence::PersistentStore,
+  persistence::PersistentStore, shutdown::ShutdownCoordinator,
 };
 use itertools::Itertools;
 use reqwest::Client;
@@ -67,17 +67,22 @@ impl Handler {
     http: Client,
     docker: Box<dyn DockerClient>,
     persistence: Arc<PersistentStore>,
+    shutdown: &mut ShutdownCoordinator,
   ) -> Self {
     let poll_handle =
-      ActorHandle::<PollMessage>::spawn(|r, h| PollActor::new(r, h, persistence.clone()));
-    let chk_handle = ActorHandle::<CheckInMessage>::spawn(|r, h| {
-      Box::new(CheckInActor::new(
-        h,
-        r,
-        poll_handle.clone(),
-        persistence.clone(),
-      ))
-    });
+      ActorHandle::<PollMessage>::spawn(|r, h| PollActor::new(r, h, persistence.clone()), shutdown);
+
+    let chk_handle = ActorHandle::<CheckInMessage>::spawn(
+      |r, h| {
+        Box::new(CheckInActor::new(
+          h,
+          r,
+          poll_handle.clone(),
+          persistence.clone(),
+        ))
+      },
+      shutdown,
+    );
     Handler {
       listeners: vec![
         Box::new(shrug::ShrugHandler::new(config.clone(), emoji.clone())),
@@ -87,7 +92,7 @@ impl Handler {
         Box::new(poll::Poll::new(emoji.clone(), poll_handle.clone())),
         Box::new(check_in::CheckIn::new(emoji.clone(), chk_handle.clone())),
         Box::new(dice_roll::DiceRoll::new(emoji.clone())),
-        Box::new(voice::Voice::new(config, emoji.clone())),
+        Box::new(voice::Voice::new(config, emoji.clone(), shutdown)),
         Box::new(server::GameServers::new(emoji, http, docker)),
       ],
       ready: ready::ReadyHandler::new(poll_handle, chk_handle),

@@ -1,3 +1,4 @@
+use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use serenity::{
   all::{ChannelId, ComponentInteraction, ComponentInteractionDataKind},
@@ -6,12 +7,14 @@ use serenity::{
 };
 use std::{sync::Arc, time::SystemTime};
 use tokio::sync::mpsc::Receiver;
-use tracing::{error, info, warn};
+use tracing::{error, info, instrument, warn};
 use uuid::Uuid;
 
 use crate::{
   actor::{Actor, ActorHandle},
+  cmd::poll::NAME,
   persistence::PersistentStore,
+  shutdown::ShutdownHook,
 };
 
 use super::{cache::Cache, messages, pollstate::PollState};
@@ -52,6 +55,7 @@ impl Actor<PollMessage> for PollActor {
     &mut self.receiver
   }
 
+  #[instrument(name=NAME, level="INFO", skip(self, msg))]
   async fn handle_msg(&mut self, msg: PollMessage) {
     match msg {
       PollMessage::CreatePoll(boxed_data) => {
@@ -60,13 +64,18 @@ impl Actor<PollMessage> for PollActor {
         let exp_key = ps.id;
 
         // Save to persistence first
+        // TODO: This is the only time a poll is saved to disk, so any votes captured
+        //    between the time the poll was made and expired would be lost on restore.
+        //    (Verify this in dev server and then consider a fix). You likely want
+        //    to support a shutdown hook so things like polls and chat sessions
+        //    (and other handlers) can persist their state
         if let Err(e) = self.persistence.polls().save(&ps.id, &ps) {
           error!("Failed to persist poll {}: {}", ps.id, e);
         }
 
         if let Err(e) = messages::send_poll_message(&ps, &itx)
           .await
-          .map_err(|e| format!("{}", e))
+          .map_err(|e| anyhow!("{}", e))
           .and_then(|_| self.states.insert(ps.id, ps))
         {
           error!("Failed to launch poll {}", e);
@@ -118,7 +127,7 @@ impl Actor<PollMessage> for PollActor {
           .contains_key(&id)
           .and_then(|ext| match ext {
             true => Ok(()),
-            false => Err(format!("Poll expired, dead interaction: {}", id)),
+            false => Err(anyhow!("Poll expired, dead interaction: {}", id)),
           })
           .and_then(|_| {
             self
@@ -209,5 +218,20 @@ impl Actor<PollMessage> for PollActor {
         }
       }
     }
+  }
+}
+
+#[async_trait]
+impl ShutdownHook for PollActor {
+  #[instrument(name=NAME, level="INFO", skip(self))]
+  async fn shutdown(&self) -> Result<()> {
+    info!("Shutting down");
+    self.states.iter(|id, poll| {
+      if let Err(e) = self.persistence.polls().save(id, poll) {
+        error!("Failed to save poll {} during shutdown: {}", id, e)
+      }
+    })?;
+    info!("Shutdown complete");
+    Ok(())
   }
 }

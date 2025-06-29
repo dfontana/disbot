@@ -21,7 +21,7 @@ use serenity::{
 use std::time::Duration;
 use tracing::{error, instrument};
 
-const NAME: &str = "check-in";
+pub const NAME: &str = "check-in";
 
 #[derive(new)]
 pub struct CheckIn {
@@ -31,7 +31,7 @@ pub struct CheckIn {
 
 #[async_trait]
 impl AppInteractor for CheckIn {
-  #[instrument(name = "CheckIn", level = "INFO", skip(self))]
+  #[instrument(name = NAME, level = "INFO", skip(self))]
   fn commands(&self) -> Vec<CreateCommand> {
     vec![CreateCommand::new(NAME)
       .description("Create a Check In for this Channel")
@@ -58,7 +58,7 @@ impl AppInteractor for CheckIn {
       )]
   }
 
-  #[instrument(name = "CheckIn", level = "INFO", skip(self, ctx, itx))]
+  #[instrument(name = NAME, level = "INFO", skip(self, ctx, itx))]
   async fn app_interact(&self, ctx: &Context, itx: &CommandInteraction) {
     if !itx.data.name.as_str().eq(NAME) {
       return;
