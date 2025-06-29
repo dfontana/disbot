@@ -18,6 +18,7 @@ use serenity::{
   prelude::*,
 };
 use std::sync::Arc;
+use tracing::error;
 
 mod arg_util;
 pub mod check_in;
@@ -31,7 +32,7 @@ mod voice;
 
 #[async_trait]
 trait MessageListener: Send + Sync {
-  async fn message(&self, ctx: &Context, msg: &Message);
+  async fn message(&self, ctx: &Context, msg: &Message) -> Result<(), anyhow::Error>;
 }
 
 #[async_trait]
@@ -97,7 +98,12 @@ impl Handler {
 #[async_trait]
 impl EventHandler for Handler {
   async fn message(&self, ctx: Context, msg: Message) {
-    future::join_all(self.listeners.iter().map(|f| f.message(&ctx, &msg))).await;
+    let results = future::join_all(self.listeners.iter().map(|f| f.message(&ctx, &msg))).await;
+    for res in results {
+      if let Err(e) = res {
+        error!("{}", e);
+      }
+    }
   }
 
   async fn ready(&self, ctx: Context, rdy: Ready) {

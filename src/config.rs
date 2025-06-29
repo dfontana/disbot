@@ -1,3 +1,4 @@
+use anyhow::bail;
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use tracing::{info, warn};
@@ -39,10 +40,7 @@ impl Default for Config {
 }
 
 impl Config {
-  pub fn from_toml<P: AsRef<Path>>(
-    path: P,
-    env: Environment,
-  ) -> Result<Config, Box<dyn std::error::Error>> {
+  pub fn from_toml<P: AsRef<Path>>(path: P, env: Environment) -> Result<Config, anyhow::Error> {
     let path_ref = path.as_ref();
 
     // If file doesn't exist, generate it with defaults
@@ -66,11 +64,10 @@ impl Config {
       };
 
       default_config.to_toml(path_ref)?;
-      info!(
+      bail!(
         "Generated {} - please edit this file with your bot credentials and restart.",
         path_ref.display()
       );
-      std::process::exit(0);
     }
 
     // Load existing file
@@ -80,7 +77,7 @@ impl Config {
     Ok(config)
   }
 
-  pub fn to_toml<P: AsRef<Path>>(&self, path: P) -> Result<(), Box<dyn std::error::Error>> {
+  pub fn to_toml<P: AsRef<Path>>(&self, path: P) -> Result<(), anyhow::Error> {
     let toml_string = toml::to_string_pretty(self)?;
     fs::write(path, toml_string)?;
     Ok(())

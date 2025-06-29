@@ -110,7 +110,7 @@ impl TypeMapKey for HttpClient {
 }
 
 #[tokio::main]
-async fn main() {
+async fn main() -> Result<(), anyhow::Error> {
   initalize_logging();
 
   // Parse CLI arguments with clap
@@ -124,22 +124,10 @@ async fn main() {
 
   // Load configuration from TOML file
   info!("Loading configuration from {}", final_config_path);
-  let config = match Config::from_toml(&final_config_path, cli.environment) {
-    Ok(config) => {
-      // Update global instance
-      if let Ok(mut inst) = Config::global_instance().write() {
-        *inst = config.clone();
-      }
-      config
-    }
-    Err(e) => {
-      error!(
-        "Error loading configuration from {}: {}",
-        final_config_path, e
-      );
-      std::process::exit(1);
-    }
-  };
+  let config = Config::from_toml(&final_config_path, cli.environment)?;
+  if let Ok(mut inst) = Config::global_instance().write() {
+    *inst = config.clone();
+  }
 
   // Upgrade logger after bootstrap
   if let Err(e) = set_log_level(Level::from_str(&config.log_level).unwrap()) {
@@ -151,13 +139,8 @@ async fn main() {
   }
 
   // Initialize persistence store
-  let persistence = match PersistentStore::new(&config.db_path) {
-    Ok(store) => Arc::new(store),
-    Err(e) => {
-      error!("Failed to initialize persistence store: {}", e);
-      std::process::exit(1);
-    }
-  };
+  // Persistence restoration happens in the ready event handler where actor handles are available
+  let persistence = Arc::new(PersistentStore::new(&config.db_path)?);
 
   let emoji = emoji::EmojiLookup::new(&config);
   let http = reqwest::Client::new();
@@ -181,13 +164,7 @@ async fn main() {
     persistence.clone(),
   ))
   .application_id(config.app_id.into())
-  .await
-  .unwrap_or_else(|e| {
-    error!("Error creating Discord client: {:?}", e);
-    std::process::exit(1);
-  });
-
-  // Persistence restoration happens in the ready event handler where actor handles are available
+  .await?;
 
   // Start web server and Discord client concurrently
   let web_server = web::start_server(
@@ -209,5 +186,6 @@ async fn main() {
         error!("Failed to start Discord Client: {:?}", why);
       }
     }
-  }
+  };
+  Ok(())
 }
