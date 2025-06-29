@@ -162,6 +162,7 @@ impl Actor<PollMessage> for PollActor {
               // Restore the Http client that was skipped during serialization
               poll.ctx.http = http.clone();
 
+              // TODO: Should utilize the expiration feature of persistence to flush old data out on restore
               // Check if poll has expired using checked duration calculation
               let elapsed = SystemTime::now()
                 .duration_since(poll.created_at)
