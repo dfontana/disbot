@@ -9,32 +9,23 @@ mod config;
 mod docker;
 mod emoji;
 mod env;
+mod logging;
 mod persistence;
 mod web;
 
-use std::{path::PathBuf, str::FromStr, sync::Mutex};
-
 use clap::Parser;
-use once_cell::sync::Lazy;
+use cmd::Handler;
+use config::Config;
+use env::Environment;
+use persistence::PersistentStore;
 use serenity::{
   client::Client,
   prelude::{GatewayIntents, TypeMapKey},
 };
 use songbird::SerenityInit;
-use tracing::{error, info, Level};
-use tracing_subscriber::{
-  filter::LevelFilter,
-  fmt::Layer,
-  prelude::*,
-  reload::{self, Handle},
-  Registry,
-};
-
-use cmd::Handler;
-use config::Config;
-use env::Environment;
-use persistence::PersistentStore;
 use std::sync::Arc;
+use std::{path::PathBuf, str::FromStr};
+use tracing::{error, info, Level};
 
 #[derive(Debug, Clone)]
 pub enum WebBindAddress {
@@ -74,36 +65,6 @@ struct Cli {
   web_bind_address: WebBindAddress,
 }
 
-// Global handle for runtime log level changes
-static LOG_RELOAD_HANDLE: Lazy<Mutex<Option<Handle<LevelFilter, Registry>>>> =
-  Lazy::new(|| Mutex::new(None));
-
-pub fn set_log_level(level: Level) -> Result<(), String> {
-  let handle_guard = LOG_RELOAD_HANDLE
-    .lock()
-    .map_err(|e| format!("Lock error: {}", e))?;
-  if let Some(handle) = handle_guard.as_ref() {
-    handle
-      .modify(|filter| *filter = LevelFilter::from_level(level))
-      .map_err(|e| format!("Failed to update log level: {}", e))?;
-    Ok(())
-  } else {
-    Err("Log reload handle not initialized".to_string())
-  }
-}
-
-fn initalize_logging() {
-  let (filter, reload_handle) = reload::Layer::new(LevelFilter::from_level(Level::INFO));
-  {
-    let mut handle_guard = LOG_RELOAD_HANDLE.lock().unwrap();
-    *handle_guard = Some(reload_handle);
-  }
-  tracing_subscriber::Registry::default()
-    .with(filter)
-    .with(Layer::default().with_target(false))
-    .init();
-}
-
 pub struct HttpClient;
 impl TypeMapKey for HttpClient {
   type Value = reqwest::Client;
@@ -111,7 +72,7 @@ impl TypeMapKey for HttpClient {
 
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
-  initalize_logging();
+  logging::initalize_logging();
 
   // Parse CLI arguments with clap
   let cli = Cli::parse();
@@ -130,13 +91,7 @@ async fn main() -> Result<(), anyhow::Error> {
   }
 
   // Upgrade logger after bootstrap
-  if let Err(e) = set_log_level(Level::from_str(&config.log_level).unwrap()) {
-    error!(
-      "Failed to update logger level from config {}: {}",
-      &config.log_level, e
-    );
-    std::process::exit(1);
-  }
+  logging::set_log_level(Level::from_str(&config.log_level)?)?;
 
   // Initialize persistence store
   // Persistence restoration happens in the ready event handler where actor handles are available

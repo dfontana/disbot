@@ -3,7 +3,7 @@ use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use tracing::{info, warn};
 
-use crate::Environment;
+use crate::{logging, Environment};
 use std::sync::RwLock;
 use std::time::Duration;
 use std::{fs, path::Path};
@@ -110,7 +110,7 @@ impl Config {
         .log_level
         .parse::<tracing::Level>()
         .map_err(|_| ())
-        .and_then(|level| crate::set_log_level(level).map_err(|_| ()))
+        .and_then(|level| logging::set_log_level(level).map_err(|_| ()))
         .unwrap_or_else(|_| warn!("Failed to update runtime log level"));
     }
 
