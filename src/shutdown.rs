@@ -40,7 +40,8 @@ impl ShutdownCoordinator {
   }
 
   #[instrument(name = "shutdown", level = "INFO", skip(self))]
-  pub async fn wait_for_shutdown(self) {
+  pub async fn wait_for_shutdown(self) -> Result<(), anyhow::Error> {
+    // Note: This function needs to return something for tokio-select block to trigger
     info!("Waiting for shutdown signals");
     let mut sigint =
       unix::signal(SignalKind::interrupt()).expect("Failed to install SIGINT handler");
@@ -62,5 +63,6 @@ impl ShutdownCoordinator {
       }
     }
     info!("Shutdown sequence complete");
+    Ok(())
   }
 }

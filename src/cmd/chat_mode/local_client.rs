@@ -1,5 +1,7 @@
+use crate::shutdown::ShutdownHook;
 use crate::{config::Config, persistence::PersistentStore};
 use anyhow::{anyhow, Result};
+use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use kalosm::language::*;
 use serde::{Deserialize, Serialize};
@@ -74,10 +76,11 @@ pub struct LocalClient {
   llm: Llama,
 }
 
+const NAME: &str = "local-llm";
 const SYSTEM_PROMPT: &str = "You are a silly, chatty cat with sometimes snarky responses. Always respond in 3 sentences or less.";
 
 impl LocalClient {
-  #[instrument(name = "LocalClient", level = "INFO", skip(config, persistence))]
+  #[instrument(name = NAME, level = "INFO", skip(config, persistence))]
   pub async fn new(config: &Config, persistence: Arc<PersistentStore>) -> Result<Self> {
     // Initialize the LLM model (TODO: This takes 4 seconds)
     info!("Initializing local LLM model...");
@@ -99,20 +102,16 @@ impl LocalClient {
 
     info!("Loaded {} local sessions from persistence", sessions.len());
 
-    let mut client = Self {
+    Ok(Self {
       sessions,
       conversation_timeout: config.chat_mode_conversation_timeout,
       persistence,
       chat_mode_enabled: config.chat_mode_enabled,
       llm,
-    };
-
-    // Clean up any expired sessions from persistence
-    client.cleanup_expired_sessions();
-
-    Ok(client)
+    })
   }
 
+  #[instrument(name = NAME, level = "INFO", skip(self))]
   pub async fn add_message(
     &mut self,
     id: &ConversationId,
@@ -148,7 +147,7 @@ impl LocalClient {
       .await
       .map_err(|e| anyhow!("Failed to get response from local LLM: {}", e))?;
 
-    // Update session state and save
+    // Update session state
     let session = chat.session().map_err(|e| anyhow!("{}", e))?;
     self
       .sessions
@@ -156,46 +155,20 @@ impl LocalClient {
       .and_modify(|c| c.update_session(session.clone()))
       .or_insert_with(|| LocalSessionContext::new(id.clone(), session.clone()));
 
-    // TODO: This would be better done on a shutdown hook
-    self.save_session_to_persistence(id);
-
-    // TODO: This would be better done in an async task
-    //   Eg: Maybe you should schedule a timeout task that removes from memory on create && restore on init like polls
-    //   then you just have to expire on load (like polls) and avoid paying this cost each msg sent
-    self.cleanup_expired_sessions();
     Ok(response)
   }
+}
 
-  fn save_session_to_persistence(&self, conversation_key: &ConversationId) {
-    if let Some(context) = self.sessions.get(conversation_key) {
-      if let Err(e) = self.persistence.sessions().save(conversation_key, context) {
-        error!(
-          "Failed to save local session {} to persistence: {}",
-          conversation_key, e
-        );
+#[async_trait]
+impl ShutdownHook for LocalClient {
+  #[instrument(name=NAME, level="INFO", skip(self))]
+  async fn shutdown(&self) -> Result<(), anyhow::Error> {
+    info!("Starting shutdown");
+    for (id, ctx) in self.sessions.iter() {
+      if let Err(e) = self.persistence.sessions().save(id, ctx) {
+        error!("Failed to save local session {} to persistence: {}", id, e);
       }
     }
-  }
-
-  fn cleanup_expired_sessions(&mut self) {
-    // Clean up memory first
-    let expired_keys: Vec<ConversationId> = self
-      .sessions
-      .iter()
-      .filter_map(|(key, context)| {
-        if context.is_expired(self.conversation_timeout) {
-          Some(key.clone())
-        } else {
-          None
-        }
-      })
-      .collect();
-
-    for key in &expired_keys {
-      self.sessions.remove(key);
-    }
-
-    // Also clean up expired sessions from persistence
     if let Err(e) = self
       .persistence
       .sessions()
@@ -206,5 +179,7 @@ impl LocalClient {
         e
       );
     }
+    info!("Shutdown complete");
+    Ok(())
   }
 }
