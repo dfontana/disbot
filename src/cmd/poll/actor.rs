@@ -65,6 +65,11 @@ impl Actor<PollMessage> for PollActor {
         let exp_key = ps.id;
 
         // Save to persistence first
+        // TODO: This is the only time a poll is saved to disk, so any votes captured
+        //    between the time the poll was made and expired would be lost on restore.
+        //    (Verify this in dev server and then consider a fix). You likely want
+        //    to support a shutdown hook so things like polls and chat sessions
+        //    (and other handlers) can persist their state
         if let Err(e) = self.persistence.polls().save(&ps.id, &ps) {
           error!("Failed to persist poll {}: {}", ps.id, e);
         }
