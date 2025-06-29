@@ -1,11 +1,11 @@
 use anyhow::bail;
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
+use std::time::Duration;
 use tracing::{info, warn};
 
 use crate::{logging, Environment};
 use std::sync::RwLock;
-use std::time::Duration;
 use std::{fs, path::Path};
 
 static INSTANCE: Lazy<RwLock<Config>> = Lazy::new(|| RwLock::new(Config::default()));
@@ -22,6 +22,10 @@ pub struct Config {
   #[serde(with = "humantime_serde")]
   pub voice_channel_timeout: Duration,
   pub db_path: String,
+  #[serde(with = "humantime_serde")]
+  pub chat_mode_conversation_timeout: Duration,
+  pub chat_mode_max_messages_per_conversation: usize,
+  pub chat_mode_enabled: bool,
 }
 
 impl Default for Config {
@@ -35,6 +39,9 @@ impl Default for Config {
       log_level: "INFO".to_string(),
       voice_channel_timeout: Duration::from_secs(600),
       db_path: "disbot.db".to_string(),
+      chat_mode_conversation_timeout: Duration::from_secs(30 * 60),
+      chat_mode_max_messages_per_conversation: 50,
+      chat_mode_enabled: true,
     }
   }
 }
@@ -115,6 +122,7 @@ impl Config {
     }
 
     self.voice_channel_timeout = form_data.voice_channel_timeout;
+    self.chat_mode_enabled = form_data.chat_mode_enabled;
 
     Ok(())
   }
@@ -168,6 +176,7 @@ pub struct FormData {
   pub emote_users: String,
   pub log_level: String,
   pub voice_channel_timeout: Duration,
+  pub chat_mode_enabled: bool,
 }
 
 #[derive(Debug)]

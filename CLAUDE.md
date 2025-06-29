@@ -116,3 +116,7 @@ Custom actor implementation in `src/actor/mod.rs` handles asynchronous state man
 ### Docker Game Server Support
 
 The bot manages game servers via Docker containers with configurations in `docker/minecraft/` and `docker/valheim/`. Server control requires Docker TCP API access over port 2375 and SSH access for power management commands.
+
+### GitHub Pull Request Utilities
+
+- When asked to fetch pull review comments, use the `pr-comments` zsh function. This wraps the gh cli and returns a json
