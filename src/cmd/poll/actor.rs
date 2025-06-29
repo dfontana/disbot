@@ -60,7 +60,7 @@ impl Actor<PollMessage> for PollActor {
         let exp_key = ps.id;
 
         // Save to persistence first
-        if let Err(e) = self.persistence.save_poll(&ps.id, &ps) {
+        if let Err(e) = self.persistence.polls().save(&ps.id, &ps) {
           error!("Failed to persist poll {}: {}", ps.id, e);
         }
 
@@ -97,7 +97,7 @@ impl Actor<PollMessage> for PollActor {
           warn!("Failed to reap poll on exp: {}", e);
         }
 
-        if let Err(e) = self.persistence.remove_poll(&id) {
+        if let Err(e) = self.persistence.polls().remove(&id) {
           error!(
             "Failed to remove expired poll {} from persistence: {}",
             id, e
@@ -128,7 +128,7 @@ impl Actor<PollMessage> for PollActor {
           .and_then(|_| {
             if let Err(e) = self
               .states
-              .invoke(&id, |p| self.persistence.save_poll(&p.id, p))
+              .invoke(&id, |p| self.persistence.polls().save(&p.id, p))
             {
               warn!("Failed to persist vote update for poll {}: {}", id, e);
             }
@@ -156,9 +156,9 @@ impl Actor<PollMessage> for PollActor {
         }
       }
       PollMessage::RestorePolls(http) => {
-        match self.persistence.load_all_polls() {
+        match self.persistence.polls().load_all() {
           Ok(polls) => {
-            for mut poll in polls {
+            for (_, mut poll) in polls {
               // Restore the Http client that was skipped during serialization
               poll.ctx.http = http.clone();
 
@@ -167,7 +167,7 @@ impl Actor<PollMessage> for PollActor {
                 .duration_since(poll.created_at)
                 .unwrap_or(poll.duration);
               if elapsed >= poll.duration {
-                if let Err(e) = self.persistence.remove_poll(&poll.id) {
+                if let Err(e) = self.persistence.polls().remove(&poll.id) {
                   warn!("Failed to clean up expired poll from persistence: {}", e);
                 }
                 continue;
@@ -177,7 +177,7 @@ impl Actor<PollMessage> for PollActor {
               let poll_id = poll.id;
               if let Err(e) = self.states.insert(poll.id, poll.clone()) {
                 error!("Failed to restore poll {} to cache: {}", poll_id, e);
-                if let Err(cleanup_err) = self.persistence.remove_poll(&poll_id) {
+                if let Err(cleanup_err) = self.persistence.polls().remove(&poll_id) {
                   error!(
                     "Failed to clean up unrestorable poll {} from persistence: {}",
                     poll_id, cleanup_err

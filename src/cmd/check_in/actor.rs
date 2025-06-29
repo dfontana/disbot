@@ -83,7 +83,7 @@ impl Actor<CheckInMessage> for CheckInActor {
         }
 
         // Persist the check-in configuration using the guild_id from context
-        if let Err(e) = self.persistence.save_checkin_config(ctx.guild_id, &ctx) {
+        if let Err(e) = self.persistence.check_ins().save(&ctx.guild_id, &ctx) {
           error!(
             "Failed to persist check-in configuration for guild {}: {}",
             ctx.guild_id, e
@@ -129,7 +129,7 @@ impl Actor<CheckInMessage> for CheckInActor {
           .await;
       }
       CheckInMessage::RestoreConfig(guild_id, http) => {
-        match self.persistence.load_checkin_config(guild_id) {
+        match self.persistence.check_ins().load(&guild_id) {
           Ok(Some(mut config)) => {
             // Restore the Http client that was skipped during serialization
             config.http = http;
