@@ -1,4 +1,5 @@
 use super::MessageListener;
+use anyhow::{anyhow, bail};
 use derive_new::new;
 use once_cell::sync::Lazy;
 use regex::Regex;
@@ -7,7 +8,7 @@ use serde::Deserialize;
 use serenity::utils::MessageBuilder;
 use serenity::{async_trait, model::channel::Message, prelude::Context};
 use std::collections::HashMap;
-use tracing::{error, info, instrument, warn};
+use tracing::{info, instrument};
 
 static REDDIT_LINK: Lazy<Regex> = Lazy::new(|| {
   Regex::new(
@@ -87,7 +88,7 @@ pub struct RedditPreviewHandler {
 }
 
 impl RedditPreviewHandler {
-  async fn get_api_details(&self, entity: &str) -> Result<Content, Box<dyn std::error::Error>> {
+  async fn get_api_details(&self, entity: &str) -> Result<Content, anyhow::Error> {
     let mut req: RedditApi = self
       .http
       .get(format!(
@@ -104,7 +105,7 @@ impl RedditPreviewHandler {
       .children
       .drain(0..1)
       .next()
-      .ok_or::<String>("No data from the Reddit API".into())?;
+      .ok_or(anyhow!("No data from the Reddit API"))?;
 
     match kind {
       RedditKind::T1(comm) => {
@@ -182,17 +183,17 @@ fn cap_as_map(inp: &str) -> Option<HashMap<&str, &str>> {
 #[async_trait]
 impl MessageListener for RedditPreviewHandler {
   #[instrument(name = "RedditPreview", level = "INFO", skip(self, ctx, msg))]
-  async fn message(&self, ctx: &Context, msg: &Message) {
+  async fn message(&self, ctx: &Context, msg: &Message) -> Result<(), anyhow::Error> {
     if msg.author.id == ctx.cache.as_ref().current_user().id {
       info!("Skipping, self message");
-      return;
+      return Ok(());
     }
 
     let cap_dict = match cap_as_map(&msg.content) {
       Some(c) => c,
       None => {
         info!("No reddit link, skipping");
-        return;
+        return Ok(());
       }
     };
 
@@ -202,17 +203,10 @@ impl MessageListener for RedditPreviewHandler {
       Some(commid) => format!("t1_{}", commid),
       None => format!("t3_{}", postid),
     };
-    let content = match self.get_api_details(&entity).await {
-      Ok(v) => v,
-      Err(err) => {
-        warn!("Failed to find fetch reddit data: {}", err);
-        return;
-      }
-    };
-
+    let content = self.get_api_details(&entity).await?;
     if content.ctype.is_empty() || content.ctype == "Video" {
       info!("Skipping non-previewable post");
-      return;
+      return Ok(());
     }
 
     let mut bld = MessageBuilder::new();
@@ -231,8 +225,9 @@ impl MessageListener for RedditPreviewHandler {
     let preview = bld.to_string();
 
     if let Err(err) = msg.channel_id.say(&ctx.http, preview).await {
-      error!("Failed to send preview {:?}", err);
+      bail!("Failed to send preview {:?}", err);
     }
+    Ok(())
   }
 }
 
