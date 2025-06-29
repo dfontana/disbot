@@ -75,6 +75,7 @@ impl TypeMapKey for HttpClient {
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
   logging::initalize_logging();
+  let mut shutdown = ShutdownCoordinator::new();
 
   // Parse CLI arguments with clap
   let cli = Cli::parse();
@@ -98,9 +99,6 @@ async fn main() -> Result<(), anyhow::Error> {
   // Initialize persistence store
   // Persistence restoration happens in the ready event handler where actor handles are available
   let persistence = Arc::new(PersistentStore::new(&config.db_path)?);
-
-  // Create shutdown coordinator
-  let mut shutdown = ShutdownCoordinator::new();
 
   let emoji = emoji::EmojiLookup::new(&config);
   let http = reqwest::Client::new();

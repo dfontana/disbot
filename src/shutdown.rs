@@ -1,7 +1,13 @@
 use anyhow::Result;
 use async_trait::async_trait;
 use serenity::futures::future;
-use tokio::{signal, task::JoinHandle};
+use tokio::{
+  signal::{
+    self,
+    unix::{self, SignalKind},
+  },
+  task::JoinHandle,
+};
 use tokio_util::sync::CancellationToken;
 use tracing::{error, info, instrument};
 
@@ -33,50 +39,28 @@ impl ShutdownCoordinator {
     self.tasks.push(task);
   }
 
-  #[instrument(name = "Shutdown", level = "INFO", skip(self))]
+  #[instrument(name = "shutdown", level = "INFO", skip(self))]
   pub async fn wait_for_shutdown(self) {
-    #[cfg(unix)]
-    {
-      let mut sigint = signal::unix::signal(signal::unix::SignalKind::interrupt())
-        .expect("Failed to install SIGINT handler");
-      let mut sigterm = signal::unix::signal(signal::unix::SignalKind::terminate())
-        .expect("Failed to install SIGTERM handler");
+    info!("Waiting for shutdown signals");
+    let mut sigint =
+      unix::signal(SignalKind::interrupt()).expect("Failed to install SIGINT handler");
+    let mut sigterm =
+      unix::signal(SignalKind::terminate()).expect("Failed to install SIGTERM handler");
 
-      tokio::select! {
-          _ = sigint.recv() => {
-              info!("Received SIGINT, initiating graceful shutdown");
-          }
-          _ = sigterm.recv() => {
-              info!("Received SIGTERM, initiating graceful shutdown");
-          }
-          _ = self.token.cancelled() => {
-              info!("Shutdown requested programmatically");
-          }
-      }
+    tokio::select! {
+        _ = sigint.recv() => {info!("Received SIGINT")}
+        _ = sigterm.recv() => {info!("Received SIGTERM")}
+        _ = signal::ctrl_c() => {info!("Received Ctrl+C")}
+        _ = self.token.cancelled() => {info!("Shutdown requested programmatically")}
     }
 
-    #[cfg(windows)]
-    {
-      tokio::select! {
-          _ = signal::ctrl_c() => {
-              info!("Received Ctrl+C, initiating graceful shutdown");
-          }
-          _ = self.token.cancelled() => {
-              info!("Shutdown requested programmatically");
-          }
-      }
-    }
-
-    info!("Starting graceful shutdown sequence");
-
-    // Cancel the token to signal all tasks to shutdown and wait for them to do so
+    info!("Starting shutdown sequence");
     self.token.cancel();
     for res in future::join_all(self.tasks).await {
       if let Err(e) = res {
         error!("Shutdown hook failed: {}", e);
       }
     }
-
-    info!("Graceful shutdown sequence completed");
+    info!("Shutdown sequence complete");
   }
 }
