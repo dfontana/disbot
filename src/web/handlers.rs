@@ -23,8 +23,14 @@ fn get_config_or_default() -> Config {
 // Helper function to render error response
 fn render_error_response(error: &str, persistence: &Arc<PersistentStore>) -> Html<String> {
   let config = get_config_or_default();
-  let checkin_configs = persistence.load_all_checkin_configs().unwrap_or_default();
-  let active_polls = persistence.load_all_polls().unwrap_or_default();
+  let checkin_configs = persistence.check_ins().load_all().unwrap_or_default();
+  let active_polls = persistence
+    .polls()
+    .load_all()
+    .unwrap_or_default()
+    .into_iter()
+    .map(|(_, p)| p)
+    .collect();
   Html(templates::render_admin_page(
     &config,
     Some(error),
@@ -43,8 +49,14 @@ pub async fn get_admin(
     .get("success")
     .map(|_| "Configuration saved successfully!");
 
-  let checkin_configs = persistence.load_all_checkin_configs().unwrap_or_default();
-  let active_polls = persistence.load_all_polls().unwrap_or_default();
+  let checkin_configs = persistence.check_ins().load_all().unwrap_or_default();
+  let active_polls = persistence
+    .polls()
+    .load_all()
+    .unwrap_or_default()
+    .into_iter()
+    .map(|(_, p)| p)
+    .collect();
 
   Ok(Html(templates::render_admin_page(
     &config,
@@ -144,7 +156,7 @@ pub async fn get_checkin_admin(
 
   let error = params.get("error").map(|e| e.as_str());
 
-  let checkin_configs = match persistence.load_all_checkin_configs() {
+  let checkin_configs = match persistence.check_ins().load_all() {
     Ok(configs) => configs,
     Err(e) => {
       return Ok(Html(templates::render_checkin_admin_page(
@@ -180,7 +192,7 @@ pub async fn post_checkin_admin(
         }
       };
 
-      match persistence.remove_checkin_config(guild_id) {
+      match persistence.check_ins().remove(&guild_id) {
         Ok(_) => Redirect::to("/admin/checkins?success=1").into_response(),
         Err(e) => {
           let error_msg = format!("Failed to delete check-in configuration: {}", e);
