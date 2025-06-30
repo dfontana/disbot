@@ -82,7 +82,7 @@ const SYSTEM_PROMPT: &str = "You are a silly, chatty cat with sometimes snarky r
 impl LocalClient {
   #[instrument(name = NAME, level = "INFO", skip(config, persistence))]
   pub async fn new(config: &Config, persistence: Arc<PersistentStore>) -> Result<Self> {
-    // Initialize the LLM model (TODO: This takes 4 seconds)
+    // Initialize the LLM model
     info!("Initializing local LLM model...");
     let llm = Llama::builder()
       .with_source(LlamaSource::phi_3_5_mini_4k_instruct())
@@ -91,19 +91,19 @@ impl LocalClient {
       .map_err(|e| anyhow!("Failed to initialize LLM model: {}", e))?;
     info!("Local LLM model initialized successfully");
 
-    // TODO: This takes 13 seconds (what!)
+    // TODO: This takes 13 seconds (what!). Turns out serialization is very very slow for this type.
     // Load existing sessions from persistence
-    let sessions: HashMap<ConversationId, LocalSessionContext> = persistence
-      .sessions()
-      .load_all()?
-      .into_iter()
-      .filter(|(_, context)| !context.is_expired(config.chat_mode_conversation_timeout))
-      .collect();
+    // let sessions: HashMap<ConversationId, LocalSessionContext> = persistence
+    //   .sessions()
+    //   .load_all()?
+    //   .into_iter()
+    //   .filter(|(_, context)| !context.is_expired(config.chat_mode_conversation_timeout))
+    //   .collect();
 
-    info!("Loaded {} local sessions from persistence", sessions.len());
+    // info!("Loaded {} local sessions from persistence", sessions.len());
 
     Ok(Self {
-      sessions,
+      sessions: HashMap::new(),
       conversation_timeout: config.chat_mode_conversation_timeout,
       persistence,
       chat_mode_enabled: config.chat_mode_enabled,
@@ -121,7 +121,6 @@ impl LocalClient {
       return Err(anyhow!("Local LLM not available - chat mode is disabled"));
     }
 
-    // TODO: Should I store the chat or the session on the struct?
     let mut chat = self.llm.chat();
 
     // Create or restore chat session
@@ -164,11 +163,12 @@ impl ShutdownHook for LocalClient {
   #[instrument(name=NAME, level="INFO", skip(self))]
   async fn shutdown(&self) -> Result<(), anyhow::Error> {
     info!("Starting shutdown");
-    for (id, ctx) in self.sessions.iter() {
-      if let Err(e) = self.persistence.sessions().save(id, ctx) {
-        error!("Failed to save local session {} to persistence: {}", id, e);
-      }
-    }
+    // TODO: This is superrr slow. Serialization cost is high.
+    // for (id, ctx) in self.sessions.iter() {
+    //   if let Err(e) = self.persistence.sessions().save(id, ctx) {
+    //     error!("Failed to save local session {} to persistence: {}", id, e);
+    //   }
+    // }
     if let Err(e) = self
       .persistence
       .sessions()

@@ -5,7 +5,12 @@ use crate::config::Config;
 use anyhow::anyhow;
 use derive_new::new;
 pub use local_client::*;
-use serenity::{async_trait, model::channel::Message, prelude::Context};
+use serenity::{
+  all::{CacheHttp, CreateMessage, CreateThread},
+  async_trait,
+  model::channel::Message,
+  prelude::Context,
+};
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use tracing::{error, info, instrument, warn};
@@ -28,9 +33,6 @@ fn extract_user_message(ctx: &Context, msg: &Message) -> Option<String> {
     .trim()
     .to_string();
 
-  // TODO: When sent just the word "morp" the bot seems to think it got
-  //    "morpn". Is there a newline that is sneaking through here?
-
   Some(content).filter(|s| !s.is_empty())
 }
 
@@ -44,11 +46,15 @@ impl MessageListener for ChatModeHandler {
     }
 
     // Only process if bot is mentioned
+    // TODO: Actually, this should only be true if the message isn't in a thread that I am part of
+    //       (so need to check the channel id has an active session). This way the bot can just chat back and forth
+    //       naturally
     if !msg.mentions_me(ctx).await.ok().unwrap_or_default() {
       return Ok(());
     }
 
     // Check if chat mode is enabled
+    // TODO: Remove max_messages
     let (chat_mode_enabled, emote_name, max_messages) = {
       let config = Config::global_instance().read().unwrap();
       (
@@ -76,36 +82,48 @@ impl MessageListener for ChatModeHandler {
       msg.author.name
     );
 
-    // Build conversation chain
-    let conversation_messages: Vec<Message> = std::iter::once(msg)
-      .flat_map(|m| m.referenced_message.iter())
-      .map(|m| (**m).clone())
-      // Drop any internal errors in the chain as that doesn't count
-      .filter(|m| !m.content.starts_with("InternalError"))
-      .take(max_messages)
-      .collect::<Vec<_>>()
-      .into_iter()
-      .rev()
-      .collect();
-
-    // Check if we've hit the max conversation limit
-    if conversation_messages.len() >= max_messages {
-      let response = "Max chat length reached, start a new message chain";
-      msg.reply(&ctx.http, response).await?;
-      return Ok(());
-    }
-
-    // Everything is keyed on the first message's Id in the reply chain, which
-    // may be this message
-    // TODO: This appears to be finding a different first message if you:
-    //   1. Mention the bot which makes a new session w/ your messaageId
-    //   2. Stop the server, saving that key as the id
-    //   3. Start the server and continue your reply chain, this creates a new session under the bot's message -- not your first one
-    //      (unclear if it sees the original message or not)
-    let conversation_key: ConversationId = conversation_messages
-      .first()
-      .map(|m| m.id.to_string())
-      .unwrap_or_else(|| msg.id.to_string());
+    // If the message is not in a thread, create a thread && init the session against that thread id
+    // if the message is in a thread, use that session
+    let thread_id = match &msg.thread {
+      // Msg created a thread, reply there
+      Some(thread) => thread.id,
+      None => {
+        // So message is either in thread or out of thread. Check the type.
+        let chan = msg
+          .channel(&ctx.http())
+          .await?
+          .guild()
+          .map(|gc| gc.kind)
+          .unwrap();
+        match chan {
+          serenity::all::ChannelType::PublicThread | serenity::all::ChannelType::PrivateThread => {
+            // In thread, reply there.
+            msg.channel_id
+          }
+          _ => {
+            // Out of thread, create a thread!
+            info!("About to create a channel b/c msg.thread was empty");
+            msg
+              .channel_id
+              .create_thread_from_message(
+                &ctx.http(),
+                msg.id,
+                CreateThread::new(format!(
+                  "{} x {}",
+                  ctx.cache.current_user().name,
+                  msg.author.name
+                ))
+                // TODO: Likely should be customizable/align to the config value
+                .auto_archive_duration(serenity::all::AutoArchiveDuration::OneHour),
+              )
+              .await?
+              .id
+          }
+        }
+      }
+    };
+    info!("Resolved thread {}", thread_id);
+    let conversation_key = thread_id.to_string();
 
     // Format the current message for Claude or default one if the user
     // only mentions the bot with no additional message
@@ -114,7 +132,10 @@ impl MessageListener for ChatModeHandler {
       .unwrap_or_else(|| format!("User {} says: Hello!", msg.author.name));
 
     // Send typing indicator to show the bot is processing
-    if let Err(e) = msg.channel_id.broadcast_typing(&ctx.http).await {
+    if let Err(e) = thread_id.broadcast_typing(&ctx.http).await {
+      // TODO: This only lasts for 5 seconds, which bot can be slower
+      //       can I tokio::select against the add_message await && a 5sec sleep loop?
+      //       Maybe I can just poll every 5 seconds until response hits?
       warn!("Failed to send typing indicator: {}", e);
     }
 
@@ -133,15 +154,12 @@ impl MessageListener for ChatModeHandler {
     };
 
     // Send response back to Discord
-    if let Err(e) = msg.reply(&ctx.http, response).await {
+    if let Err(e) = thread_id
+      .send_message(&ctx.http, CreateMessage::new().content(response))
+      .await
+    {
       error!("Failed to send response: {}", e);
-      let (emote_name, bot_nick) = {
-        let config = Config::global_instance().read().unwrap();
-        (
-          config.emote_name.clone(),
-          ctx.cache.current_user().name.clone(),
-        )
-      };
+      let bot_nick = ctx.cache.current_user().name.clone();
       msg
         .reply(
           &ctx.http,
