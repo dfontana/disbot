@@ -102,11 +102,9 @@ async fn main() -> Result<(), anyhow::Error> {
   let persistence = Arc::new(PersistentStore::new(&config.db_path)?);
 
   // Create local chat client
-  // TODO: Does the client need a mutex or is it safe to do concurrent chats?
   let chat_client = Arc::new(Mutex::new(
     LocalClient::new(&config, persistence.clone()).await?,
   ));
-  // TODO: Move this into new?
   let token = shutdown.token();
   let client_ref = chat_client.clone();
   shutdown.register_task(tokio::spawn(async move {

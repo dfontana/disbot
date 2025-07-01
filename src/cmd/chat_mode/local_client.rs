@@ -40,7 +40,7 @@ mod session_serde {
   where
     D: Deserializer<'de>,
   {
-    let bytes: Vec<u8> = Vec::deserialize(deserializer)?;
+    let bytes = Vec::deserialize(deserializer)?;
     LlamaChatSession::from_bytes(&bytes)
       .map_err(|e| D::Error::custom(format!("Failed to deserialize session: {}", e)))
   }
@@ -91,19 +91,16 @@ impl LocalClient {
       .map_err(|e| anyhow!("Failed to initialize LLM model: {}", e))?;
     info!("Local LLM model initialized successfully");
 
-    // TODO: This takes 13 seconds (what!). Turns out serialization is very very slow for this type.
     // Load existing sessions from persistence
-    // let sessions: HashMap<ConversationId, LocalSessionContext> = persistence
-    //   .sessions()
-    //   .load_all()?
-    //   .into_iter()
-    //   .filter(|(_, context)| !context.is_expired(config.chat_mode_conversation_timeout))
-    //   .collect();
-
-    // info!("Loaded {} local sessions from persistence", sessions.len());
+    let sessions: HashMap<ConversationId, LocalSessionContext> = persistence
+      .sessions()
+      .load_all()?
+      .into_iter()
+      .filter(|(_, context)| !context.is_expired(config.chat_mode_conversation_timeout))
+      .collect();
 
     Ok(Self {
-      sessions: HashMap::new(),
+      sessions,
       conversation_timeout: config.chat_mode_conversation_timeout,
       persistence,
       chat_mode_enabled: config.chat_mode_enabled,
@@ -163,12 +160,11 @@ impl ShutdownHook for LocalClient {
   #[instrument(name=NAME, level="INFO", skip(self))]
   async fn shutdown(&self) -> Result<(), anyhow::Error> {
     info!("Starting shutdown");
-    // TODO: This is superrr slow. Serialization cost is high.
-    // for (id, ctx) in self.sessions.iter() {
-    //   if let Err(e) = self.persistence.sessions().save(id, ctx) {
-    //     error!("Failed to save local session {} to persistence: {}", id, e);
-    //   }
-    // }
+    for (id, ctx) in self.sessions.iter() {
+      if let Err(e) = self.persistence.sessions().save(id, ctx) {
+        error!("Failed to save local session {} to persistence: {}", id, e);
+      }
+    }
     if let Err(e) = self
       .persistence
       .sessions()
