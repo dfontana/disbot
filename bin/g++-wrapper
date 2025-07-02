@@ -1,0 +1,10 @@
+#!/bin/bash
+# Wrapper script to filter out -stdlib=libc++ flag for musl cross-compilation
+# for esaxx-rs C++ compilation
+args=()
+for arg in "$@"; do
+    if [[ "$arg" != "-stdlib=libc++" ]]; then
+        args+=("$arg")
+    fi
+done
+exec x86_64-unknown-linux-musl-g++ "${args[@]}"

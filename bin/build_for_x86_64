@@ -9,6 +9,7 @@ export AR_x86_64_unknown_linux_musl=$TARGET-ar
 export CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_LINKER=$TARGET-gcc
 export CMAKE_TOOLCHAIN_FILE_x86_64_unknown_linux_musl=$(pwd)/bin/x86_64.cmake
 export CMAKE_x86_64_unknown_linux_musl=$(pwd)/bin/cmake-wrapper
+export CXX_x86_64_unknown_linux_musl=$(pwd)/bin/g++-wrapper
 
 # Static linking setup for musl
 export RUSTFLAGS="-C target-feature=+crt-static"
