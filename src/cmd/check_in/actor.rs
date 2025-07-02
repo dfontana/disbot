@@ -23,7 +23,7 @@ pub enum CheckInMessage {
   CheckIn(CheckInCtx),
   Sleep((Duration, CheckInCtx)),
   SetPoll(CheckInCtx),
-  RestoreConfig(u64, Arc<serenity::http::Http>), // guild_id, http
+  RestoreConfig(Arc<serenity::http::Http>),
 }
 
 #[derive(new, Clone, Serialize, Deserialize)]
@@ -131,27 +131,23 @@ impl Actor<CheckInMessage> for CheckInActor {
           .send(CheckInMessage::Sleep((sleep_until, nw_ctx)))
           .await;
       }
-      CheckInMessage::RestoreConfig(guild_id, http) => {
-        match self.persistence.check_ins().load(&guild_id) {
-          Ok(Some(mut config)) => {
-            // Restore the Http client that was skipped during serialization
-            config.http = http;
-            let sleep_until = time_until(Utc::now(), config.poll_time);
-            self
-              .self_ref
-              .send(CheckInMessage::Sleep((sleep_until, config.clone())))
-              .await;
-            info!("Restored check-in configuration for guild {}", guild_id);
-          }
-          Ok(None) => {
-            info!("No check-in configuration found for guild {}", guild_id);
-          }
+      CheckInMessage::RestoreConfig(http) => {
+        let state = match self.persistence.check_ins().load_all() {
+          Ok(v) => v,
           Err(e) => {
-            error!(
-              "Failed to restore check-in configuration for guild {}: {}",
-              guild_id, e
-            );
+            error!("Failed to load check-in state {}", e);
+            return;
           }
+        };
+        for (guild_id, mut config) in state {
+          // Restore the Http client that was skipped during serialization
+          config.http = http.clone();
+          let sleep_until = time_until(Utc::now(), config.poll_time);
+          self
+            .self_ref
+            .send(CheckInMessage::Sleep((sleep_until, config.clone())))
+            .await;
+          info!("Restored check-in configuration for guild {}", guild_id);
         }
       }
     }

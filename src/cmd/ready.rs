@@ -25,14 +25,9 @@ impl ReadyHandler {
       .await;
 
     // Restore check-in
-    for guild_id in ctx.cache.guilds() {
-      self
-        .checkin_handle
-        .send(CheckInMessage::RestoreConfig(
-          guild_id.into(),
-          ctx.http.clone(),
-        ))
-        .await;
-    }
+    self
+      .checkin_handle
+      .send(CheckInMessage::RestoreConfig(ctx.http.clone()))
+      .await;
   }
 }
