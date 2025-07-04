@@ -447,13 +447,7 @@ pub fn render_admin_page(
             margin-top: 2px;
             line-height: 1.3;
         }}
-        
-        .restart-indicator {{
-            color: #dc3545;
-            font-size: 11px;
-            font-weight: 500;
-        }}
-        
+     
         .nav-links {{
             text-align: center;
             margin-bottom: 20px;
@@ -673,7 +667,6 @@ pub fn render_admin_page(
                         <input type="checkbox" id="chat_mode_enabled" name="chat_mode_enabled" {chat_mode_checked} style="margin-right: 8px; width: auto;">
                         <span style="font-size: 14px;">Allow users to @mention the bot for Claude AI conversations</span>
                     </div>
-                    <div class="help-text">Restart required when re-enabling chat mode</div>
                 </div>
             </div>
             

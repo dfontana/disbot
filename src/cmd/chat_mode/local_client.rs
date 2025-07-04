@@ -160,6 +160,7 @@ impl ShutdownHook for LocalClient {
   #[instrument(name=NAME, level="INFO", skip(self))]
   async fn shutdown(&self) -> Result<(), anyhow::Error> {
     info!("Starting shutdown");
+    // TODO: Is this still slow? It seems after getting a few messages in we've regressed again
     for (id, ctx) in self.sessions.iter() {
       if let Err(e) = self.persistence.sessions().save(id, ctx) {
         error!("Failed to save local session {} to persistence: {}", id, e);

@@ -1,12 +1,12 @@
 mod local_client;
 
 use super::MessageListener;
-use crate::config::Config;
+use crate::{config::Config, emoji::EmojiLookup};
 use anyhow::anyhow;
 use derive_new::new;
 pub use local_client::*;
 use serenity::{
-  all::{CacheHttp, CreateMessage, CreateThread},
+  all::{CacheHttp, CreateMessage, CreateThread, MessageBuilder},
   async_trait,
   model::channel::Message,
   prelude::Context,
@@ -18,6 +18,7 @@ use tracing::{error, info, instrument, warn};
 #[derive(new)]
 pub struct ChatModeHandler {
   chat_client: Arc<Mutex<LocalClient>>,
+  emoji: EmojiLookup,
 }
 
 fn extract_user_message(ctx: &Context, msg: &Message) -> Option<String> {
@@ -65,13 +66,18 @@ impl MessageListener for ChatModeHandler {
     };
 
     if !chat_mode_enabled {
+      let emoji = self
+        .emoji
+        .get(&ctx.http, &ctx.cache, msg.guild_id.unwrap())
+        .await?;
       msg
         .reply(
           &ctx.http,
-          format!(
-        "InternalError: Chat mode is currently disabled. {} Maybe try again later when I'm feeling more chatty.",
-        emote_name
-      ),
+          MessageBuilder::new()
+            .push("InternalError: Chat mode is currently disabled. ")
+            .emoji(&emoji)
+            .push(" Maybe try again later when I'm feeling more chatty.")
+            .build(),
         )
         .await?;
       return Ok(());
