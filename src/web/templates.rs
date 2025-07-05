@@ -9,7 +9,6 @@ use crate::{
 use chrono::{DateTime, NaiveDateTime, TimeZone, Utc};
 use chrono_tz::America;
 use humantime::format_duration;
-use kalosm::language::ChatSession;
 use std::time::Duration;
 
 // Helper function to format duration in a user-friendly way (without microseconds)
@@ -215,7 +214,7 @@ pub fn render_admin_page(
     chat_sessions
       .iter()
       .map(|(key, context)| {
-        let session_size = context.session.history().len();
+        let session_size = context.messages.len();
 
         // Calculate expiration time
         let timeout_duration = config.chat_mode_conversation_timeout;

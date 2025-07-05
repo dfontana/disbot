@@ -12,52 +12,33 @@ use tracing::{error, info, instrument};
 
 pub type ConversationId = String;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct LocalSessionContext {
   pub conversation_id: ConversationId,
   pub last_activity: DateTime<Utc>,
-  #[serde(with = "session_serde")]
-  pub session: LlamaChatSession,
-}
-
-mod session_serde {
-  use super::*;
-  use serde::de::Error as DeError;
-  use serde::ser::Error as SerError;
-  use serde::{Deserialize, Deserializer, Serializer};
-
-  pub fn serialize<S>(session: &LlamaChatSession, serializer: S) -> Result<S::Ok, S::Error>
-  where
-    S: Serializer,
-  {
-    session
-      .to_bytes()
-      .map_err(|e| S::Error::custom(format!("Failed to serialize session: {}", e)))
-      .and_then(|bytes| serializer.serialize_bytes(&bytes))
-  }
-
-  pub fn deserialize<'de, D>(deserializer: D) -> Result<LlamaChatSession, D::Error>
-  where
-    D: Deserializer<'de>,
-  {
-    let bytes = Vec::deserialize(deserializer)?;
-    LlamaChatSession::from_bytes(&bytes)
-      .map_err(|e| D::Error::custom(format!("Failed to deserialize session: {}", e)))
-  }
+  pub messages: Vec<String>,
 }
 
 impl LocalSessionContext {
-  pub fn new(conversation_id: ConversationId, session: LlamaChatSession) -> Self {
+  pub fn new(conversation_id: ConversationId) -> Self {
     Self {
       conversation_id,
       last_activity: Utc::now(),
-      session,
+      messages: Vec::new(),
     }
   }
 
-  pub fn update_session(&mut self, session: LlamaChatSession) {
-    self.session = session;
+  pub fn new_with(conversation_id: ConversationId, messages: Vec<String>) -> Self {
+    Self {
+      conversation_id,
+      last_activity: Utc::now(),
+      messages,
+    }
+  }
+
+  pub fn update_session(&mut self, new_messages: Vec<String>) {
     self.last_activity = Utc::now();
+    self.messages.extend_from_slice(&new_messages);
   }
 
   pub fn is_expired(&self, timeout: Duration) -> bool {
@@ -69,7 +50,7 @@ impl LocalSessionContext {
 }
 
 pub struct LocalClient {
-  sessions: HashMap<ConversationId, LocalSessionContext>,
+  sessions: HashMap<ConversationId, (LlamaChatSession, LocalSessionContext)>,
   conversation_timeout: Duration,
   persistence: Arc<PersistentStore>,
   chat_mode_enabled: bool,
@@ -92,11 +73,19 @@ impl LocalClient {
     info!("Local LLM model initialized successfully");
 
     // Load existing sessions from persistence
-    let sessions: HashMap<ConversationId, LocalSessionContext> = persistence
+    let sessions: HashMap<ConversationId, (LlamaChatSession, LocalSessionContext)> = persistence
       .sessions()
       .load_all()?
       .into_iter()
       .filter(|(_, context)| !context.is_expired(config.chat_mode_conversation_timeout))
+      .map(|(id, ctx)| {
+        let mut session = llm.chat().with_system_prompt(SYSTEM_PROMPT);
+        ctx.messages.iter().for_each(|m| {
+          session.add_message(m);
+        });
+        let sess: LlamaChatSession = session.session().unwrap().clone();
+        (id, (sess, ctx))
+      })
       .collect();
 
     Ok(Self {
@@ -118,22 +107,28 @@ impl LocalClient {
       return Err(anyhow!("Local LLM not available - chat mode is disabled"));
     }
 
-    let mut chat = self.llm.chat();
+    let chat = self.llm.chat();
 
     // Create or restore chat session
-    chat = match self.sessions.entry(id.clone()) {
-      Entry::Occupied(e) if e.get().is_expired(self.conversation_timeout) => {
+    let (mut chat, _) = match self.sessions.entry(id.clone()) {
+      Entry::Occupied(e) if e.get().1.is_expired(self.conversation_timeout) => {
         e.remove_entry();
         info!("Session expired for {}, creating new session", id);
-        chat.with_system_prompt(SYSTEM_PROMPT)
+        (
+          chat.with_system_prompt(SYSTEM_PROMPT),
+          LocalSessionContext::new(id.clone()),
+        )
       }
       Entry::Vacant(_) => {
         info!("No session found for {}, creating new session", id);
-        chat.with_system_prompt(SYSTEM_PROMPT)
+        (
+          chat.with_system_prompt(SYSTEM_PROMPT),
+          LocalSessionContext::new(id.clone()),
+        )
       }
       Entry::Occupied(e) => {
         info!("Restored session for {}", id);
-        chat.with_session(e.get().session.clone())
+        (chat.with_session(e.get().0.clone()), e.get().1.clone())
       }
     };
 
@@ -148,8 +143,16 @@ impl LocalClient {
     self
       .sessions
       .entry(id.clone())
-      .and_modify(|c| c.update_session(session.clone()))
-      .or_insert_with(|| LocalSessionContext::new(id.clone(), session.clone()));
+      .and_modify(|(chat, ctx)| {
+        *chat = session.clone();
+        ctx.update_session(vec![current_user_message.to_string()])
+      })
+      .or_insert_with(|| {
+        (
+          session.clone(),
+          LocalSessionContext::new_with(id.clone(), vec![current_user_message.to_string()]),
+        )
+      });
 
     Ok(response)
   }
@@ -161,8 +164,10 @@ impl ShutdownHook for LocalClient {
   async fn shutdown(&self) -> Result<(), anyhow::Error> {
     info!("Starting shutdown");
     // TODO: Is this still slow? It seems after getting a few messages in we've regressed again
+    // Well 1 session was .5GB, so that's the real problem here. Storing messages and restoring that way will likely be more efficient.
+    // How is it 0.5GB for a few lines of text? Who knows....
     for (id, ctx) in self.sessions.iter() {
-      if let Err(e) = self.persistence.sessions().save(id, ctx) {
+      if let Err(e) = self.persistence.sessions().save(id, &ctx.1) {
         error!("Failed to save local session {} to persistence: {}", id, e);
       }
     }
