@@ -24,7 +24,6 @@ pub struct Config {
   pub db_path: String,
   #[serde(with = "humantime_serde")]
   pub chat_mode_conversation_timeout: Duration,
-  pub chat_mode_max_messages_per_conversation: usize,
   pub chat_mode_enabled: bool,
 }
 
@@ -40,7 +39,6 @@ impl Default for Config {
       voice_channel_timeout: Duration::from_secs(600),
       db_path: "disbot.db".to_string(),
       chat_mode_conversation_timeout: Duration::from_secs(30 * 60),
-      chat_mode_max_messages_per_conversation: 50,
       chat_mode_enabled: true,
     }
   }

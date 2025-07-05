@@ -2,52 +2,13 @@ use crate::shutdown::ShutdownHook;
 use crate::{config::Config, persistence::PersistentStore};
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
-use chrono::{DateTime, Utc};
 use kalosm::language::*;
-use serde::{Deserialize, Serialize};
 use std::collections::{hash_map::Entry, HashMap};
 use std::sync::Arc;
 use std::time::Duration;
 use tracing::{error, info, instrument};
 
-pub type ConversationId = String;
-
-#[derive(Clone, Serialize, Deserialize)]
-pub struct LocalSessionContext {
-  pub conversation_id: ConversationId,
-  pub last_activity: DateTime<Utc>,
-  pub messages: Vec<String>,
-}
-
-impl LocalSessionContext {
-  pub fn new(conversation_id: ConversationId) -> Self {
-    Self {
-      conversation_id,
-      last_activity: Utc::now(),
-      messages: Vec::new(),
-    }
-  }
-
-  pub fn new_with(conversation_id: ConversationId, messages: Vec<String>) -> Self {
-    Self {
-      conversation_id,
-      last_activity: Utc::now(),
-      messages,
-    }
-  }
-
-  pub fn update_session(&mut self, new_messages: Vec<String>) {
-    self.last_activity = Utc::now();
-    self.messages.extend_from_slice(&new_messages);
-  }
-
-  pub fn is_expired(&self, timeout: Duration) -> bool {
-    (Utc::now() - self.last_activity)
-      .to_std()
-      .unwrap_or(Duration::ZERO)
-      > timeout
-  }
-}
+use super::{ConversationId, LocalSessionContext};
 
 pub struct LocalClient {
   sessions: HashMap<ConversationId, (LlamaChatSession, LocalSessionContext)>,
@@ -95,6 +56,10 @@ impl LocalClient {
       chat_mode_enabled: config.chat_mode_enabled,
       llm,
     })
+  }
+
+  pub fn is_active_thread(&self, id: &ConversationId) -> bool {
+    self.sessions.contains_key(id)
   }
 
   #[instrument(name = NAME, level = "INFO", skip(self))]

@@ -3,15 +3,17 @@ mod local_client;
 use super::MessageListener;
 use crate::{config::Config, emoji::EmojiLookup};
 use anyhow::anyhow;
+use chrono::{DateTime, Utc};
 use derive_new::new;
 pub use local_client::*;
+use serde::{Deserialize, Serialize};
 use serenity::{
-  all::{CacheHttp, CreateMessage, CreateThread, MessageBuilder},
+  all::{CacheHttp, ChannelId, ChannelType, CreateMessage, CreateThread, MessageBuilder},
   async_trait,
   model::channel::Message,
   prelude::Context,
 };
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 use tokio::sync::Mutex;
 use tracing::{error, info, instrument, warn};
 
@@ -19,6 +21,45 @@ use tracing::{error, info, instrument, warn};
 pub struct ChatModeHandler {
   chat_client: Arc<Mutex<LocalClient>>,
   emoji: EmojiLookup,
+}
+
+pub type ConversationId = String;
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct LocalSessionContext {
+  pub conversation_id: ConversationId,
+  pub last_activity: DateTime<Utc>,
+  pub messages: Vec<String>,
+}
+
+impl LocalSessionContext {
+  pub fn new(conversation_id: ConversationId) -> Self {
+    Self {
+      conversation_id,
+      last_activity: Utc::now(),
+      messages: Vec::new(),
+    }
+  }
+
+  pub fn new_with(conversation_id: ConversationId, messages: Vec<String>) -> Self {
+    Self {
+      conversation_id,
+      last_activity: Utc::now(),
+      messages,
+    }
+  }
+
+  pub fn update_session(&mut self, new_messages: Vec<String>) {
+    self.last_activity = Utc::now();
+    self.messages.extend_from_slice(&new_messages);
+  }
+
+  pub fn is_expired(&self, timeout: Duration) -> bool {
+    (Utc::now() - self.last_activity)
+      .to_std()
+      .unwrap_or(Duration::ZERO)
+      > timeout
+  }
 }
 
 fn extract_user_message(ctx: &Context, msg: &Message) -> Option<String> {
@@ -37,6 +78,25 @@ fn extract_user_message(ctx: &Context, msg: &Message) -> Option<String> {
   Some(content).filter(|s| !s.is_empty())
 }
 
+async fn get_thread_id(ctx: &Context, msg: &Message) -> Option<ChannelId> {
+  match &msg.thread {
+    Some(thread) => Some(thread.id),
+    None => {
+      // So message is either in thread or out of thread. Check the type.
+      let chan = msg
+        .channel(&ctx.http())
+        .await
+        .ok()?
+        .guild()
+        .map(|gc| gc.kind)?;
+      match chan {
+        ChannelType::PublicThread | ChannelType::PrivateThread => Some(msg.channel_id),
+        _ => None,
+      }
+    }
+  }
+}
+
 #[async_trait]
 impl MessageListener for ChatModeHandler {
   #[instrument(name = "ChatMode", level = "INFO", skip(self, ctx, msg))]
@@ -46,23 +106,23 @@ impl MessageListener for ChatModeHandler {
       return Ok(());
     }
 
-    // Only process if bot is mentioned
-    // TODO: Actually, this should only be true if the message isn't in a thread that I am part of
-    //       (so need to check the channel id has an active session). This way the bot can just chat back and forth
-    //       naturally
-    if !msg.mentions_me(ctx).await.ok().unwrap_or_default() {
+    let thread_id = get_thread_id(ctx, msg).await;
+
+    // Only process if bot is mentioned unless you're responding in thread with the bot
+    let client = self.chat_client.lock().await;
+    if thread_id
+      .filter(|tid| !client.is_active_thread(&tid.to_string()))
+      .is_some()
+      && !msg.mentions_me(ctx).await.ok().unwrap_or_default()
+    {
+      info!("Skipping message, does not mention me or in a thread");
       return Ok(());
     }
 
     // Check if chat mode is enabled
-    // TODO: Remove max_messages
-    let (chat_mode_enabled, emote_name, max_messages) = {
+    let (chat_mode_enabled, emote_name) = {
       let config = Config::global_instance().read().unwrap();
-      (
-        config.chat_mode_enabled,
-        config.emote_name.clone(),
-        config.chat_mode_max_messages_per_conversation,
-      )
+      (config.chat_mode_enabled, config.emote_name.clone())
     };
 
     if !chat_mode_enabled {
@@ -90,42 +150,25 @@ impl MessageListener for ChatModeHandler {
 
     // If the message is not in a thread, create a thread && init the session against that thread id
     // if the message is in a thread, use that session
-    let thread_id = match &msg.thread {
-      // Msg created a thread, reply there
-      Some(thread) => thread.id,
+    let thread_id = match thread_id {
+      Some(v) => v,
       None => {
-        // So message is either in thread or out of thread. Check the type.
-        let chan = msg
-          .channel(&ctx.http())
+        info!("About to create a channel b/c msg thread was empty");
+        msg
+          .channel_id
+          .create_thread_from_message(
+            &ctx.http(),
+            msg.id,
+            CreateThread::new(format!(
+              "{} x {}",
+              ctx.cache.current_user().name,
+              msg.author.name
+            ))
+            // TODO: Likely should be customizable/align to the config value
+            .auto_archive_duration(serenity::all::AutoArchiveDuration::OneHour),
+          )
           .await?
-          .guild()
-          .map(|gc| gc.kind)
-          .unwrap();
-        match chan {
-          serenity::all::ChannelType::PublicThread | serenity::all::ChannelType::PrivateThread => {
-            // In thread, reply there.
-            msg.channel_id
-          }
-          _ => {
-            // Out of thread, create a thread!
-            info!("About to create a channel b/c msg.thread was empty");
-            msg
-              .channel_id
-              .create_thread_from_message(
-                &ctx.http(),
-                msg.id,
-                CreateThread::new(format!(
-                  "{} x {}",
-                  ctx.cache.current_user().name,
-                  msg.author.name
-                ))
-                // TODO: Likely should be customizable/align to the config value
-                .auto_archive_duration(serenity::all::AutoArchiveDuration::OneHour),
-              )
-              .await?
-              .id
-          }
-        }
+          .id
       }
     };
     info!("Resolved thread {}", thread_id);

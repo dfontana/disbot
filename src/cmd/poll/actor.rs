@@ -51,6 +51,10 @@ impl PollActor {
 
 #[async_trait]
 impl Actor<PollMessage> for PollActor {
+  fn name(&self) -> &'static str {
+    NAME
+  }
+
   fn receiver(&mut self) -> &mut Receiver<PollMessage> {
     &mut self.receiver
   }

@@ -6,7 +6,7 @@ use std::fmt::Display;
 use std::marker::PhantomData;
 use std::path::Path;
 use std::time::Duration;
-use tracing::error;
+use tracing::{error, info};
 use uuid::Uuid;
 
 pub struct PersistentStore {
@@ -186,24 +186,22 @@ impl<'a, K: Id, V> SessionHandle<'a, K, V> {
   }
 }
 
-impl<'a, K: Id + std::fmt::Display, V: Expirable + serde::de::DeserializeOwned>
+impl<'a, K: Id + std::fmt::Display, V: Expirable + serde::de::DeserializeOwned + std::fmt::Debug>
   SessionHandle<'a, K, V>
 {
-  pub fn cleanup_expired(&self, timeout: Duration) -> Result<usize> {
+  pub fn cleanup_expired(&self, timeout: Duration) -> Result<()> {
     let items: Vec<(K, V)> = self.load_all()?;
-    let mut removed_count = 0;
-
+    info!("Looking for expired items out of {}", items.len());
     for (key, item) in items {
+      info!("Checking for expiration: {} -> {:?}", key, item);
       if item.is_expired(timeout) {
+        info!("Expired {}", key);
         if let Err(e) = self.remove(&key) {
           error!("Failed to remove expired item {}: {}", key, e);
-        } else {
-          removed_count += 1;
         }
       }
     }
-
-    Ok(removed_count)
+    Ok(())
   }
 }
 
