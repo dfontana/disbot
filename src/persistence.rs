@@ -1,3 +1,4 @@
+use crate::cmd::chat_mode::{ConversationId, LocalSessionContext};
 use crate::cmd::{check_in::CheckInCtx, poll::pollstate::PollState};
 use anyhow::{anyhow, Result};
 use redb::{Database, ReadableTable, TableDefinition};
@@ -45,12 +46,29 @@ impl Id for u64 {
   }
 }
 
+impl Id for ConversationId {
+  fn id(&self) -> String {
+    self.to_owned()
+  }
+
+  fn from(s: String) -> Self {
+    s
+  }
+}
+
 pub trait Expirable {
   fn is_expired(&self, timeout: Duration) -> bool;
 }
 
+impl Expirable for LocalSessionContext {
+  fn is_expired(&self, timeout: Duration) -> bool {
+    self.is_expired(timeout)
+  }
+}
+
 const POLL_TABLE: TableDefinition<&str, &[u8]> = TableDefinition::new("polls");
 const CHECKIN_TABLE: TableDefinition<&str, &[u8]> = TableDefinition::new("checkins");
+const SESSION_TABLE: TableDefinition<&str, &[u8]> = TableDefinition::new("sessions");
 
 impl<'a, K: Id, V: serde::Serialize> Handle<'a, K, V> {
   pub fn save(&self, key: &K, data: &V) -> Result<()> {
@@ -131,6 +149,7 @@ impl PersistentStore {
     {
       let _polls_table = write_txn.open_table(POLL_TABLE)?;
       let _checkins_table = write_txn.open_table(CHECKIN_TABLE)?;
+      let _sessions_table = write_txn.open_table(SESSION_TABLE)?;
     }
     write_txn.commit()?;
 
@@ -152,6 +171,15 @@ impl PersistentStore {
       k: PhantomData,
       v: PhantomData,
       table: CHECKIN_TABLE,
+    }
+  }
+
+  pub fn sessions<'a>(&'a self) -> Handle<'a, ConversationId, LocalSessionContext> {
+    Handle {
+      db: &self.db,
+      k: PhantomData,
+      v: PhantomData,
+      table: SESSION_TABLE,
     }
   }
 }
