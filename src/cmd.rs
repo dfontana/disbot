@@ -7,6 +7,7 @@ use crate::{
   actor::ActorHandle, config::Config, docker::DockerClient, emoji::EmojiLookup,
   persistence::PersistentStore, shutdown::ShutdownCoordinator,
 };
+use chat_mode::LocalClient;
 use itertools::Itertools;
 use reqwest::Client;
 use serenity::{
@@ -21,6 +22,7 @@ use std::sync::Arc;
 use tracing::error;
 
 mod arg_util;
+pub mod chat_mode;
 pub mod check_in;
 mod dice_roll;
 pub mod poll;
@@ -68,6 +70,7 @@ impl Handler {
     docker: Box<dyn DockerClient>,
     persistence: Arc<PersistentStore>,
     shutdown: &mut ShutdownCoordinator,
+    chat_client: Arc<tokio::sync::Mutex<LocalClient>>,
   ) -> Self {
     let poll_handle =
       ActorHandle::<PollMessage>::spawn(|r, h| PollActor::new(r, h, persistence.clone()), shutdown);
@@ -87,6 +90,7 @@ impl Handler {
       listeners: vec![
         Box::new(shrug::ShrugHandler::new(config.clone(), emoji.clone())),
         Box::new(reddit_prev::RedditPreviewHandler::new(http.clone())),
+        Box::new(chat_mode::ChatModeHandler::new(chat_client, emoji.clone())),
       ],
       app_interactors: vec![
         Box::new(poll::Poll::new(emoji.clone(), poll_handle.clone())),

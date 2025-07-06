@@ -1,6 +1,9 @@
 use crate::{
-  cmd::check_in::{time_until, CheckInCtx},
-  cmd::poll::pollstate::PollState,
+  cmd::{
+    chat_mode::LocalSessionContext,
+    check_in::{time_until, CheckInCtx},
+    poll::pollstate::PollState,
+  },
   config::Config,
 };
 use chrono::{DateTime, NaiveDateTime, TimeZone, Utc};
@@ -60,6 +63,7 @@ pub fn render_admin_page(
   success: Option<&str>,
   checkin_configs: Vec<(u64, CheckInCtx)>,
   active_polls: Vec<PollState>,
+  chat_sessions: Vec<(String, LocalSessionContext)>,
 ) -> String {
   let api_key_display = if config.api_key.is_empty() {
     ""
@@ -201,6 +205,53 @@ pub fn render_admin_page(
       })
       .collect::<Vec<String>>()
       .join("")
+  };
+
+  // Generate Chat Sessions table data
+  let chat_conversations_table_rows = if chat_sessions.is_empty() {
+    r#"<tr><td colspan="4" class="no-data">No active chat sessions found</td></tr>"#.to_string()
+  } else {
+    chat_sessions
+      .iter()
+      .map(|(key, context)| {
+        let session_size = context.messages.len();
+
+        // Calculate expiration time
+        let timeout_duration = config.chat_mode_conversation_timeout;
+        let expiration_time =
+          context.last_activity + chrono::Duration::from_std(timeout_duration).unwrap_or_default();
+        let now = chrono::Utc::now();
+        let (expiration_display, time_remaining) = if expiration_time > now {
+          let remaining = (expiration_time - now).to_std().unwrap_or_default();
+          let remaining_formatted = format_duration_clean(remaining);
+          (format!("in {}", remaining_formatted), remaining_formatted)
+        } else {
+          ("Expired".to_string(), "Expired".to_string())
+        };
+
+        format!(
+          r#"<tr>
+            <td title="{}">{}</td>
+            <td>{}</td>
+            <td>{}</td>
+            <td>{}</td>
+          </tr>"#,
+          html_escape(key),
+          html_escape(key),
+          html_escape(&session_size.to_string()),
+          html_escape(&time_remaining),
+          html_escape(&expiration_display)
+        )
+      })
+      .collect::<Vec<String>>()
+      .join("")
+  };
+
+  // Chat mode toggle state
+  let chat_mode_checked = if config.chat_mode_enabled {
+    "checked"
+  } else {
+    ""
   };
 
   format!(
@@ -395,13 +446,7 @@ pub fn render_admin_page(
             margin-top: 2px;
             line-height: 1.3;
         }}
-        
-        .restart-indicator {{
-            color: #dc3545;
-            font-size: 11px;
-            font-weight: 500;
-        }}
-        
+     
         .nav-links {{
             text-align: center;
             margin-bottom: 20px;
@@ -613,6 +658,17 @@ pub fn render_admin_page(
                 </div>
             </div>
             
+            <div class="form-section">
+                <h3>💬 Chat Mode Settings</h3>
+                <div class="form-group">
+                    <label for="chat_mode_enabled">Enable Chat Mode</label>
+                    <div style="display: flex; align-items: center; margin-top: 4px;">
+                        <input type="checkbox" id="chat_mode_enabled" name="chat_mode_enabled" {chat_mode_checked} style="margin-right: 8px; width: auto;">
+                        <span style="font-size: 14px;">Allow users to @mention the bot for Claude AI conversations</span>
+                    </div>
+                </div>
+            </div>
+            
                     <button type="submit" class="submit-btn">💾 Save Configuration</button>
                 </form>
             </div>
@@ -661,6 +717,27 @@ pub fn render_admin_page(
                         </tbody>
                     </table>
                 </div>
+                
+                <div class="checkin-section">
+                    <h3>💬 Active Chat Conversations</h3>
+                    <div class="section-info">
+                        ℹ️ Currently active Claude AI chat conversations. Messages auto-expire after configured timeout.
+                    </div>
+                    
+                    <table class="admin-table">
+                        <thead>
+                            <tr>
+                                <th>Conversation Key</th>
+                                <th>Messages</th>
+                                <th>Time Remaining</th>
+                                <th>Expires</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {chat_conversations_table_rows}
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
     </div>
@@ -700,6 +777,8 @@ pub fn render_admin_page(
     timeout = format_duration(config.voice_channel_timeout),
     checkin_table_rows = checkin_table_rows,
     polls_table_rows = polls_table_rows,
+    chat_conversations_table_rows = chat_conversations_table_rows,
+    chat_mode_checked = chat_mode_checked,
   )
 }
 

@@ -15,7 +15,7 @@ mod shutdown;
 mod web;
 
 use clap::Parser;
-use cmd::Handler;
+use cmd::{chat_mode::LocalClient, Handler};
 use config::Config;
 use env::Environment;
 use persistence::PersistentStore;
@@ -23,10 +23,11 @@ use serenity::{
   client::Client,
   prelude::{GatewayIntents, TypeMapKey},
 };
-use shutdown::ShutdownCoordinator;
+use shutdown::{ShutdownCoordinator, ShutdownHook};
 use songbird::SerenityInit;
 use std::sync::Arc;
 use std::{path::PathBuf, str::FromStr};
+use tokio::sync::Mutex;
 use tracing::{error, info, Level};
 
 #[derive(Debug, Clone)]
@@ -100,6 +101,19 @@ async fn main() -> Result<(), anyhow::Error> {
   // Persistence restoration happens in the ready event handler where actor handles are available
   let persistence = Arc::new(PersistentStore::new(&config.db_path)?);
 
+  // Create local chat client
+  let chat_client = Arc::new(Mutex::new(
+    LocalClient::new(&config, persistence.clone()).await?,
+  ));
+  let token = shutdown.token();
+  let client_ref = chat_client.clone();
+  shutdown.register_task(tokio::spawn(async move {
+    token.cancelled().await;
+    let cc = client_ref.lock().await;
+    if let Err(e) = cc.shutdown().await {
+      error!("Failed shutdown: {}", e);
+    }
+  }));
   let emoji = emoji::EmojiLookup::new(&config);
   let http = reqwest::Client::new();
 
@@ -121,6 +135,7 @@ async fn main() -> Result<(), anyhow::Error> {
     docker::create_docker_client(),
     persistence.clone(),
     &mut shutdown,
+    chat_client.clone(),
   ))
   .application_id(config.app_id.into())
   .await?;
@@ -147,9 +162,7 @@ async fn main() -> Result<(), anyhow::Error> {
         error!("Failed to start Discord Client: {:?}", why);
       }
     }
-    _ = shutdown_listener => {
-      info!("Shutdown signal received, stopping services");
-    }
+    _ = shutdown_listener => {}
   };
 
   info!("Application shutdown complete");

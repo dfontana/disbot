@@ -1,3 +1,4 @@
+use crate::cmd::chat_mode::{ConversationId, LocalSessionContext};
 use crate::cmd::{check_in::CheckInCtx, poll::pollstate::PollState};
 use anyhow::{anyhow, Result};
 use redb::{Database, ReadableTable, TableDefinition};
@@ -5,7 +6,7 @@ use std::fmt::Display;
 use std::marker::PhantomData;
 use std::path::Path;
 use std::time::Duration;
-use tracing::error;
+use tracing::{error, info};
 use uuid::Uuid;
 
 pub struct PersistentStore {
@@ -17,6 +18,13 @@ pub trait Id {
   fn from(s: String) -> Self;
 }
 pub struct Handle<'a, K: Id, V> {
+  db: &'a Database,
+  k: PhantomData<K>,
+  v: PhantomData<V>,
+  table: TableDefinition<'static, &'static str, &'static [u8]>,
+}
+
+pub struct SessionHandle<'a, K: Id, V> {
   db: &'a Database,
   k: PhantomData<K>,
   v: PhantomData<V>,
@@ -45,12 +53,29 @@ impl Id for u64 {
   }
 }
 
+impl Id for ConversationId {
+  fn id(&self) -> String {
+    self.to_owned()
+  }
+
+  fn from(s: String) -> Self {
+    s
+  }
+}
+
 pub trait Expirable {
   fn is_expired(&self, timeout: Duration) -> bool;
 }
 
+impl Expirable for LocalSessionContext {
+  fn is_expired(&self, timeout: Duration) -> bool {
+    self.is_expired(timeout)
+  }
+}
+
 const POLL_TABLE: TableDefinition<&str, &[u8]> = TableDefinition::new("polls");
 const CHECKIN_TABLE: TableDefinition<&str, &[u8]> = TableDefinition::new("checkins");
+const SESSION_TABLE: TableDefinition<&str, &[u8]> = TableDefinition::new("sessions");
 
 impl<'a, K: Id, V: serde::Serialize> Handle<'a, K, V> {
   pub fn save(&self, key: &K, data: &V) -> Result<()> {
@@ -105,6 +130,81 @@ impl<'a, K: Id, V> Handle<'a, K, V> {
   }
 }
 
+// SessionHandle implementation using bincode for sessions
+impl<'a, K: Id, V: serde::Serialize> SessionHandle<'a, K, V> {
+  pub fn save(&self, key: &K, data: &V) -> Result<()> {
+    let serialized = bincode_new::serde::encode_to_vec(data, bincode_new::config::standard())?;
+    let write_txn = self.db.begin_write()?;
+    {
+      let mut table_handle = write_txn.open_table(self.table)?;
+      table_handle.insert(key.id().as_str(), serialized.as_slice())?;
+    }
+    write_txn.commit()?;
+    Ok(())
+  }
+}
+
+impl<'a, K: Id, V: serde::de::DeserializeOwned> SessionHandle<'a, K, V> {
+  pub fn load(&self, key: &K) -> Result<Option<V>> {
+    let read_txn = self.db.begin_read()?;
+    let table_handle = read_txn.open_table(self.table)?;
+    if let Some(data) = table_handle.get(key.id().as_str())? {
+      let (item, _): (V, usize) =
+        bincode_new::serde::decode_from_slice(data.value(), bincode_new::config::standard())?;
+      Ok(Some(item))
+    } else {
+      Ok(None)
+    }
+  }
+
+  pub fn load_all(&self) -> Result<Vec<(K, V)>> {
+    let read_txn = self.db.begin_read()?;
+    let table_handle = read_txn.open_table(self.table)?;
+    let mut items = Vec::new();
+
+    for entry in table_handle.iter()? {
+      let (key, value) = entry?;
+      let key_string = key.value().to_string();
+      let (item, _): (V, usize) =
+        bincode_new::serde::decode_from_slice(value.value(), bincode_new::config::standard())?;
+      items.push((K::from(key_string), item));
+    }
+
+    Ok(items)
+  }
+}
+
+impl<'a, K: Id, V> SessionHandle<'a, K, V> {
+  pub fn remove(&self, key: &K) -> Result<()> {
+    let write_txn = self.db.begin_write()?;
+    {
+      let mut table_handle = write_txn.open_table(self.table)?;
+      table_handle.remove(key.id().as_str())?;
+    }
+    write_txn.commit()?;
+    Ok(())
+  }
+}
+
+impl<'a, K: Id + std::fmt::Display, V: Expirable + serde::de::DeserializeOwned + std::fmt::Debug>
+  SessionHandle<'a, K, V>
+{
+  pub fn cleanup_expired(&self, timeout: Duration) -> Result<()> {
+    let items: Vec<(K, V)> = self.load_all()?;
+    info!("Looking for expired items out of {}", items.len());
+    for (key, item) in items {
+      info!("Checking for expiration: {} -> {:?}", key, item);
+      if item.is_expired(timeout) {
+        info!("Expired {}", key);
+        if let Err(e) = self.remove(&key) {
+          error!("Failed to remove expired item {}: {}", key, e);
+        }
+      }
+    }
+    Ok(())
+  }
+}
+
 impl<'a, K: Id + Display, V: Expirable + serde::de::DeserializeOwned> Handle<'a, K, V> {
   pub fn cleanup_expired(&self, timeout: Duration) -> Result<usize> {
     let items: Vec<(K, V)> = self.load_all()?;
@@ -131,6 +231,7 @@ impl PersistentStore {
     {
       let _polls_table = write_txn.open_table(POLL_TABLE)?;
       let _checkins_table = write_txn.open_table(CHECKIN_TABLE)?;
+      let _sessions_table = write_txn.open_table(SESSION_TABLE)?;
     }
     write_txn.commit()?;
 
@@ -152,6 +253,15 @@ impl PersistentStore {
       k: PhantomData,
       v: PhantomData,
       table: CHECKIN_TABLE,
+    }
+  }
+
+  pub fn sessions<'a>(&'a self) -> SessionHandle<'a, ConversationId, LocalSessionContext> {
+    SessionHandle {
+      db: &self.db,
+      k: PhantomData,
+      v: PhantomData,
+      table: SESSION_TABLE,
     }
   }
 }

@@ -72,6 +72,10 @@ impl ShutdownHook for CheckInActor {}
 
 #[async_trait]
 impl Actor<CheckInMessage> for CheckInActor {
+  fn name(&self) -> &'static str {
+    NAME
+  }
+
   #[instrument(name = NAME, level = "INFO", skip(self, msg))]
   async fn handle_msg(&mut self, msg: CheckInMessage) {
     match msg {

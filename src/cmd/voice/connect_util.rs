@@ -31,6 +31,8 @@ pub struct DisconnectDetails {
   emoji: Emoji,
 }
 
+const NAME: &'static str = "disconnect";
+
 pub struct DisconnectActor {
   receiver: Receiver<DisconnectMessage>,
   in_progress_count: usize,
@@ -41,6 +43,10 @@ impl ShutdownHook for DisconnectActor {}
 
 #[async_trait]
 impl Actor<DisconnectMessage> for DisconnectActor {
+  fn name(&self) -> &'static str {
+    NAME
+  }
+
   fn receiver(&mut self) -> &mut Receiver<DisconnectMessage> {
     &mut self.receiver
   }

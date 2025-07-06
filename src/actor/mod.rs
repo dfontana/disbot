@@ -8,6 +8,7 @@ use tracing::error;
 pub trait Actor<T: Send + Sync>: ShutdownHook {
   async fn handle_msg(&mut self, msg: T);
   fn receiver(&mut self) -> &mut Receiver<T>;
+  fn name(&self) -> &'static str;
 }
 
 #[derive(Clone)]
@@ -24,16 +25,19 @@ impl<T: Clone + Send + Sync + 'static> ActorHandle<T> {
     let handle = Self { sender };
     let mut actor = mk_actor(receiver, handle.clone());
     let completion = shutdown.token();
-    let jhandle = tokio::spawn(async move {
-      tokio::select! {
-        _ = run_actor(&mut actor) => {}
-        _ = completion.cancelled() => {
-          if let Err(e) = actor.shutdown().await {
-            error!("Graceful shutdown failed for actor. {}", e);
+    let jhandle = tokio::task::Builder::new()
+      .name(actor.name())
+      .spawn(async move {
+        tokio::select! {
+          _ = run_actor(&mut actor) => {}
+          _ = completion.cancelled() => {
+            if let Err(e) = actor.shutdown().await {
+              error!("Graceful shutdown failed for actor. {}", e);
+            }
           }
         }
-      }
-    });
+      })
+      .unwrap();
     shutdown.register_task(jhandle);
     handle
   }
