@@ -1,6 +1,8 @@
 use crate::cmd::{check_in::CheckInCtx, poll::pollstate::PollState};
 use anyhow::{anyhow, Result};
+use bincode::{Decode, Encode};
 use redb::{Database, ReadableTable, TableDefinition};
+use serenity::all::GuildId;
 use std::fmt::Display;
 use std::marker::PhantomData;
 use std::path::Path;
@@ -32,7 +34,7 @@ impl Id for Uuid {
   }
 }
 
-impl Id for u64 {
+impl Id for GuildId {
   fn id(&self) -> String {
     self.to_string()
   }
@@ -51,9 +53,9 @@ pub trait Expirable {
 const POLL_TABLE: TableDefinition<&str, &[u8]> = TableDefinition::new("polls");
 const CHECKIN_TABLE: TableDefinition<&str, &[u8]> = TableDefinition::new("checkins");
 
-impl<'a, K: Id, V: serde::Serialize> Handle<'a, K, V> {
+impl<'a, K: Id, V: Encode> Handle<'a, K, V> {
   pub fn save(&self, key: &K, data: &V) -> Result<()> {
-    let serialized = serde_json::to_vec(data)?;
+    let serialized = bincode::encode_to_vec(data, bincode::config::standard())?;
     let write_txn = self.db.begin_write()?;
     {
       let mut table_handle = write_txn.open_table(self.table)?;
@@ -64,12 +66,12 @@ impl<'a, K: Id, V: serde::Serialize> Handle<'a, K, V> {
   }
 }
 
-impl<'a, K: Id, V: serde::de::DeserializeOwned> Handle<'a, K, V> {
+impl<'a, K: Id, V: Decode<()>> Handle<'a, K, V> {
   pub fn load(&self, key: &K) -> Result<Option<V>> {
     let read_txn = self.db.begin_read()?;
     let table_handle = read_txn.open_table(self.table)?;
     if let Some(data) = table_handle.get(key.id().as_str())? {
-      let item: V = serde_json::from_slice(data.value())?;
+      let (item, _) = bincode::decode_from_slice(data.value(), bincode::config::standard())?;
       Ok(Some(item))
     } else {
       Ok(None)
@@ -84,7 +86,7 @@ impl<'a, K: Id, V: serde::de::DeserializeOwned> Handle<'a, K, V> {
     for entry in table_handle.iter()? {
       let (key, value) = entry?;
       let key_string = key.value().to_string();
-      let item: V = serde_json::from_slice(value.value())?;
+      let (item, _) = bincode::decode_from_slice(value.value(), bincode::config::standard())?;
       items.push((K::from(key_string), item));
     }
 
@@ -104,7 +106,7 @@ impl<'a, K: Id, V> Handle<'a, K, V> {
   }
 }
 
-impl<'a, K: Id + Display, V: Expirable + serde::de::DeserializeOwned> Handle<'a, K, V> {
+impl<'a, K: Id + Display, V: Expirable + Decode<()>> Handle<'a, K, V> {
   pub fn cleanup_expired(&self) -> Result<usize> {
     let items: Vec<(K, V)> = self.load_all()?;
     let mut removed_count = 0;
@@ -145,7 +147,7 @@ impl PersistentStore {
     }
   }
 
-  pub fn check_ins<'a>(&'a self) -> Handle<'a, u64, CheckInCtx> {
+  pub fn check_ins<'a>(&'a self) -> Handle<'a, GuildId, CheckInCtx> {
     Handle {
       db: &self.db,
       k: PhantomData,
@@ -158,12 +160,14 @@ impl PersistentStore {
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::cmd::poll::pollstate::{CallContext, PollState};
+  use crate::{
+    cmd::poll::pollstate::PollState,
+    types::{Chan, Guil, NaiveT, Pid},
+  };
   use chrono::NaiveTime;
   use serenity::model::prelude::ChannelId;
   use std::{
     collections::{HashMap, HashSet},
-    sync::Arc,
     time::{Duration, SystemTime},
   };
   use tempfile::tempdir;
@@ -188,51 +192,26 @@ mod tests {
     );
 
     PollState {
-      id: Uuid::new_v4(),
+      id: Pid(Uuid::new_v4()),
       duration: Duration::from_secs(300),
       topic: "Test Poll".to_string(),
       longest_option: 8,
       most_votes: 2,
       votes,
-      ctx: CallContext {
-        channel: ChannelId::from(123456789),
-        http: Arc::new(serenity::http::Http::new("test_token")),
-        emoji: create_test_emoji(),
-      },
       created_at: SystemTime::now(),
+      channel: Chan(ChannelId::from(123456789)),
+      guild: Guil(<serenity::all::GuildId as From<u64>>::from(111111111)),
     }
   }
 
   fn create_test_checkin_ctx() -> CheckInCtx {
     CheckInCtx {
-      poll_time: NaiveTime::from_hms_opt(20, 0, 0).unwrap(),
+      poll_time: NaiveT(NaiveTime::from_hms_opt(20, 0, 0).unwrap()),
       poll_dur: Duration::from_secs(3600),
       at_group: None, // Simplified for testing - None is easier to handle
-      channel: ChannelId::from(123456789),
-      http: Arc::new(serenity::http::Http::new("test_token")),
-      emoji: create_test_emoji(),
-      guild_id: 111111111,
+      channel: Chan(ChannelId::from(123456789)),
+      guild: Guil(<serenity::all::GuildId as From<u64>>::from(111111111)),
     }
-  }
-
-  fn create_test_emoji() -> serenity::model::prelude::Emoji {
-    // Create an emoji using the builder pattern or deserialize from JSON
-    // This is a workaround for non-exhaustive structs
-    serde_json::from_str(
-      r#"
-    {
-      "animated": false,
-      "available": true,
-      "id": "123456789012345678",
-      "managed": false,
-      "name": "test_emoji",
-      "require_colons": true,
-      "roles": [],
-      "user": null
-    }
-    "#,
-    )
-    .expect("Failed to create test emoji")
   }
 
   #[test]
@@ -242,7 +221,7 @@ mod tests {
     let store = PersistentStore::new(db_path).unwrap();
 
     let poll_state = create_test_poll_state();
-    let poll_id = poll_state.id;
+    let poll_id = *poll_state.id;
 
     // Test save() method
     store.polls().save(&poll_id, &poll_state).unwrap();
@@ -271,7 +250,7 @@ mod tests {
     let store = PersistentStore::new(db_path).unwrap();
 
     let checkin_ctx = create_test_checkin_ctx();
-    let guild_id = checkin_ctx.guild_id;
+    let guild_id = *checkin_ctx.guild;
 
     // Test save and remove
     store.check_ins().save(&guild_id, &checkin_ctx).unwrap();

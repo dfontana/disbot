@@ -104,7 +104,7 @@ async fn wrapped_handle(
         .send(DisconnectMessage::Details(DisconnectDetails::new(
           handler_lock.clone(),
           ctx.http.clone(),
-          play.emoji.get(&ctx.http, &ctx.cache, guild_id).await?,
+          play.emoji.get(&ctx.http, guild_id).await?,
         )))
         .await;
 
@@ -162,7 +162,7 @@ async fn wrapped_handle(
   );
   let _th = handler.enqueue(track_with_data).await;
 
-  let emoji = play.emoji.get(&ctx.http, &ctx.cache, guild_id).await?;
+  let emoji = play.emoji.get(&ctx.http, guild_id).await?;
   let mut build = MessageBuilder::new();
   build
     .push_bold("Queued")

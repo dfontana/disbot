@@ -66,7 +66,7 @@ impl MessageListener for ShrugHandler {
       return Ok(());
     }
 
-    let emoji = self.emoji.get(&ctx.http, &ctx.cache, guild_id).await?;
+    let emoji = self.emoji.get(&ctx.http, guild_id).await?;
     self.react_and_send(emoji, ctx, msg).await
   }
 }

@@ -12,6 +12,7 @@ mod env;
 mod logging;
 mod persistence;
 mod shutdown;
+mod types;
 mod web;
 
 use clap::Parser;

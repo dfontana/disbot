@@ -6,6 +6,7 @@ use crate::{
 use chrono::{DateTime, NaiveDateTime, TimeZone, Utc};
 use chrono_tz::America;
 use humantime::format_duration;
+use serenity::all::GuildId;
 use std::time::Duration;
 
 // Helper function to format duration in a user-friendly way (without microseconds)
@@ -58,7 +59,7 @@ pub fn render_admin_page(
   config: &Config,
   error: Option<&str>,
   success: Option<&str>,
-  checkin_configs: Vec<(u64, CheckInCtx)>,
+  checkin_configs: Vec<(GuildId, CheckInCtx)>,
   active_polls: Vec<PollState>,
 ) -> String {
   let api_key_display = if config.api_key.is_empty() {
@@ -85,18 +86,18 @@ pub fn render_admin_page(
     checkin_configs
       .iter()
       .map(|(guild_id, config)| {
-        let iso_timestamp = generate_iso_timestamp(now, config.poll_time);
-        let time_until_duration = time_until(now, config.poll_time);
+        let iso_timestamp = generate_iso_timestamp(now, *config.poll_time);
+        let time_until_duration = time_until(now, *config.poll_time);
         let countdown = format_duration_clean(time_until_duration);
 
         // Truncate long IDs for better display
+        // TODO: Get the cache/async passed through so you can call .name() instead of IDs
         let guild_id_display = truncate_id(&guild_id.to_string(), 10);
         let channel_id_display = truncate_id(&config.channel.to_string(), 10);
-
         let role_display = config
           .at_group
           .as_ref()
-          .map(|role| format!("@{}", html_escape(&role.name)))
+          .map(|role| truncate_id(&role.to_string(), 10))
           .unwrap_or_else(|| "None".to_string());
 
         let duration_display = format!("{}s", config.poll_dur.as_secs());

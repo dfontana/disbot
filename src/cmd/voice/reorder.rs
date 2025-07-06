@@ -53,7 +53,7 @@ impl SubCommandHandler for Reorder {
       }
     });
 
-    let emoji = self.emoji.get(&ctx.http, &ctx.cache, guild_id).await?;
+    let emoji = self.emoji.get(&ctx.http, guild_id).await?;
     itx
       .edit_response(
         &ctx.http,

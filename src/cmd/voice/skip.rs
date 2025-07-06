@@ -29,7 +29,7 @@ impl SubCommandHandler for Skip {
       .expect("Songbird Voice client placed in at initialisation.")
       .clone();
 
-    let emoji = self.emoji.get(&ctx.http, &ctx.cache, guild_id).await?;
+    let emoji = self.emoji.get(&ctx.http, guild_id).await?;
 
     let handler_lock = manager
       .get(guild_id)

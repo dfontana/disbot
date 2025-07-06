@@ -1,5 +1,5 @@
 use super::{check_in::CheckInMessage, poll::PollMessage};
-use crate::actor::ActorHandle;
+use crate::{actor::ActorHandle, cmd::CallContext};
 use derive_new::new;
 use serenity::{model::gateway::Ready, prelude::Context};
 use tracing::{info, instrument};
@@ -18,16 +18,20 @@ impl ReadyHandler {
     // Restore persisted polls and check-in configurations
     info!("Restoring persistent state...");
 
+    let cctx = CallContext {
+      http: ctx.http.clone(),
+    };
+
     // Restore polls
     self
       .poll_handle
-      .send(PollMessage::RestorePolls(ctx.http.clone()))
+      .send(PollMessage::RestorePolls(cctx.clone()))
       .await;
 
     // Restore check-in
     self
       .checkin_handle
-      .send(CheckInMessage::RestoreConfig(ctx.http.clone()))
+      .send(CheckInMessage::RestoreConfig(cctx))
       .await;
   }
 }

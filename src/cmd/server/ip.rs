@@ -60,7 +60,7 @@ impl SubCommandHandler for Ip {
       return Ok(());
     };
 
-    let emoji = self.emoji.get(&ctx.http, &ctx.cache, guild_id).await?;
+    let emoji = self.emoji.get(&ctx.http, guild_id).await?;
     let mut build = MessageBuilder::new();
     build
       .push_bold("Ya boi shruggin at ")
