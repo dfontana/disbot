@@ -13,10 +13,6 @@ pub fn create_router(config_path: String, persistence: Arc<PersistentStore>) -> 
       "/admin",
       get(handlers::get_admin).post(handlers::post_admin),
     )
-    .route(
-      "/admin/checkins",
-      get(handlers::get_checkin_admin).post(handlers::post_checkin_admin),
-    )
     .route("/favicon.ico", get(handlers::get_favicon))
     .layer(Extension(config_path))
     .layer(Extension(persistence))
