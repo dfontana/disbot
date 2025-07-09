@@ -104,7 +104,7 @@ impl DiceRoll {
       Some(id) => id,
       None => return Ok(()),
     };
-    let emoji = self.emoji.get(&ctx.http, &ctx.cache, guild_id).await?;
+    let emoji = self.emoji.get(&ctx.http, guild_id).await?;
     let mut response = MessageBuilder::new();
     response
       .push(format!("<@{}>", itx.user.id))

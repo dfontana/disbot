@@ -1,13 +1,16 @@
 use serenity::{
+  all::Emoji,
   builder::{CreateMessage, CreateSelectMenu, CreateSelectMenuKind, CreateSelectMenuOption},
-  model::prelude::{ChannelId, ReactionType},
+  model::prelude::ReactionType,
   utils::MessageBuilder,
 };
+
+use crate::cmd::CallContext;
 
 use super::pollstate::PollState;
 use humantime::format_duration;
 
-pub fn build_poll_message(ps: &PollState) -> String {
+pub fn build_poll_message(ps: &PollState, emoji: &Emoji) -> String {
   let mut bar_vec = ps
     .votes
     .iter()
@@ -45,9 +48,9 @@ pub fn build_poll_message(ps: &PollState) -> String {
   voter_vec.sort();
 
   MessageBuilder::new()
-    .emoji(&ps.ctx.emoji)
+    .emoji(emoji)
     .push_underline("Roommate Poll, Bobby, Roommate Poll!")
-    .emoji(&ps.ctx.emoji)
+    .emoji(emoji)
     .push_line("")
     .push_line("")
     .push_bold(&ps.topic)
@@ -64,12 +67,16 @@ pub fn build_poll_message(ps: &PollState) -> String {
     .build()
 }
 
-pub async fn send_poll_message(ps: &PollState, itx: &ChannelId) -> serenity::Result<()> {
-  itx
+pub async fn send_poll_message(
+  ps: &PollState,
+  ctx: &CallContext,
+  emoji: &Emoji,
+) -> serenity::Result<()> {
+  ps.channel
     .send_message(
-      &ps.ctx.http,
+      &ctx.http,
       CreateMessage::new()
-        .content(build_poll_message(ps))
+        .content(build_poll_message(ps, emoji))
         .select_menu(
           CreateSelectMenu::new(
             ps.id.to_string(),
@@ -82,7 +89,7 @@ pub async fn send_poll_message(ps: &PollState, itx: &ChannelId) -> serenity::Res
                     ReactionType::Custom {
                       name: None,
                       animated: false,
-                      id: ps.ctx.emoji.id,
+                      id: emoji.id,
                     },
                   )
                 })
@@ -99,7 +106,7 @@ pub async fn send_poll_message(ps: &PollState, itx: &ChannelId) -> serenity::Res
     .map(|_| ())
 }
 
-pub fn build_exp_message(ps: &PollState) -> String {
+pub fn build_exp_message(ps: &PollState, emoji: &Emoji) -> String {
   let winner = ps
     .votes
     .values()
@@ -108,9 +115,9 @@ pub fn build_exp_message(ps: &PollState) -> String {
     .unwrap_or_else(|| "<Error Poll Had No Options?>".to_string());
 
   MessageBuilder::new()
-    .emoji(&ps.ctx.emoji)
+    .emoji(emoji)
     .push_underline("The Vote has Ended!")
-    .emoji(&ps.ctx.emoji)
+    .emoji(emoji)
     .push_line("")
     .push_line("")
     .push("The winner of \"")

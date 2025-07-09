@@ -1,3 +1,8 @@
+use crate::web::templates;
+use crate::{
+  config::{Config, FormData},
+  persistence::PersistentStore,
+};
 use axum::{
   extract::{Extension, Form, Query},
   http::{header, StatusCode},
@@ -5,12 +10,6 @@ use axum::{
 };
 use humantime::parse_duration;
 use std::{collections::HashMap, sync::Arc};
-
-use crate::web::templates;
-use crate::{
-  config::{Config, FormData},
-  persistence::PersistentStore,
-};
 
 // Helper function to get config or return default
 fn get_config_or_default() -> Config {

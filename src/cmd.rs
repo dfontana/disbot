@@ -10,7 +10,7 @@ use crate::{
 use itertools::Itertools;
 use reqwest::Client;
 use serenity::{
-  all::{CommandInteraction, ComponentInteraction, Interaction},
+  all::{CommandInteraction, ComponentInteraction, Http, Interaction},
   async_trait,
   builder::CreateCommand,
   futures::future,
@@ -54,6 +54,11 @@ trait SubCommandHandler: Send + Sync {
   ) -> Result<(), anyhow::Error>;
 }
 
+#[derive(Clone)]
+pub struct CallContext {
+  pub http: Arc<Http>,
+}
+
 pub struct Handler {
   listeners: Vec<Box<dyn MessageListener>>,
   app_interactors: Vec<Box<dyn AppInteractor>>,
@@ -69,8 +74,10 @@ impl Handler {
     persistence: Arc<PersistentStore>,
     shutdown: &mut ShutdownCoordinator,
   ) -> Self {
-    let poll_handle =
-      ActorHandle::<PollMessage>::spawn(|r, h| PollActor::new(r, h, persistence.clone()), shutdown);
+    let poll_handle = ActorHandle::<PollMessage>::spawn(
+      |r, h| PollActor::new(r, h, persistence.clone(), emoji.clone()),
+      shutdown,
+    );
 
     let chk_handle = ActorHandle::<CheckInMessage>::spawn(
       |r, h| {
@@ -89,7 +96,7 @@ impl Handler {
         Box::new(reddit_prev::RedditPreviewHandler::new(http.clone())),
       ],
       app_interactors: vec![
-        Box::new(poll::Poll::new(emoji.clone(), poll_handle.clone())),
+        Box::new(poll::Poll::new(poll_handle.clone())),
         Box::new(check_in::CheckIn::new(emoji.clone(), chk_handle.clone())),
         Box::new(dice_roll::DiceRoll::new(emoji.clone())),
         Box::new(voice::Voice::new(config, emoji.clone(), shutdown)),

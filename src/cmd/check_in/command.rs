@@ -1,8 +1,9 @@
 use super::{CheckInCtx, CheckInMessage};
 use crate::{
   actor::ActorHandle,
-  cmd::{arg_util::Args, AppInteractor},
+  cmd::{arg_util::Args, AppInteractor, CallContext},
   emoji::EmojiLookup,
+  types::{Chan, Guil, NaiveT, Rol},
 };
 use anyhow::anyhow;
 use chrono::NaiveTime;
@@ -84,7 +85,7 @@ impl CheckIn {
     let guild_id = itx
       .guild_id
       .ok_or_else(|| anyhow!("No Guild Id on Interaction"))?;
-    let emoji = self.emoji.get(&ctx.http, &ctx.cache, guild_id).await?;
+    let emoji = self.emoji.get(&ctx.http, guild_id).await?;
     let raw_args = &itx.data.options();
     let args = Args::from(raw_args);
 
@@ -108,15 +109,18 @@ impl CheckIn {
 
     self
       .actor
-      .send(CheckInMessage::SetPoll(CheckInCtx::new(
-        time,
-        duration,
-        at_group,
-        itx.channel_id,
-        ctx.http.clone(),
-        emoji.clone(),
-        guild_id.into(),
-      )))
+      .send(CheckInMessage::SetPoll(
+        CheckInCtx::new(
+          NaiveT(time),
+          duration,
+          at_group.map(|r| Rol(r.id)),
+          Chan(itx.channel_id),
+          Guil(guild_id),
+        ),
+        CallContext {
+          http: ctx.http.clone(),
+        },
+      ))
       .await;
     itx
       .create_response(

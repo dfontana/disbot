@@ -1,10 +1,8 @@
 use super::actor::PollMessage;
 use crate::{
   actor::ActorHandle,
-  cmd::{poll::pollstate::PollState, AppInteractor},
-  emoji::EmojiLookup,
+  cmd::{poll::pollstate::PollState, AppInteractor, CallContext},
 };
-use anyhow::anyhow;
 use derive_new::new;
 use serenity::{
   all::{CommandInteraction, CommandOptionType, CommandType, ComponentInteraction},
@@ -23,7 +21,6 @@ pub const NAME: &str = "poll";
 
 #[derive(new)]
 pub struct Poll {
-  emoji: EmojiLookup,
   actor: ActorHandle<PollMessage>,
 }
 
@@ -111,15 +108,13 @@ impl Poll {
     ctx: &Context,
     itx: &CommandInteraction,
   ) -> Result<(), anyhow::Error> {
-    let guild_id = itx
-      .guild_id
-      .ok_or_else(|| anyhow!("No Guild Id on Interaction"))?;
-    let pm = self
-      .emoji
-      .get(&ctx.http, &ctx.cache, guild_id)
-      .await
-      .and_then(|emoji| PollState::from_args(ctx, emoji, itx))
-      .map(|ps| PollMessage::CreatePoll(Box::new((ps, itx.channel_id))))?;
+    let poll_state = PollState::from_args(itx)?;
+    let pm = PollMessage::CreatePoll(Box::new((
+      poll_state,
+      CallContext {
+        http: ctx.http.clone(),
+      },
+    )));
     self.actor.send(pm).await;
     let _ = itx
       .create_response(

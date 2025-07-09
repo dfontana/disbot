@@ -1,50 +1,30 @@
+use super::cache::Expiring;
+use crate::cmd::poll::NAME;
+use crate::cmd::{arg_util::Args, check_in::CheckInCtx};
+use crate::persistence::Expirable;
+use crate::types::{Chan, Guil, Pid};
 use anyhow::anyhow;
+use bincode::{Decode, Encode};
 use humantime::parse_duration;
-use serde::{Deserialize, Serialize};
-use serenity::{
-  all::CommandInteraction,
-  http::Http,
-  model::prelude::{ChannelId, Emoji},
-  prelude::Context,
-};
+use serenity::all::CommandInteraction;
 use std::{
   collections::{HashMap, HashSet},
-  sync::Arc,
   time::{Duration, SystemTime},
 };
-use tracing::{info, instrument, warn};
+use tracing::{info, instrument};
 use uuid::Uuid;
 
-use crate::{
-  cmd::{arg_util::Args, check_in::CheckInCtx, poll::NAME},
-  persistence::Expirable,
-};
-
-use super::cache::Expiring;
-
-#[derive(Clone, Serialize, Deserialize)]
-pub struct CallContext {
-  pub channel: ChannelId,
-  #[serde(skip, default = "default_http")]
-  pub http: Arc<Http>,
-  pub emoji: Emoji,
-}
-
-fn default_http() -> Arc<Http> {
-  // Gets replaced after serialization, during startup
-  Arc::new(serenity::http::Http::new(""))
-}
-
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Encode, Decode)]
 pub struct PollState {
-  pub id: Uuid,
+  pub id: Pid,
   pub duration: Duration,
   pub topic: String,
   pub longest_option: usize,
   pub most_votes: usize,
   pub votes: HashMap<String, (String, usize, HashSet<String>)>,
-  pub ctx: CallContext,
   pub created_at: SystemTime,
+  pub channel: Chan,
+  pub guild: Guil,
 }
 
 impl Expiring for PollState {
@@ -62,11 +42,11 @@ impl Expirable for PollState {
 impl From<CheckInCtx> for PollState {
   fn from(c: CheckInCtx) -> Self {
     PollState {
-      id: Uuid::new_v4(),
+      id: Pid(Uuid::new_v4()),
       duration: c.poll_dur,
       topic: format!(
         "{}Will you be on tonight? This is a legally binding.",
-        c.at_group.map(|c| format!("{} ", c)).unwrap_or("".into())
+        c.at_group.map(|c| format!("{} ", *c)).unwrap_or("".into())
       ),
       longest_option: 3,
       most_votes: 0,
@@ -74,24 +54,21 @@ impl From<CheckInCtx> for PollState {
         ("1".into(), ("Yes".into(), 0, HashSet::new())),
         ("2".into(), ("No".into(), 0, HashSet::new())),
       ]),
-      ctx: CallContext {
-        channel: c.channel,
-        http: c.http,
-        emoji: c.emoji,
-      },
       created_at: SystemTime::now(),
+      channel: c.channel,
+      guild: c.guild,
     }
   }
 }
 
 impl PollState {
-  pub fn from_args(
-    ctx: &Context,
-    emoji: Emoji,
-    itx: &CommandInteraction,
-  ) -> Result<PollState, anyhow::Error> {
+  pub fn from_args(itx: &CommandInteraction) -> Result<PollState, anyhow::Error> {
     let raw_args = &itx.data.options();
     let args = Args::from(raw_args);
+
+    let guild = itx
+      .guild_id
+      .ok_or_else(|| anyhow!("No Guild Id on Interaction"))?;
 
     let duration: Duration = args
       .str("duration")
@@ -120,18 +97,15 @@ impl PollState {
     });
 
     Ok(PollState {
-      id: Uuid::new_v4(),
+      id: Pid(Uuid::new_v4()),
       duration,
       topic,
       longest_option: opt_width,
       most_votes: 0,
       votes,
-      ctx: CallContext {
-        channel: itx.channel_id,
-        http: ctx.http.clone(),
-        emoji,
-      },
       created_at: SystemTime::now(),
+      channel: Chan(itx.channel_id),
+      guild: Guil(guild),
     })
   }
 

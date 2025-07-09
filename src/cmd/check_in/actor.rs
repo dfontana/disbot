@@ -1,46 +1,35 @@
 use crate::{
   actor::{Actor, ActorHandle},
-  cmd::{check_in::NAME, poll::PollMessage},
+  cmd::{check_in::NAME, poll::PollMessage, CallContext},
   persistence::PersistentStore,
   shutdown::ShutdownHook,
+  types::{Chan, Guil, NaiveT, Rol},
 };
 use async_trait::async_trait;
+use bincode::{Decode, Encode};
 use chrono::{DateTime, NaiveDateTime, NaiveTime, TimeZone, Utc};
 use chrono_tz::America;
 use derive_new::new;
-use serde::{Deserialize, Serialize};
-use serenity::{
-  all::Role,
-  http::Http,
-  model::prelude::{ChannelId, Emoji},
-};
+use serenity::all::GuildId;
 use std::{collections::HashMap, sync::Arc, time::Duration};
 use tokio::{sync::mpsc::Receiver, task::JoinHandle};
 use tracing::{error, info, instrument};
 
 #[derive(Clone)]
 pub enum CheckInMessage {
-  CheckIn(CheckInCtx),
-  Sleep((Duration, CheckInCtx)),
-  SetPoll(CheckInCtx),
-  RestoreConfig(Arc<serenity::http::Http>),
+  CheckIn(CheckInCtx, CallContext),
+  Sleep((Duration, CheckInCtx, CallContext)),
+  SetPoll(CheckInCtx, CallContext),
+  RestoreConfig(CallContext),
 }
 
-#[derive(new, Clone, Serialize, Deserialize)]
+#[derive(new, Clone, Encode, Decode)]
 pub struct CheckInCtx {
-  pub poll_time: NaiveTime,
+  pub poll_time: NaiveT,
   pub poll_dur: Duration,
-  pub at_group: Option<Role>,
-  pub channel: ChannelId,
-  #[serde(skip, default = "default_http")]
-  pub http: Arc<Http>,
-  pub emoji: Emoji,
-  pub guild_id: u64,
-}
-
-fn default_http() -> Arc<Http> {
-  // Gets replaced after serialization, during startup
-  Arc::new(serenity::http::Http::new(""))
+  pub at_group: Option<Rol>,
+  pub channel: Chan,
+  pub guild: Guil,
 }
 
 pub struct CheckInActor {
@@ -48,7 +37,7 @@ pub struct CheckInActor {
   receiver: Receiver<CheckInMessage>,
   poll_handle: ActorHandle<PollMessage>,
   persistence: Arc<PersistentStore>,
-  active_tasks: HashMap<u64, JoinHandle<()>>,
+  active_tasks: HashMap<GuildId, JoinHandle<()>>,
 }
 
 impl CheckInActor {
@@ -75,33 +64,30 @@ impl Actor<CheckInMessage> for CheckInActor {
   #[instrument(name = NAME, level = "INFO", skip(self, msg))]
   async fn handle_msg(&mut self, msg: CheckInMessage) {
     match msg {
-      CheckInMessage::SetPoll(ctx) => {
+      CheckInMessage::SetPoll(ctx, cctx) => {
         // Cancel any existing sleep task for this guild
-        if let Some(existing_task) = self.active_tasks.remove(&ctx.guild_id) {
+        if let Some(existing_task) = self.active_tasks.remove(&ctx.guild) {
           existing_task.abort();
-          info!(
-            "Cancelled existing check-in task for guild {}",
-            ctx.guild_id
-          );
+          info!("Cancelled existing check-in task for guild {}", *ctx.guild);
         }
 
         // Persist the check-in configuration using the guild_id from context
-        if let Err(e) = self.persistence.check_ins().save(&ctx.guild_id, &ctx) {
+        if let Err(e) = self.persistence.check_ins().save(&ctx.guild, &ctx) {
           error!(
             "Failed to persist check-in configuration for guild {}: {}",
-            ctx.guild_id, e
+            *ctx.guild, e
           );
         }
 
-        let sleep_until = time_until(Utc::now(), ctx.poll_time);
+        let sleep_until = time_until(Utc::now(), *ctx.poll_time);
         self
           .self_ref
-          .send(CheckInMessage::Sleep((sleep_until, ctx.clone())))
+          .send(CheckInMessage::Sleep((sleep_until, ctx.clone(), cctx)))
           .await;
       }
-      CheckInMessage::Sleep((sleep_until, ctx)) => {
+      CheckInMessage::Sleep((sleep_until, ctx, cctx)) => {
         let hdl = self.self_ref.clone();
-        let guild_id = ctx.guild_id;
+        let guild_id = *ctx.guild;
         info!(
           "Sleep scheduled until {}",
           Utc::now() + chrono::Duration::from_std(sleep_until).unwrap()
@@ -109,29 +95,31 @@ impl Actor<CheckInMessage> for CheckInActor {
 
         let task = tokio::spawn(async move {
           tokio::time::sleep(sleep_until).await;
-          hdl.send(CheckInMessage::CheckIn(ctx)).await
+          hdl.send(CheckInMessage::CheckIn(ctx, cctx)).await
         });
 
         // Store the task handle for potential cancellation
         self.active_tasks.insert(guild_id, task);
       }
-      CheckInMessage::CheckIn(ctx) => {
+      CheckInMessage::CheckIn(ctx, cctx) => {
         // Remove the completed task from active tasks
-        self.active_tasks.remove(&ctx.guild_id);
+        self.active_tasks.remove(&ctx.guild);
 
-        let chan = ctx.channel;
         let nw_ctx = ctx.clone();
         self
           .poll_handle
-          .send(PollMessage::CreatePoll(Box::new((ctx.into(), chan))))
+          .send(PollMessage::CreatePoll(Box::new((
+            ctx.into(),
+            cctx.clone(),
+          ))))
           .await;
-        let sleep_until = time_until(Utc::now(), nw_ctx.poll_time);
+        let sleep_until = time_until(Utc::now(), *nw_ctx.poll_time);
         self
           .self_ref
-          .send(CheckInMessage::Sleep((sleep_until, nw_ctx)))
+          .send(CheckInMessage::Sleep((sleep_until, nw_ctx, cctx)))
           .await;
       }
-      CheckInMessage::RestoreConfig(http) => {
+      CheckInMessage::RestoreConfig(cctx) => {
         let state = match self.persistence.check_ins().load_all() {
           Ok(v) => v,
           Err(e) => {
@@ -139,13 +127,16 @@ impl Actor<CheckInMessage> for CheckInActor {
             return;
           }
         };
-        for (guild_id, mut config) in state {
+        for (guild_id, config) in state {
           // Restore the Http client that was skipped during serialization
-          config.http = http.clone();
-          let sleep_until = time_until(Utc::now(), config.poll_time);
+          let sleep_until = time_until(Utc::now(), *config.poll_time);
           self
             .self_ref
-            .send(CheckInMessage::Sleep((sleep_until, config.clone())))
+            .send(CheckInMessage::Sleep((
+              sleep_until,
+              config.clone(),
+              cctx.clone(),
+            )))
             .await;
           info!("Restored check-in configuration for guild {}", guild_id);
         }
