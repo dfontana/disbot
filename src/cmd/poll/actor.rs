@@ -1,3 +1,10 @@
+use super::{cache::Cache, messages, pollstate::PollState};
+use crate::{
+  actor::{Actor, ActorHandle},
+  cmd::poll::NAME,
+  persistence::PersistentStore,
+  shutdown::ShutdownHook,
+};
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use serenity::{
@@ -5,19 +12,10 @@ use serenity::{
   builder::EditMessage,
   prelude::Context,
 };
-use std::{sync::Arc, time::SystemTime};
+use std::sync::Arc;
 use tokio::sync::mpsc::Receiver;
 use tracing::{error, info, instrument, warn};
 use uuid::Uuid;
-
-use crate::{
-  actor::{Actor, ActorHandle},
-  cmd::poll::NAME,
-  persistence::PersistentStore,
-  shutdown::ShutdownHook,
-};
-
-use super::{cache::Cache, messages, pollstate::PollState};
 
 #[derive(Clone)]
 pub enum PollMessage {
@@ -64,11 +62,6 @@ impl Actor<PollMessage> for PollActor {
         let exp_key = ps.id;
 
         // Save to persistence first
-        // TODO: This is the only time a poll is saved to disk, so any votes captured
-        //    between the time the poll was made and expired would be lost on restore.
-        //    (Verify this in dev server and then consider a fix). You likely want
-        //    to support a shutdown hook so things like polls and chat sessions
-        //    (and other handlers) can persist their state
         if let Err(e) = self.persistence.polls().save(&ps.id, &ps) {
           error!("Failed to persist poll {}: {}", ps.id, e);
         }
@@ -165,39 +158,23 @@ impl Actor<PollMessage> for PollActor {
         }
       }
       PollMessage::RestorePolls(http) => {
+        if let Err(e) = self.persistence.polls().cleanup_expired() {
+          warn!("Failed to clean up expired poll from persistence: {}", e);
+        }
         match self.persistence.polls().load_all() {
           Ok(polls) => {
             for (_, mut poll) in polls {
               // Restore the Http client that was skipped during serialization
               poll.ctx.http = http.clone();
 
-              // TODO: Should utilize the expiration feature of persistence to flush old data out on restore
-              // Check if poll has expired using checked duration calculation
-              let elapsed = SystemTime::now()
-                .duration_since(poll.created_at)
-                .unwrap_or(poll.duration);
-              if elapsed >= poll.duration {
-                if let Err(e) = self.persistence.polls().remove(&poll.id) {
-                  warn!("Failed to clean up expired poll from persistence: {}", e);
-                }
-                continue;
-              }
-
               // Restore to in-memory cache
               let poll_id = poll.id;
               if let Err(e) = self.states.insert(poll.id, poll.clone()) {
-                error!("Failed to restore poll {} to cache: {}", poll_id, e);
-                if let Err(cleanup_err) = self.persistence.polls().remove(&poll_id) {
-                  error!(
-                    "Failed to clean up unrestorable poll {} from persistence: {}",
-                    poll_id, cleanup_err
-                  );
-                }
-                continue;
+                panic!("Failed to restore poll {} to cache: {}", poll_id, e);
               }
 
               // Set up expiry timer for remaining duration using checked arithmetic
-              let remaining_duration = poll.duration - elapsed;
+              let remaining_duration = poll.duration - poll.elapsed();
               let exp_key = poll.id;
               let hdl = self.self_ref.clone();
               tokio::spawn(async move {

@@ -15,7 +15,10 @@ use std::{
 use tracing::{info, instrument, warn};
 use uuid::Uuid;
 
-use crate::cmd::{arg_util::Args, check_in::CheckInCtx, poll::NAME};
+use crate::{
+  cmd::{arg_util::Args, check_in::CheckInCtx, poll::NAME},
+  persistence::Expirable,
+};
 
 use super::cache::Expiring;
 
@@ -47,6 +50,12 @@ pub struct PollState {
 impl Expiring for PollState {
   fn duration(&self) -> Duration {
     self.duration
+  }
+}
+
+impl Expirable for PollState {
+  fn is_expired(&self) -> bool {
+    self.elapsed() >= self.duration
   }
 }
 
@@ -147,5 +156,12 @@ impl PollState {
 
   fn set_highest_vote(&mut self) {
     self.most_votes = self.votes.values().map(|e| e.1).max().unwrap_or(0);
+  }
+
+  pub fn elapsed(&self) -> Duration {
+    SystemTime::now()
+      .duration_since(self.created_at)
+      // Assume full duration elapsed if now is before created_at
+      .unwrap_or(self.duration)
   }
 }

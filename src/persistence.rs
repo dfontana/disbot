@@ -4,7 +4,6 @@ use redb::{Database, ReadableTable, TableDefinition};
 use std::fmt::Display;
 use std::marker::PhantomData;
 use std::path::Path;
-use std::time::Duration;
 use tracing::error;
 use uuid::Uuid;
 
@@ -46,7 +45,7 @@ impl Id for u64 {
 }
 
 pub trait Expirable {
-  fn is_expired(&self, timeout: Duration) -> bool;
+  fn is_expired(&self) -> bool;
 }
 
 const POLL_TABLE: TableDefinition<&str, &[u8]> = TableDefinition::new("polls");
@@ -106,12 +105,12 @@ impl<'a, K: Id, V> Handle<'a, K, V> {
 }
 
 impl<'a, K: Id + Display, V: Expirable + serde::de::DeserializeOwned> Handle<'a, K, V> {
-  pub fn cleanup_expired(&self, timeout: Duration) -> Result<usize> {
+  pub fn cleanup_expired(&self) -> Result<usize> {
     let items: Vec<(K, V)> = self.load_all()?;
     let mut removed_count = 0;
 
     for (key, item) in items {
-      if item.is_expired(timeout) {
+      if item.is_expired() {
         if let Err(e) = self.remove(&key) {
           error!("Failed to remove expired item {}: {}", key, e);
         } else {
