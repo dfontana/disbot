@@ -46,7 +46,7 @@ impl From<CheckInCtx> for PollState {
       duration: c.poll_dur,
       topic: format!(
         "{}Will you be on tonight? This is a legally binding.",
-        c.at_group.map(|c| format!("{} ", *c)).unwrap_or("".into())
+        c.at_group.map(|c| format!("{} ", c)).unwrap_or("".into())
       ),
       longest_option: 3,
       most_votes: 0,
