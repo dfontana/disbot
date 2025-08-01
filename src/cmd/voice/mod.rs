@@ -9,7 +9,7 @@ mod stop;
 use self::connect_util::{DisconnectActor, DisconnectMessage};
 use super::arg_util::Args;
 use super::{AppInteractor, SubCommandHandler};
-use crate::shutdown::ShutdownCoordinator;
+use kitchen_sink::shutdown::ShutdownCoordinator;
 use crate::{actor::ActorHandle, config::Config, emoji::EmojiLookup};
 use list::*;
 use play::*;

@@ -5,9 +5,10 @@ use self::{
 };
 use crate::{
   actor::ActorHandle, config::Config, docker::DockerClient, emoji::EmojiLookup,
-  persistence::PersistentStore, shutdown::ShutdownCoordinator,
+  persistence::PersistentStore,
 };
 use itertools::Itertools;
+use kitchen_sink::shutdown::ShutdownCoordinator;
 use reqwest::Client;
 use serenity::{
   all::{CommandInteraction, ComponentInteraction, Http, Interaction},

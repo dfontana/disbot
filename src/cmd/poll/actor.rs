@@ -4,10 +4,10 @@ use crate::{
   cmd::{poll::NAME, CallContext},
   emoji::EmojiLookup,
   persistence::PersistentStore,
-  shutdown::ShutdownHook,
 };
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
+use kitchen_sink::shutdown::ShutdownHook;
 use serenity::{
   all::{ComponentInteraction, ComponentInteractionDataKind, Emoji, GuildId},
   builder::EditMessage,

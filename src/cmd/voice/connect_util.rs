@@ -1,4 +1,6 @@
+use crate::actor::{Actor, ActorHandle};
 use derive_new::new;
+use kitchen_sink::shutdown::ShutdownHook;
 use serenity::{
   async_trait,
   http::Http,
@@ -10,11 +12,6 @@ use songbird::{Call, Event, EventContext, EventHandler};
 use std::{sync::Arc, time::Duration};
 use tokio::sync::mpsc::Receiver;
 use tracing::{info, instrument};
-
-use crate::{
-  actor::{Actor, ActorHandle},
-  shutdown::ShutdownHook,
-};
 
 #[derive(Clone)]
 pub enum DisconnectMessage {

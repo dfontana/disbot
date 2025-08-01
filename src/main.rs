@@ -10,7 +10,6 @@ mod docker;
 mod emoji;
 mod env;
 mod persistence;
-mod shutdown;
 mod types;
 mod web;
 
@@ -19,12 +18,12 @@ use cmd::Handler;
 use config::Config;
 use env::Environment;
 use kitchen_sink::logging;
+use kitchen_sink::shutdown::ShutdownCoordinator;
 use persistence::PersistentStore;
 use serenity::{
   client::Client,
   prelude::{GatewayIntents, TypeMapKey},
 };
-use shutdown::ShutdownCoordinator;
 use songbird::SerenityInit;
 use std::sync::Arc;
 use std::{path::PathBuf, str::FromStr};

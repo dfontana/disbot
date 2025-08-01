@@ -1,4 +1,4 @@
-use crate::shutdown::{ShutdownCoordinator, ShutdownHook};
+use kitchen_sink::shutdown::{ShutdownCoordinator, ShutdownHook};
 use async_trait::async_trait;
 use tokio::sync::mpsc::{self, Receiver, Sender};
 use tracing::error;
