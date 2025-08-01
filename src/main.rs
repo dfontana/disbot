@@ -9,7 +9,6 @@ mod config;
 mod docker;
 mod emoji;
 mod env;
-mod logging;
 mod persistence;
 mod shutdown;
 mod types;
@@ -19,6 +18,7 @@ use clap::Parser;
 use cmd::Handler;
 use config::Config;
 use env::Environment;
+use kitchen_sink::logging;
 use persistence::PersistentStore;
 use serenity::{
   client::Client,

@@ -1,12 +1,12 @@
+use crate::Environment;
 use anyhow::bail;
+use kitchen_sink::logging;
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
-use tracing::{info, warn};
-
-use crate::{logging, Environment};
 use std::sync::RwLock;
 use std::time::Duration;
 use std::{fs, path::Path};
+use tracing::{info, warn};
 
 static INSTANCE: Lazy<RwLock<Config>> = Lazy::new(|| RwLock::new(Config::default()));
 

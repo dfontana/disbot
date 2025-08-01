@@ -899,6 +899,7 @@ dependencies = [
  "humantime",
  "humantime-serde",
  "itertools",
+ "kitchen-sink",
  "local-ip-address",
  "once_cell",
  "openssl",
@@ -1794,6 +1795,23 @@ checksum = "1cfaf33c695fc6e08064efbc1f72ec937429614f25eef83af942d0e227c3a28f"
 dependencies = [
  "once_cell",
  "wasm-bindgen",
+]
+
+[[package]]
+name = "kitchen-sink"
+version = "0.1.0"
+source = "git+https://github.com/dfontana/kitchen-sink.git?tag=0.1#501f85f9bb786bd8b22075cb577610439eb591e7"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "futures",
+ "parking_lot",
+ "serde",
+ "tokio",
+ "tokio-util",
+ "tracing",
+ "tracing-error",
+ "tracing-subscriber",
 ]
 
 [[package]]
