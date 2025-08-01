@@ -1,6 +1,5 @@
 use super::{connect_util::DisconnectMessage, SubCommandHandler};
 use crate::{
-  actor::ActorHandle,
   cmd::{
     arg_util::Args,
     voice::connect_util::{DisconnectDetails, DisconnectEventHandler},
@@ -11,6 +10,7 @@ use crate::{
 };
 use anyhow::anyhow;
 use derive_new::new;
+use kitchen_sink::actor::ActorHandle;
 use serenity::{
   all::CommandInteraction, async_trait, builder::EditInteractionResponse, client::Context,
   utils::MessageBuilder,

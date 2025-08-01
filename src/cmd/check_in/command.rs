@@ -1,6 +1,5 @@
 use super::{CheckInCtx, CheckInMessage};
 use crate::{
-  actor::ActorHandle,
   cmd::{arg_util::Args, AppInteractor, CallContext},
   emoji::EmojiLookup,
   types::{Chan, Guil, NaiveT, Rol},
@@ -9,6 +8,7 @@ use anyhow::anyhow;
 use chrono::NaiveTime;
 use derive_new::new;
 use humantime::parse_duration;
+use kitchen_sink::actor::ActorHandle;
 use serenity::{
   all::{CommandInteraction, CommandOptionType, CommandType, Role},
   async_trait,

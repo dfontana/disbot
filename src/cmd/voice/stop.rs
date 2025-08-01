@@ -1,9 +1,7 @@
 use super::SubCommandHandler;
-use crate::{
-  actor::ActorHandle,
-  cmd::{arg_util::Args, voice::connect_util::DisconnectMessage},
-};
+use crate::cmd::{arg_util::Args, voice::connect_util::DisconnectMessage};
 use derive_new::new;
+use kitchen_sink::actor::ActorHandle;
 use serenity::{all::CommandInteraction, async_trait, client::Context};
 use tracing::info;
 

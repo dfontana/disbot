@@ -1,13 +1,12 @@
 use super::{cache::Cache, messages, pollstate::PollState};
 use crate::{
-  actor::{Actor, ActorHandle},
   cmd::{poll::NAME, CallContext},
   emoji::EmojiLookup,
   persistence::PersistentStore,
 };
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
-use kitchen_sink::shutdown::ShutdownHook;
+use kitchen_sink::{actor::Actor, actor::ActorHandle, shutdown::ShutdownHook};
 use serenity::{
   all::{ComponentInteraction, ComponentInteractionDataKind, Emoji, GuildId},
   builder::EditMessage,

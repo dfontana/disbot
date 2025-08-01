@@ -4,11 +4,10 @@ use self::{
   poll::{PollActor, PollMessage},
 };
 use crate::{
-  actor::ActorHandle, config::Config, docker::DockerClient, emoji::EmojiLookup,
-  persistence::PersistentStore,
+  config::Config, docker::DockerClient, emoji::EmojiLookup, persistence::PersistentStore,
 };
 use itertools::Itertools;
-use kitchen_sink::shutdown::ShutdownCoordinator;
+use kitchen_sink::{actor::ActorHandle, shutdown::ShutdownCoordinator};
 use reqwest::Client;
 use serenity::{
   all::{CommandInteraction, ComponentInteraction, Http, Interaction},

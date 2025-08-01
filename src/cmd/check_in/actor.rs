@@ -1,5 +1,4 @@
 use crate::{
-  actor::{Actor, ActorHandle},
   cmd::{check_in::NAME, poll::PollMessage, CallContext},
   persistence::PersistentStore,
   types::{Chan, Guil, NaiveT, Rol},
@@ -9,7 +8,10 @@ use bincode::{Decode, Encode};
 use chrono::{DateTime, NaiveDateTime, NaiveTime, TimeZone, Utc};
 use chrono_tz::America;
 use derive_new::new;
-use kitchen_sink::shutdown::ShutdownHook;
+use kitchen_sink::{
+  actor::{Actor, ActorHandle},
+  shutdown::ShutdownHook,
+};
 use serenity::all::GuildId;
 use std::{collections::HashMap, sync::Arc, time::Duration};
 use tokio::{sync::mpsc::Receiver, task::JoinHandle};

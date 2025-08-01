@@ -1,9 +1,7 @@
 use super::actor::PollMessage;
-use crate::{
-  actor::ActorHandle,
-  cmd::{poll::pollstate::PollState, AppInteractor, CallContext},
-};
+use crate::cmd::{poll::pollstate::PollState, AppInteractor, CallContext};
 use derive_new::new;
+use kitchen_sink::actor::ActorHandle;
 use serenity::{
   all::{CommandInteraction, CommandOptionType, CommandType, ComponentInteraction},
   async_trait,

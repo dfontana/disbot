@@ -1,6 +1,8 @@
-use crate::actor::{Actor, ActorHandle};
 use derive_new::new;
-use kitchen_sink::shutdown::ShutdownHook;
+use kitchen_sink::{
+  actor::{Actor, ActorHandle},
+  shutdown::ShutdownHook,
+};
 use serenity::{
   async_trait,
   http::Http,

@@ -1,6 +1,7 @@
 use super::{check_in::CheckInMessage, poll::PollMessage};
-use crate::{actor::ActorHandle, cmd::CallContext};
+use crate::cmd::CallContext;
 use derive_new::new;
+use kitchen_sink::actor::ActorHandle;
 use serenity::{model::gateway::Ready, prelude::Context};
 use tracing::{info, instrument};
 
