@@ -49,8 +49,8 @@ impl AppInteractor for Poll {
       command = command.add_option(
         CreateCommandOption::new(
           CommandOptionType::String,
-          format!("option_{}", i),
-          format!("Option to add to poll #{}", i),
+          format!("option_{i}"),
+          format!("Option to add to poll #{i}"),
         )
         .required(true),
       );
@@ -60,8 +60,8 @@ impl AppInteractor for Poll {
       command = command.add_option(
         CreateCommandOption::new(
           CommandOptionType::String,
-          format!("option_{}", i),
-          format!("Option to add to poll #{}", i),
+          format!("option_{i}"),
+          format!("Option to add to poll #{i}"),
         )
         .required(false),
       );
@@ -79,7 +79,7 @@ impl AppInteractor for Poll {
       let _ = itx
         .edit_response(
           &ctx.http,
-          EditInteractionResponse::new().content(format!("{}", e)),
+          EditInteractionResponse::new().content(format!("{e}")),
         )
         .await;
     }

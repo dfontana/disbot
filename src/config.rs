@@ -180,9 +180,9 @@ pub enum ValidationError {
 impl std::fmt::Display for ValidationError {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     match self {
-      ValidationError::EmoteName(msg) => write!(f, "Invalid emote name: {}", msg),
-      ValidationError::LogLevel(msg) => write!(f, "Invalid log level: {}", msg),
-      ValidationError::Timeout(msg) => write!(f, "Invalid timeout: {}", msg),
+      ValidationError::EmoteName(msg) => write!(f, "Invalid emote name: {msg}"),
+      ValidationError::LogLevel(msg) => write!(f, "Invalid log level: {msg}"),
+      ValidationError::Timeout(msg) => write!(f, "Invalid timeout: {msg}"),
     }
   }
 }

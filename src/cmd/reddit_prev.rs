@@ -91,10 +91,7 @@ impl RedditPreviewHandler {
   async fn get_api_details(&self, entity: &str) -> Result<Content, anyhow::Error> {
     let mut req: RedditApi = self
       .http
-      .get(format!(
-        "https://www.reddit.com/api/info.json?id={}",
-        entity
-      ))
+      .get(format!("https://www.reddit.com/api/info.json?id={entity}"))
       .send()
       .await?
       .json::<RedditApi>()
@@ -200,8 +197,8 @@ impl MessageListener for RedditPreviewHandler {
     let postid = cap_dict.get("postid").unwrap();
     let maybe_commid = cap_dict.get("commentid");
     let entity = match maybe_commid {
-      Some(commid) => format!("t1_{}", commid),
-      None => format!("t3_{}", postid),
+      Some(commid) => format!("t1_{commid}"),
+      None => format!("t3_{postid}"),
     };
     let content = self.get_api_details(&entity).await?;
     if content.ctype.is_empty() || content.ctype == "Video" {

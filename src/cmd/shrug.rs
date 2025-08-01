@@ -32,7 +32,7 @@ impl ShrugHandler {
         name: Some(emoji.name.to_string()),
       },
     );
-    let message = msg.channel_id.say(&ctx.http, format!("{}", emoji));
+    let message = msg.channel_id.say(&ctx.http, format!("{emoji}"));
     tokio::try_join!(react, message)
       .map(|_| ())
       .map_err(|_| anyhow!("Failed to react/Send"))

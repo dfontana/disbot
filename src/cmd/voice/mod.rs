@@ -149,7 +149,7 @@ impl AppInteractor for Voice {
       let _ = itx
         .edit_response(
           &ctx.http,
-          EditInteractionResponse::new().content(format!("{}", e)),
+          EditInteractionResponse::new().content(format!("{e}")),
         )
         .await;
     }

@@ -48,7 +48,7 @@ impl AppInteractor for DiceRoll {
   async fn app_interact(&self, ctx: &Context, itx: &CommandInteraction) {
     let mut err = false;
     if let Err(e) = self._handle_app(ctx, itx).await {
-      error!("Failed to roll {:?}", e);
+      error!("Failed to roll {e:?}");
       err = true;
     }
     if err {
@@ -61,7 +61,7 @@ impl AppInteractor for DiceRoll {
         )
         .await
       {
-        error!("Failed to notify app failed {:?}", e);
+        error!("Failed to notify app failed {e:?}");
       }
     }
   }
@@ -93,7 +93,7 @@ impl DiceRoll {
         itx
           .edit_response(
             &ctx.http,
-            EditInteractionResponse::new().content(format!("{}", e)),
+            EditInteractionResponse::new().content(format!("{e}")),
           )
           .await?;
         return Ok(());
@@ -125,7 +125,7 @@ impl DiceRoll {
       .push(" ")
       .emoji(&emoji)
       .push(" ")
-      .push_mono(format!("({} - {})", lower, upper))
+      .push_mono(format!("({lower} - {upper})"))
       .build();
 
     itx

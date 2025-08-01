@@ -16,11 +16,11 @@ fn format_duration_clean(duration: Duration) -> String {
   let minutes = (total_seconds % 3600) / 60;
   let seconds = total_seconds % 60;
   match (hours, minutes, seconds) {
-    (h, m, s) if h > 0 && s > 0 => format!("{}h {}m {}s", h, m, s),
-    (h, m, _) if h > 0 => format!("{}h {}m", h, m),
-    (_, m, s) if m > 0 && s > 0 => format!("{}m {}s", m, s),
-    (_, m, _) if m > 0 => format!("{}m", m),
-    (_, _, s) => format!("{}s", s),
+    (h, m, s) if h > 0 && s > 0 => format!("{h}h {m}m {s}s"),
+    (h, m, _) if h > 0 => format!("{h}h {m}m"),
+    (_, m, s) if m > 0 && s > 0 => format!("{m}m {s}s"),
+    (_, m, _) if m > 0 => format!("{m}m"),
+    (_, _, s) => format!("{s}s"),
   }
 }
 

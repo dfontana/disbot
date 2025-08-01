@@ -33,11 +33,8 @@ pub async fn start_server(
     WebBindAddress::Ip(ip) => ip,
   };
 
-  let listener = tokio::net::TcpListener::bind(format!("{}:{}", resolved_address, port)).await?;
-  println!(
-    "Admin web server running on http://{}:{}/admin",
-    resolved_address, port
-  );
+  let listener = tokio::net::TcpListener::bind(format!("{resolved_address}:{port}")).await?;
+  println!("Admin web server running on http://{resolved_address}:{port}/admin");
 
   axum::serve(listener, app)
     .with_graceful_shutdown(async move {

@@ -46,7 +46,7 @@ impl From<CheckInCtx> for PollState {
       duration: c.poll_dur,
       topic: format!(
         "{}Will you be on tonight? This is a legally binding.",
-        c.at_group.map(|c| format!("{} ", c)).unwrap_or("".into())
+        c.at_group.map(|c| format!("{c} ")).unwrap_or("".into())
       ),
       longest_option: 3,
       most_votes: 0,
@@ -81,7 +81,7 @@ impl PollState {
       .map(|s| s.to_string())?;
 
     let items: Vec<String> = { 0..9 }
-      .map(|i| format!("option_{}", i))
+      .map(|i| format!("option_{i}"))
       .filter_map(|key| args.str(&key).ok())
       .map(|s| s.to_string())
       .collect();

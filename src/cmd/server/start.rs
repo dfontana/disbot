@@ -46,18 +46,18 @@ impl SubCommandHandler for Start {
         return send_error_response(
           ctx,
           itx,
-          format!("Server in state that can't be started: {}", s),
+          format!("Server in state that can't be started: {s}"),
         )
         .await;
       }
       Err(e) => {
-        return send_error_response(ctx, itx, format!("{}", e)).await;
+        return send_error_response(ctx, itx, format!("{e}")).await;
       }
     }
 
     match self.docker.start(name).await {
       Ok(_) => send_error_response(ctx, itx, "Server starting".to_string()).await,
-      Err(e) => send_error_response(ctx, itx, format!("{}", e)).await,
+      Err(e) => send_error_response(ctx, itx, format!("{e}")).await,
     }
   }
 }

@@ -40,7 +40,7 @@ impl SubCommandHandler for Stop {
 
     match self.docker.stop(name).await {
       Ok(_) => send_response(ctx, itx, "Server stopped".to_string()).await,
-      Err(e) => send_response(ctx, itx, format!("{}", e)).await,
+      Err(e) => send_response(ctx, itx, format!("{e}")).await,
     }
   }
 }

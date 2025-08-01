@@ -181,7 +181,7 @@ impl Actor<PollMessage> for PollActor {
               // Restore to in-memory cache
               let poll_id = *poll.id;
               if let Err(e) = self.states.insert(*poll.id, poll.clone()) {
-                panic!("Failed to restore poll {} to cache: {}", poll_id, e);
+                panic!("Failed to restore poll {poll_id} to cache: {e}");
               }
 
               // Set up expiry timer for remaining duration using checked arithmetic

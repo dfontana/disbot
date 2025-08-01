@@ -69,7 +69,7 @@ impl AppInteractor for CheckIn {
       let _ = itx
         .edit_response(
           &ctx.http,
-          EditInteractionResponse::new().content(format!("{}", e)),
+          EditInteractionResponse::new().content(format!("{e}")),
         )
         .await;
     }

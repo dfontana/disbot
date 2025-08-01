@@ -88,7 +88,7 @@ async fn wrapped_handle(
       let handler_lock = manager
         .join(guild_id, channel_id)
         .await
-        .map_err(|e| anyhow!("Error joining voice channel").context(format!("{:?}", e)))?;
+        .map_err(|e| anyhow!("Error joining voice channel").context(format!("{e:?}")))?;
 
       // Register an event handler to listen for the duration of the call
       DisconnectEventHandler::register(

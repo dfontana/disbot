@@ -95,7 +95,7 @@ pub async fn post_admin(
           Ok(_) => Ok(()),
           Err(e) => {
             // Rollback not needed since we haven't persisted the changes
-            Err(format!("Failed to save configuration: {}", e))
+            Err(format!("Failed to save configuration: {e}"))
           }
         }
       }

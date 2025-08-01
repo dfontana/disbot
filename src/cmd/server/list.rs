@@ -26,7 +26,7 @@ impl SubCommandHandler for List {
   ) -> Result<(), anyhow::Error> {
     let msg = match build_list_msg(&**self.docker).await {
       Ok(mut m) => m.build(),
-      Err(e) => format!("Failed to list docker containers: {}", e),
+      Err(e) => format!("Failed to list docker containers: {e}"),
     };
     itx
       .edit_response(&ctx.http, EditInteractionResponse::new().content(msg))
@@ -59,7 +59,7 @@ async fn build_list_msg(docker: &dyn DockerClient) -> Result<MessageBuilder, any
         summary
           .state
           .as_ref()
-          .map(|s| format!("{:?}", s))
+          .map(|s| format!("{s:?}"))
           .unwrap_or_else(|| "(No State)".into()),
       ));
       acc
