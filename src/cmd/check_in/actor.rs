@@ -14,7 +14,8 @@ use kitchen_sink::{
 };
 use serenity::all::GuildId;
 use std::{collections::HashMap, sync::Arc, time::Duration};
-use tokio::{sync::mpsc::Receiver, task::JoinHandle};
+use tokio::sync::mpsc::Receiver;
+use tokio_util::sync::{CancellationToken, DropGuard};
 use tracing::{error, info, instrument};
 
 #[derive(Clone)]
@@ -39,7 +40,7 @@ pub struct CheckInActor {
   receiver: Receiver<CheckInMessage>,
   poll_handle: ActorHandle<PollMessage>,
   persistence: Arc<PersistentStore>,
-  active_tasks: HashMap<GuildId, JoinHandle<()>>,
+  active_tasks: HashMap<GuildId, DropGuard>,
 }
 
 impl CheckInActor {
@@ -68,8 +69,8 @@ impl Actor<CheckInMessage> for CheckInActor {
     match msg {
       CheckInMessage::SetPoll(ctx, cctx) => {
         // Cancel any existing sleep task for this guild
-        if let Some(existing_task) = self.active_tasks.remove(&ctx.guild) {
-          existing_task.abort();
+        if let Some(t) = self.active_tasks.remove(&ctx.guild) {
+          drop(t);
           info!("Cancelled existing check-in task for guild {}", *ctx.guild);
         }
 
@@ -95,17 +96,31 @@ impl Actor<CheckInMessage> for CheckInActor {
           Utc::now() + chrono::Duration::from_std(sleep_until).unwrap()
         );
 
-        let task = tokio::spawn(async move {
-          tokio::time::sleep(sleep_until).await;
-          hdl.send(CheckInMessage::CheckIn(ctx, cctx)).await
+        let token = CancellationToken::new();
+        let signal = token.clone();
+        let guard = token.drop_guard();
+        tokio::spawn(async move {
+          tokio::select! {
+            biased;
+            _ = signal.cancelled() => {
+              // Cancellation always wins if both are ready
+            }
+            _ = tokio::time::sleep(sleep_until) => {
+              hdl.send(CheckInMessage::CheckIn(ctx, cctx)).await
+            }
+          }
         });
 
         // Store the task handle for potential cancellation
-        self.active_tasks.insert(guild_id, task);
+        self.active_tasks.insert(guild_id, guard);
       }
       CheckInMessage::CheckIn(ctx, cctx) => {
         // Remove the completed task from active tasks
-        self.active_tasks.remove(&ctx.guild);
+        if let None = self.active_tasks.remove(&ctx.guild) {
+          // There was no task in the map, this suggests someone else came in and cleared out already
+          // Do nothing! They handled it.
+          return;
+        }
 
         let nw_ctx = ctx.clone();
         self
@@ -125,12 +140,17 @@ impl Actor<CheckInMessage> for CheckInActor {
         let state = match self.persistence.check_ins().load_all() {
           Ok(v) => v,
           Err(e) => {
-            error!("Failed to load check-in state {}", e);
+            error!("Failed to load check-in state {e}");
             return;
           }
         };
         for (guild_id, config) in state {
           // Restore the Http client that was skipped during serialization
+          if let Some(t) = self.active_tasks.remove(&guild_id) {
+            // (This could happen if restore happens from bot restart)
+            drop(t);
+            info!("Cancelled existing check-in task for guild {guild_id} during restore");
+          }
           let sleep_until = time_until(Utc::now(), *config.poll_time);
           self
             .self_ref
@@ -140,7 +160,7 @@ impl Actor<CheckInMessage> for CheckInActor {
               cctx.clone(),
             )))
             .await;
-          info!("Restored check-in configuration for guild {}", guild_id);
+          info!("Restored check-in configuration for guild {guild_id}");
         }
       }
     }
