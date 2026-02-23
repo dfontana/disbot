@@ -68,8 +68,8 @@ Install required dependencies for the songbird functionality to work:
 
 ```
 apt install libopus-dev ffmpeg
-sudo curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o /usr/local/bin/yt-dlp
-sudo chmod a+rx /usr/local/bin/yt-dlp
+sudo curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o ~/.local/bin/yt-dlp
+sudo chmod a+rx ~/.local/bin/yt-dlp
 ```
 
 (If you need to update `yt-dlp` use the `-U` flag)
@@ -81,6 +81,7 @@ sudo chmod a+rx /usr/local/bin/yt-dlp
 mkdir -p ~/.config/systemd/user
 
 # Create service file (you might repeat for dev)
+# (replace the %i with your user name)
 cat > ~/.config/systemd/user/disbot-prod.service << 'EOF'
 [Unit]
 Description=Disbot Service File
@@ -90,11 +91,34 @@ After=network.target
 Type=simple
 Restart=always
 RestartSec=1
-ExecStart=/home/%i/deploy/disbot-prod prod
+ExecStart=/home/%i/deploy/disbot-prod prod --web-bind-address lan
 WorkingDirectory=/home/%i/deploy
+Environment="PATH=/usr/local/bin:/usr/bin:/home/%i/.local/bin"
 
 [Install]
 WantedBy=default.target
+EOF
+
+# Create a timer to keep yt-dlp updated (optional but helpful)
+cat > ~/.config/systemd/user/yt-dlp-update.service << 'EOF'
+[Unit]
+Description=Update yt-dlp
+
+[Service]
+Type=oneshot
+ExecStart=/home/%i/.local/bin/yt-dlp --update
+EOF
+
+cat > ~/.config/systemd/user/yt-dlp-update.timer << 'EOF'
+[Unit]
+Description=Run yt-dlp update daily at 9 AM
+
+[Timer]
+OnCalendar=*-*-* 09:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target
 EOF
 ```
 
