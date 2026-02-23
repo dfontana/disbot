@@ -2,13 +2,14 @@ pub mod handlers;
 pub mod templates;
 
 use crate::{persistence::PersistentStore, WebBindAddress};
-use axum::{routing::get, Extension, Router};
+use axum::{response::Redirect, routing::get, Extension, Router};
 use std::sync::Arc;
 use tokio_util::sync::CancellationToken;
 use tracing::info;
 
 pub fn create_router(config_path: String, persistence: Arc<PersistentStore>) -> Router {
   Router::new()
+    .route("/", get(|| async { Redirect::permanent("/admin") }))
     .route(
       "/admin",
       get(handlers::get_admin).post(handlers::post_admin),

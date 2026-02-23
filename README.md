@@ -145,6 +145,28 @@ sudo firewall-cmd --permanent --add-port=3450/tcp
 sudo firewall-cmd --reload
 ```
 
+### Accessing the Admin UI
+
+When the bot starts successfully, it prints the admin URL to stdout:
+
+```
+Admin web server running on http://<address>:3450/admin
+```
+
+Check the logs to find the exact URL:
+
+```bash
+journalctl --user -u disbot-prod -f
+```
+
+**Default access** (when no `--web-bind-address` is set, binds to all interfaces):
+
+```
+http://localhost:3450/admin
+```
+
+**With `--web-bind-address lan`** (as used in the systemd service): the bot binds to your machine's LAN IP. The exact URL is printed in the logs on startup — look for the `Admin web server running on` line and open that URL from any device on the same network.
+
 ### Docker interactions
 
 For docker interactions to work over the local network you'll need to edit the systemd service to enable TCP access over the local network:
