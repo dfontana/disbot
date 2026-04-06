@@ -1,12 +1,13 @@
 #!/bin/bash
 # Cross compile to linux x86_64; should run from root of repo
 TARGET=x86_64-unknown-linux-musl
-export TARGET_CC=$TARGET-gcc
-export TARGET_AR=$TARGET-ar
-export CC_x86_64_unknown_linux_musl=$TARGET-gcc
-export CXX_x86_64_unknown_linux_musl=$TARGET-g++
-export AR_x86_64_unknown_linux_musl=$TARGET-ar
-export CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_LINKER=$TARGET-gcc
+TOOL_PREFIX=x86_64-linux-musl
+export TARGET_CC=$TOOL_PREFIX-gcc
+export TARGET_AR=$TOOL_PREFIX-ar
+export CC_x86_64_unknown_linux_musl=$TOOL_PREFIX-gcc
+export CXX_x86_64_unknown_linux_musl=$TOOL_PREFIX-g++
+export AR_x86_64_unknown_linux_musl=$TOOL_PREFIX-ar
+export CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_LINKER=$TOOL_PREFIX-gcc
 export CMAKE_TOOLCHAIN_FILE_x86_64_unknown_linux_musl=$(pwd)/bin/x86_64.cmake
 export CMAKE_x86_64_unknown_linux_musl=$(pwd)/bin/cmake-wrapper
 export CXX_x86_64_unknown_linux_musl=$(pwd)/bin/g++-wrapper

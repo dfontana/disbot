@@ -1,5 +1,5 @@
 set(CMAKE_SYSTEM_NAME Linux)
-set(CMAKE_SYSROOT /opt/homebrew/Cellar/x86_64-unknown-linux-musl/13.3.0/toolchain/x86_64-unknown-linux-musl/sysroot/)
+set(CMAKE_SYSROOT /opt/homebrew/Cellar/musl-cross/0.9.11/libexec/x86_64-linux-musl)
 set(tools /opt/homebrew/bin)
-set(CMAKE_C_COMPILER /opt/homebrew/bin/x86_64-unknown-linux-musl-gcc)
-set(CMAKE_CXX_COMPILER /opt/homebrew/bin/x86_64-unknown-linux-musl-g++)
+set(CMAKE_C_COMPILER /opt/homebrew/bin/x86_64-linux-musl-gcc)
+set(CMAKE_CXX_COMPILER /opt/homebrew/bin/x86_64-linux-musl-g++)

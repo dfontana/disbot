@@ -26,13 +26,13 @@ For ArmV7 (eg Raspberry Pi) or `x86_64` Linux (eg Linux Server).
   ```
   - Note: Running `./bin/deploy` WILL do this for you
 - __Native Toolchains__ (Eg from an aarch64 machine)
-  - Uses [`messense/homebrew-macos-cross-toolchains`](https://github.com/messense/homebrew-macos-cross-toolchains)
+  - Uses [`filosottile/musl-cross`](https://github.com/FiloSottile/homebrew-musl-cross)
   ```
-  brew tap messense/macos-cross-toolchains
-  brew install armv7-unknown-linux-gnueabihf x86_64-unknown-linux-musl
+  brew install filosottile/musl-cross/musl-cross
   ./bin/build_for_arm
   ./bin/build_for_x86_64
   ```
+  - Note: tools are installed as `x86_64-linux-musl-gcc` (without `unknown` in the prefix)
 - __Native__ (Eg Machine matches host)
   - When native hosts matches deploy host, can just run `cargo build --release`
 

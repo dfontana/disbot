@@ -7,4 +7,4 @@ for arg in "$@"; do
         args+=("$arg")
     fi
 done
-exec x86_64-unknown-linux-musl-g++ "${args[@]}"
+exec x86_64-linux-musl-g++ "${args[@]}"
