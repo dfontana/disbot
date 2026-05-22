@@ -91,8 +91,8 @@ After=network.target
 Type=simple
 Restart=always
 RestartSec=1
-ExecStart=/home/%i/deploy/disbot-prod prod --web-bind-address lan
-WorkingDirectory=/home/%i/deploy
+ExecStart=/home/%i/servers/disbot/disbot-prod prod --web-bind-address lan
+WorkingDirectory=/home/%i/servers/disbot
 Environment="PATH=/usr/local/bin:/usr/bin:/home/%i/.local/bin"
 
 [Install]
