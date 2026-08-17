@@ -136,7 +136,11 @@ async fn wrapped_handle(
   let resolved_src = match is_url {
     false => YoutubeDl::new_search(http_client, searchterm),
     true => YoutubeDl::new(http_client, searchterm),
-  };
+  }
+  .user_args(vec![
+    "--extractor-args".to_string(),
+    "youtube:player_client=android,web".to_string(),
+  ]);
   let mut input = Input::from(resolved_src);
 
   let list_metadata = input
