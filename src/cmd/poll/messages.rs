@@ -59,7 +59,7 @@ pub fn build_poll_message(ps: &PollState, emoji: &Emoji) -> String {
     .push_codeblock(
       format!(
         "{}\n\nVoters:\n{}",
-        &bar_vec.join("\n"),
+        bar_vec.join("\n"),
         voter_vec.join("\n")
       ),
       Some("m"),

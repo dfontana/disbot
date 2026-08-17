@@ -54,6 +54,7 @@ impl_encode!(Rol, |s| s.0.get());
 impl_decode!(Rol, |d| RoleId::new(d));
 impl_borrow_decode!(Rol);
 
+#[allow(dead_code)]
 #[derive(Clone, Deref)]
 pub struct Emoj(pub EmojiId);
 impl_encode!(Emoj, |s| s.0.get());

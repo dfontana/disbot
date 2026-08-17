@@ -67,6 +67,7 @@ impl<'a, K: Id, V: Encode> Handle<'a, K, V> {
 }
 
 impl<'a, K: Id, V: Decode<()>> Handle<'a, K, V> {
+  #[allow(dead_code)]
   pub fn load(&self, key: &K) -> Result<Option<V>> {
     let read_txn = self.db.begin_read()?;
     let table_handle = read_txn.open_table(self.table)?;

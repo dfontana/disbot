@@ -101,10 +101,12 @@ async fn wrapped_handle(
       // Inform disconnect of where to disconnect from
       play
         .disconnect
-        .send(DisconnectMessage::Details(DisconnectDetails::new(
-          handler_lock.clone(),
-          ctx.http.clone(),
-          play.emoji.get(&ctx.http, guild_id).await?,
+        .send(DisconnectMessage::Details(Box::new(
+          DisconnectDetails::new(
+            handler_lock.clone(),
+            ctx.http.clone(),
+            play.emoji.get(&ctx.http, guild_id).await?,
+          ),
         )))
         .await;
 

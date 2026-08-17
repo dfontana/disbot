@@ -19,7 +19,7 @@ use tracing::{info, instrument};
 pub enum DisconnectMessage {
   Enqueue,
   Dequeue,
-  Details(DisconnectDetails),
+  Details(Box<DisconnectDetails>),
   Disconnect(bool), // Forced = true
 }
 
@@ -50,7 +50,7 @@ impl Actor<DisconnectMessage> for DisconnectActor {
       DisconnectMessage::Dequeue => self.in_progress_count -= 1,
       DisconnectMessage::Details(det) => {
         let mut det_lock = self.disconnect_details.lock().await;
-        *det_lock = Some(det);
+        *det_lock = Some(*det);
       }
       DisconnectMessage::Disconnect(forced) => self.disconnect(forced).await,
     }

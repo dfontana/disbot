@@ -116,7 +116,7 @@ impl Actor<CheckInMessage> for CheckInActor {
       }
       CheckInMessage::CheckIn(ctx, cctx) => {
         // Remove the completed task from active tasks
-        if let None = self.active_tasks.remove(&ctx.guild) {
+        if self.active_tasks.remove(&ctx.guild).is_none() {
           // There was no task in the map, this suggests someone else came in and cleared out already
           // Do nothing! They handled it.
           return;
