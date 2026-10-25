@@ -34,8 +34,7 @@ impl EmojiLookup {
 }
 
 #[cached(
-  time = 600,
-  result = true,
+  ttl_secs = 600,
   key = "String",
   convert = r##"{format!("{}:{}", guild_id, name)}"##
 )]

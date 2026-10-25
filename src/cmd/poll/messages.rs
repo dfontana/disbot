@@ -71,7 +71,7 @@ pub async fn send_poll_message(
   ps: &PollState,
   ctx: &CallContext,
   emoji: &Emoji,
-) -> serenity::Result<()> {
+) -> anyhow::Result<()> {
   ps.channel
     .send_message(
       &ctx.http,
@@ -102,8 +102,8 @@ pub async fn send_poll_message(
           .max_values(ps.votes.len() as u8),
         ),
     )
-    .await
-    .map(|_| ())
+    .await?;
+  Ok(())
 }
 
 pub fn build_exp_message(ps: &PollState, emoji: &Emoji) -> String {

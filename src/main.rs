@@ -1,3 +1,6 @@
+// `derive-new` generates redundant field names in constructor initializers.
+#![allow(clippy::redundant_field_names)]
+
 extern crate hex;
 extern crate rand;
 extern crate regex;

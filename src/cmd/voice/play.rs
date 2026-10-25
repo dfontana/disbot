@@ -6,7 +6,6 @@ use crate::{
   },
   config::Config,
   emoji::EmojiLookup,
-  HttpClient,
 };
 use anyhow::anyhow;
 use derive_new::new;
@@ -125,13 +124,7 @@ async fn wrapped_handle(
   };
 
   // Queue up the source
-  let http_client = {
-    let data = ctx.data.read().await;
-    data
-      .get::<HttpClient>()
-      .cloned()
-      .ok_or_else(|| anyhow!("HttpClient not found in typemap"))?
-  };
+  let http_client = reqwest::Client::new();
   let is_url = searchterm.starts_with("http");
   let resolved_src = match is_url {
     false => YoutubeDl::new_search(http_client, searchterm),

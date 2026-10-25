@@ -2,7 +2,7 @@ use super::{arg_util::Args, AppInteractor};
 use crate::emoji::EmojiLookup;
 use anyhow::anyhow;
 use derive_new::new;
-use rand::Rng;
+use rand::RngExt;
 use serenity::{
   all::{CommandInteraction, CommandOptionType, CommandType, CreateCommandOption},
   async_trait,

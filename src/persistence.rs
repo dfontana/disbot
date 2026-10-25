@@ -1,7 +1,7 @@
 use crate::cmd::{check_in::CheckInCtx, poll::pollstate::PollState};
 use anyhow::{anyhow, Result};
 use bincode::{Decode, Encode};
-use redb::{Database, ReadableTable, TableDefinition};
+use redb::{Database, ReadableDatabase, ReadableTable, TableDefinition};
 use serenity::all::GuildId;
 use std::fmt::Display;
 use std::marker::PhantomData;
