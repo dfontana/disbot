@@ -126,13 +126,16 @@ async fn wrapped_handle(
   // Queue up the source
   let http_client = reqwest::Client::new();
   let is_url = searchterm.starts_with("http");
+  // Keep current defaults alongside the android/web SABR workaround (2cab42ac).
   let resolved_src = match is_url {
     false => YoutubeDl::new_search(http_client, searchterm),
     true => YoutubeDl::new(http_client, searchterm),
   }
   .user_args(vec![
+    // Validate the media URL before handing it to Songbird (avoids immediate 403s).
+    "--check-formats".to_string(),
     "--extractor-args".to_string(),
-    "youtube:player_client=android,web".to_string(),
+    "youtube:player_client=default,android,web".to_string(),
   ]);
   let mut input = Input::from(resolved_src);
 
